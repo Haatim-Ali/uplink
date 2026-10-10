@@ -343,3 +343,11 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .outcome.majority{background:var(--brand-soft);border-left-color:var(--brand)}
 /* laptop widths: keep the nav on one row (the mode label stays visible on wide/projector screens) */
 @media (max-width:1500px) and (min-width:761px){.badge-mode{display:none}.nav-in{gap:.75rem;flex-wrap:nowrap}.nav-right{flex-wrap:nowrap}.navlink{white-space:nowrap}}
+
+/* each agent's latest line, shown on its card while the debate plays */
+.agent .says{margin-top:.55rem;padding:.5rem .6rem;border-radius:10px;background:var(--bg,#f1f5f9);font-size:.86rem;line-height:1.35;color:var(--ink-2,#334155);font-style:italic;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.agent .says.objection{background:#fef2f2;color:#7f1d1d}
+.agent .says.now{outline:2px solid var(--ink-2,#334155);outline-offset:1px;animation:saysIn .35s ease-out}
+.agent.Speed .says.now{outline-color:var(--speed)}.agent.Cost .says.now{outline-color:var(--cost)}.agent.Need .says.now{outline-color:var(--need)}
+@keyframes saysIn{from{transform:translateY(4px);opacity:.3}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.agent .says.now{animation:none}}

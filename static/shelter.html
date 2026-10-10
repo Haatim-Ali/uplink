@@ -6,7 +6,10 @@
 <title>Uplink · Shelter phone</title>
 <link rel="stylesheet" href="/static/uplink.css">
 <style>
-.pick-card{margin-top:var(--s4)}
+.demo-pick{margin-top:var(--s5);padding:var(--s3) 0;border-top:1px dashed var(--line-2);color:var(--muted);font-size:var(--t-sm)}
+.demo-pick summary{cursor:pointer;font-weight:600}
+.demo-pick select{margin-top:var(--s1)}
+.full-note{margin-top:var(--s3);padding:var(--s3);border-radius:var(--r2);background:#fef2f2;color:#7f1d1d;font-size:var(--t-sm);font-weight:600}
 .who-h{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center;margin-top:var(--s3)}
 .who-h h1{font-size:var(--t-xl);line-height:1.2;letter-spacing:-.01em}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2);margin-top:var(--s3)}
@@ -52,16 +55,10 @@
 </style>
 </head>
 <body>
-<div class="phone-top"><div class="in"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↑</span>Uplink</a><span class="where">Shelter phone · sim time <b id="now">--:--</b></span></div></div>
+<div class="phone-top"><div class="in"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↑</span>Uplink</a><span class="where">For shelters · <b id="now">--:--</b></span></div></div>
 <div class="wrap">
-  <div class="card pick-card">
-    <label for="pick" style="margin-top:0">You are answering for</label>
-    <select id="pick"></select>
-    <p class="hint">When the agents choose this shelter, the request appears below. You decide, just like a real shelter would.</p>
-    <div class="vbar"><button class="btn sm" id="vt" type="button" aria-pressed="false">🔈 Voice off</button><span class="hint" id="vnote">Turn on to hear requests and answer out loud.</span></div>
-  </div>
-
   <div class="who-h"><h1 id="title">Shelter phone</h1><span id="status"></span></div>
+  <div class="vbar"><button class="btn sm" id="vt" type="button" aria-pressed="false">🔈 Read requests aloud</button><span class="hint" id="vnote"></span></div>
   <div class="stats" id="stats" aria-label="Shelter status"></div>
 
   <div class="sec" id="asks" aria-live="assertive"></div>
@@ -69,6 +66,13 @@
   <div class="card sec"><h2 class="card-title">On the way</h2><div class="list" id="coming"></div></div>
   <div class="card sec"><h2 class="card-title">Received today</h2><div class="list" id="got"></div></div>
   <div class="err hidden" id="neterr" role="status">Lost connection. Retrying…</div>
+
+  <details class="demo-pick">
+    <summary>Demo: switch shelter</summary>
+    <label for="pick">Answer as</label>
+    <select id="pick"></select>
+    <p class="hint">In real use each shelter has its own phone. For the demo, pick which one this screen answers for.</p>
+  </details>
 </div>
 <script>
 const $ = id => document.getElementById(id);
@@ -97,11 +101,11 @@ async function poll(){
   const n = s.nonprofit;
   $("now").textContent = s.now || "--:--";
   $("title").textContent = n.name;
-  $("status").innerHTML = n.full ? `<span class="pill bad">✕ Full</span>` : `<span class="pill ok">● Open until ${esc(n.open_until)}</span>`;
-  const pct = Math.min(100, Math.round(100 * n.received / (n.capacity_servings || 1)));
-  $("stats").innerHTML = `<div class="stat"><b>${n.received}/${n.capacity_servings}</b><span>servings received</span><div class="cap" aria-hidden="true"><i style="width:${pct}%"></i></div></div>
-    <div class="stat"><b>${n.has_fridge ? "Yes" : "No"}</b><span>fridge</span></div>
-    <div class="stat"><b>${s.coming.length}</b><span>on the way</span></div>`;
+  $("status").innerHTML = n.full ? `<span class="pill bad">Not taking food</span>` : `<span class="pill ok">● Open until ${esc(n.open_until)}</span>`;
+  $("stats").innerHTML = `<div class="stat"><b>${n.received}</b><span>servings today</span></div>
+    <div class="stat"><b>${s.coming.length}</b><span>on the way</span></div>
+    <div class="stat"><b>${n.has_fridge ? "Yes" : "No"}</b><span>fridge</span></div>` +
+    (n.full ? `<div class="full-note" style="grid-column:1/-1">You're marked as full, so we won't send you requests for now.</div>` : "");
   const askKey = s.asks.map(a => a.donation).join(",");
   if(askKey !== lastAsks){
     if(askKey && !lastAsks && navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -110,13 +114,13 @@ async function poll(){
       <span class="ask-tag">New donation request</span>
       <h3>${a.food.servings} servings of ${esc(a.food.items.join(", "))}</h3>
       <div class="tags"><span class="pill outline">${esc(a.food.category)}</span>${a.food.needs_cold?'<span class="pill info">❄ Must stay cold</span>':""}${a.food.allergens.length?`<span class="pill warn">⚠ Contains ${esc(a.food.allergens.join(", "))}</span>`:'<span class="pill ok">No listed allergens</span>'}</div>
-      <dl><dt>From</dt><dd>${esc(a.business)}</dd><dt>Driver</dt><dd>${esc(a.driver)}, arriving ${esc(a.arrive)}</dd><dt>Safe for</dt><dd>${a.minutes_left} more min</dd></dl>
-      <div class="timeleft" id="tl-${esc(a.donation)}">Please answer in ${Math.max(0, a.timeout - a.waiting)} min or the agents try another shelter.</div>
+      <dl><dt>From</dt><dd>${esc(a.business)}</dd><dt>Driver</dt><dd>${esc(a.driver)}, arriving ${esc(a.arrive)}</dd><dt>Good for</dt><dd>${a.minutes_left} more min</dd></dl>
+      <div class="timeleft" id="tl-${esc(a.donation)}">Please answer within ${Math.max(0, a.timeout - a.waiting)} min.</div>
       <div class="bar" aria-hidden="true"><i style="width:${Math.max(0, 100 - 100*a.waiting/a.timeout)}%"></i></div>
       <div class="row"><button class="btn ok" onclick="respond('${a.donation}', true)">✓ Accept all ${a.food.servings}</button>
       <button class="btn danger" onclick="respond('${a.donation}', false)">✕ We're full</button></div>
       <div class="part"><div class="pr"><div><label for="n-${a.donation}">Servings</label><input type="number" inputmode="numeric" id="n-${a.donation}" min="1" max="${a.food.servings - 1}" value="${Math.max(1, Math.floor(a.food.servings/2))}"></div>
-      <button class="btn" onclick="respond('${a.donation}', true, +document.getElementById('n-${a.donation}').value)">Take only part (counter-offer)</button></div></div>
+      <button class="btn" onclick="respond('${a.donation}', true, +document.getElementById('n-${a.donation}').value)">Take only this many</button></div></div>
       <button class="btn mic" id="mic-${a.donation}" type="button" onclick="answerByVoice('${a.donation}')">🎤 Answer by voice</button>
       <div class="heard" id="heard-${a.donation}" aria-live="polite"></div>
     </div>`).join("") || WAITING;
@@ -131,8 +135,8 @@ let voiceOn = false, hasEleven = false, rec = null;
 const announced = new Set();
 $("vt").onclick = () => {
   voiceOn = !voiceOn;
-  $("vt").textContent = voiceOn ? "🔊 Voice on" : "🔈 Voice off"; $("vt").classList.toggle("primary", voiceOn); $("vt").setAttribute("aria-pressed", voiceOn);
-  $("vnote").textContent = voiceOn ? (hasEleven ? "Requests are read aloud. Tap 🎤 and say yes, no, or a number." : "Browser voice (no ElevenLabs key on the server).") : "Turn on to hear requests and answer out loud.";
+  $("vt").textContent = voiceOn ? "🔊 Reading requests aloud" : "🔈 Read requests aloud"; $("vt").classList.toggle("primary", voiceOn); $("vt").setAttribute("aria-pressed", voiceOn);
+  $("vnote").textContent = voiceOn ? "Tap 🎤 on a request and say yes, no, or how many." : "";
   if(voiceOn) document.querySelectorAll(".ask .mic").forEach(b => announce(b.id.slice(4)));
 };
 function sayLocal(text){ if(!window.speechSynthesis) return; const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; speechSynthesis.speak(u); }

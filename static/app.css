@@ -161,3 +161,6 @@ input,select{font-size:1.05rem;min-height:3.1rem}
 
 /* low-contrast basemap: standard tiles, desaturated and lightened */
 .leaflet-tile-pane{filter:grayscale(.85) contrast(.85) brightness(1.08)}
+
+/* phone width: keep the whole top bar on screen */
+@media (max-width:430px){.bar nav .long{display:none}.bar-in{gap:.4rem}}

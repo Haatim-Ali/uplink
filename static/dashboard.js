@@ -230,9 +230,12 @@ function drawNegotiation(){
 
   // ---- summary (always visible): agents, what each wants, outcome in plain words ----
   const rs = playing ? roundSel : n.rounds.length-1, rr = n.rounds[rs];
+  const said = msgs.slice(0, shown);
   const cards = AGENTS.map(a=>{
     const pid = rr.proposals[a];
-    return `<div class="agent ${a}"><div class="agent-top"><h3><span aria-hidden="true">${ICON[a]}</span><span class="a-name">${a}</span></h3><span class="wt" title="Vote weight. It grows when this agent's earlier warning about a driver turned out right.">vote ×${(n.weights||{})[a]??1}</span></div><div class="goal">${GOALS[a]}</div><div class="wants">Proposes: <b>${pid ? planName(pid) : "—"}</b></div></div>`;
+    const last = said.filter(m => m.agent === a).pop();   // what this agent just said: the debate, visible without a click
+    const quote = last ? `<div class="says ${last.type}${playing && said[said.length-1] === last ? " now" : ""}" title="${esc(last.text)}">“${esc(last.text)}”</div>` : "";
+    return `<div class="agent ${a}"><div class="agent-top"><h3><span aria-hidden="true">${ICON[a]}</span><span class="a-name">${a}</span></h3><span class="wt" title="Vote weight. It grows when this agent's earlier warning about a driver turned out right.">vote ×${(n.weights||{})[a]??1}</span></div><div class="goal">${GOALS[a]}</div><div class="wants">Proposes: <b>${pid ? planName(pid) : "—"}</b></div>${quote}</div>`;
   }).join("");
   const o = OUTCOME[n.outcome] || {ic:"•", t:(n.outcome||"Decision").replace(/_/g," "), d:""};
   const chosen = n.plan ? `<div class="pick">Decision: <b>${planName(n.plan.id)}</b></div>` : "";
