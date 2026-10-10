@@ -7,7 +7,7 @@ import os
 import threading
 import time
 
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, redirect, request, send_from_directory
 
 import env
 
@@ -21,6 +21,7 @@ import voice  # noqa: E402
 from world import World  # noqa: E402
 
 app = Flask(__name__, static_folder="static")
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0   # browsers re-check pages/CSS/JS, so updates show without a hard refresh
 lock = threading.Lock()
 state = {"world": World(live=True), "speed": 1.0, "paused": False,
          "closing": {"seq": 0, "business": None},   # bumped by the dashboard's "Closing time" button
@@ -81,13 +82,18 @@ def planner_loop():
 # ---------------- pages ----------------
 
 @app.get("/")
+def customer_site():
+    return send_from_directory("static", "app.html")
+
+
+@app.get("/ops")
 def dashboard():
     return send_from_directory("static", "dashboard.html")
 
 
 @app.get("/business")
 def business():
-    return send_from_directory("static", "business.html")
+    return redirect("/#/schedule")
 
 
 @app.get("/shelter")
@@ -315,7 +321,8 @@ if __name__ == "__main__":
     threading.Thread(target=planner_loop, daemon=True).start()
     port = int(os.getenv("PORT", "5000"))
     print("Uplink · food rescue agents")
-    print(f"Dashboard: http://localhost:{port}   Business page: http://localhost:{port}/business")
+    print(f"Customer site: http://localhost:{port}   Schedule a pickup: http://localhost:{port}/#/schedule")
+    print(f"Ops dashboard (judges): http://localhost:{port}/ops   Shelter phone: http://localhost:{port}/shelter")
     print(f"Agents: {'LLM' if agents.use_llm() else 'rules'} · Vision: {llm.provider() or 'demo (no API key)'}"
           f" · Voice: {'ElevenLabs' if voice.available() else 'browser (no ElevenLabs key)'}")
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

@@ -7,6 +7,11 @@ set -e
 MODEL="${VISION_MODEL:-Qwen/Qwen2.5-VL-7B-Instruct}"
 export HF_HOME="$HOME/hf-models"   # on the persistent disk, so the model survives a stop
 
+# vLLM compiles a small GPU helper at startup: it needs a C compiler and Python headers
+if ! command -v gcc >/dev/null || [ ! -f "/usr/include/python3.$(python3 -c 'import sys; print(sys.version_info.minor)')/Python.h" ]; then
+  sudo apt-get update -qq && sudo apt-get install -y -qq build-essential \
+    "python3.$(python3 -c 'import sys; print(sys.version_info.minor)')-dev"
+fi
 if [ ! -x "$HOME/vllm-env/bin/vllm" ]; then
   rm -rf "$HOME/vllm-env"   # clear any half-made environment from an earlier failed run
   # Brev's Ubuntu image lacks the venv package; install it if needed

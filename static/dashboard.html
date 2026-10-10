@@ -31,6 +31,7 @@
       <a href="#/how" data-route="how">How it works</a>
     </nav>
     <div class="nav-right">
+      <a class="navlink" href="/" target="_blank" rel="noopener">Customer view ↗</a>
       <div class="dd dd-right">
         <button class="dd-btn solid" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="dd-demo">Demo controls <span aria-hidden="true">▾</span></button>
         <div class="dd-menu wide" id="dd-demo" hidden>
@@ -38,7 +39,7 @@
             <h3>Scenario</h3>
             <label class="sr-only" for="scenario">Scenario</label>
             <select id="scenario"></select>
-            <div class="dd-row"><button class="btn primary sm" id="start" type="button" title="Reset the world and start the selected scenario">▶ Run scenario</button><button class="btn sm" id="blank" type="button" title="Reset to an empty city with no donations">Empty world</button></div>
+            <div class="dd-row"><button class="btn primary sm" id="start" type="button" title="Reset the world and start the selected scenario">Run scenario</button><button class="btn sm" id="blank" type="button" title="Reset to an empty city with no donations">Empty world</button></div>
           </div>
           <div class="dd-sec">
             <h3>Clock</h3>
@@ -50,7 +51,7 @@
           </div>
           <div class="dd-sec">
             <h3>Sound</h3>
-            <div class="dd-row"><button class="btn sm" id="voice" type="button" aria-pressed="false" title="Each agent speaks its lines in its own voice (ElevenLabs; the browser's voice without a key)">🔈 Voices off</button></div>
+            <div class="dd-row"><button class="btn sm" id="voice" type="button" aria-pressed="false" title="Each agent speaks its lines in its own voice (ElevenLabs; the browser's voice without a key)">Voices off</button></div>
           </div>
           <div class="dd-sec">
             <h3>Inject a problem</h3>
@@ -67,8 +68,8 @@
       <div class="dd dd-right">
         <button class="dd-btn" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="dd-open">Open <span aria-hidden="true">▾</span></button>
         <div class="dd-menu" id="dd-open" hidden>
-          <a href="/business" target="_blank" rel="noopener"><b>Business donate page ↗</b><small>Phone view for a restaurant or store</small></a>
-          <a href="/shelter" target="_blank" rel="noopener"><b>Shelter phone page ↗</b><small>Phone view where a shelter answers</small></a>
+          <a href="/" target="_blank" rel="noopener"><b>Customer site ↗</b><small>What a business sees</small></a>
+          <a href="/shelter" target="_blank" rel="noopener"><b>Shelter phone page ↗</b><small>Where a shelter answers</small></a>
         </div>
       </div>
       <div class="clock-box" title="Simulated time. One simulated minute is one real second at 1× speed."><span class="clock" id="clock">12:00</span><span class="badge-mode" id="mode" title="Agents: how the three agents reason (rules or an AI model). Vision: how photos are read.">…</span></div>
@@ -111,16 +112,15 @@
       </div>
     </div>
     <div class="panel map-panel">
-      <div class="panel-head"><h2>City map</h2><span class="muted small">routes are dashed</span></div>
+      <div class="panel-head"><h2>Map</h2><span class="muted small">Labeled pins are shelters in play</span></div>
       <div id="map" role="img" aria-label="Map of businesses, shelters and drivers"></div>
       <ul class="legend" aria-label="Map legend">
-        <li><i class="lg-dot" style="background:#15803d"></i>Shelter</li>
-        <li><i class="lg-dot full"></i>Full shelter</li>
-        <li><i class="lg-dot" style="background:#0f766e"></i>New pantry</li>
-        <li><i class="lg-sq"></i>Business</li>
-        <li><i class="lg-drv" style="background:#c2410c;border-radius:6px"></i>Paid driver</li>
-        <li><i class="lg-drv" style="background:#1d4ed8"></i>Volunteer</li>
-        <li><i class="lg-drv" style="background:#6d28d9;border-radius:50% 50% 50% 0"></i>Nonprofit van</li>
+        <li><i class="lg-np"></i>Shelter</li>
+        <li><i class="lg-np full"></i>Full shelter</li>
+        <li><i class="lg-biz"></i>Business</li>
+        <li><i class="lg-on"></i>Driver on a job</li>
+        <li><i class="lg-idle"></i>Idle driver</li>
+        <li><i class="lg-line"></i>Route</li>
       </ul>
     </div>
   </div>
@@ -129,7 +129,7 @@
 <!-- ================= DECISIONS ================= -->
 <section class="view page" data-view="decisions" hidden>
   <h1 class="page-title">Decisions</h1>
-  <p class="page-sub">When the agents can't or shouldn't decide alone, the question lands here. A coordinator picks one of the agents' top options, or the business answers a question.</p>
+  <p class="page-sub">Questions the agents should not answer alone.</p>
   <div id="human" aria-live="polite"></div>
 </section>
 
@@ -143,7 +143,7 @@
     <a role="tab" href="#/activity/donations" data-tab="donations">Donations</a>
   </div>
   <div class="tabpanel" data-tabpanel="network">
-    <div class="panel-head net-head"><p class="helper" style="margin:0;max-width:46rem">Every business, shelter and driver has its own agent. For the donation being negotiated: the business announces, shelters accept, counter or decline, drivers bid, then the coordinators decide.</p><span class="muted small" id="net-agents"></span></div>
+    <div class="panel-head net-head"><p class="helper" style="margin:0">For the donation on the Live view.</p><span class="muted small" id="net-agents"></span></div>
     <div class="panel"><div class="net" id="net"></div></div>
   </div>
   <div class="tabpanel" data-tabpanel="feed" hidden>
@@ -152,7 +152,7 @@
     <div class="panel"><div class="feed" id="feed"></div></div>
   </div>
   <div class="tabpanel" data-tabpanel="safety" hidden>
-    <p class="helper">The safety rules are plain code, never negotiated. Every shelter and driver pair is checked for food type, fridge, allergens (unconfirmed counts as present), capacity, opening hours, and arriving at least 5 minutes before the food turns unsafe. Blocked plans never reach the agents.</p>
+    <p class="helper">Plain code, never negotiated. Blocked plans never reach the agents.</p>
     <div class="filter"><label for="log-filter">Show</label>
       <select id="log-filter"><option value="all">Allowed and blocked</option><option value="blocked">Blocked only</option><option value="allowed">Allowed only</option></select></div>
     <div class="panel"><div class="log" id="log"></div></div>
@@ -165,8 +165,8 @@
 <!-- ================= EVIDENCE ================= -->
 <section class="view page" data-view="evidence" hidden>
   <div class="page-head"><div><h1 class="page-title">Evidence</h1>
-    <p class="page-sub">Does a team of negotiating agents decide better than a simple rule or a single agent? Same scenarios, same events, different decision policy.</p></div>
-    <button class="btn sm" id="rerun" type="button">↻ Re-run comparison</button></div>
+    <p class="page-sub">Agents together vs a simple baseline, on the same scenarios.</p></div>
+    <button class="btn sm" id="rerun" type="button">Re-run comparison</button></div>
   <div id="takeaway"></div>
   <h2 class="sec-h">Impact in the current run</h2>
   <div class="kpis six" aria-label="Impact so far">
@@ -178,7 +178,7 @@
     <div class="kpi"><b data-k="esc">0</b><span>asked a human</span></div>
   </div>
   <h2 class="sec-h">Team vs baseline</h2>
-  <p class="helper">The baseline sends food to the nearest open shelter with room and the nearest free driver. It skips fridge, allergen and timing checks, driver reliability, cost and fairness, and never negotiates.</p>
+  <p class="helper">Baseline: nearest open shelter and nearest free driver, no safety checks, no negotiation.</p>
   <div id="cmp"><p class="muted">Loading…</p></div>
 </section>
 
@@ -199,9 +199,9 @@
   <div class="table-wrap"><table class="data">
     <thead><tr><th>Agent</th><th>Goal</th><th>Red line (a veto)</th></tr></thead>
     <tbody>
-      <tr><td><span class="agent-chip Speed">⚡ Speed</span></td><td>Keep a big safety margin before the food spoils, weighted by how reliable the driver is.</td><td>Under 10 minutes to spare, or a driver under 50% reliable.</td></tr>
-      <tr><td><span class="agent-chip Cost">$ Cost</span></td><td>Spend as little as possible. A no-show means paying for a rescue, so reliability counts.</td><td>More than $20 for one donation.</td></tr>
-      <tr><td><span class="agent-chip Need">♥ Need</span></td><td>Feed whoever has waited longest and has room.</td><td>Feeding a shelter that got food today while another reachable shelter has waited 4+ days.</td></tr>
+      <tr><td><span class="agent-chip Speed">Speed</span></td><td>Keep a big safety margin before the food spoils, weighted by how reliable the driver is.</td><td>Under 10 minutes to spare, or a driver under 50% reliable.</td></tr>
+      <tr><td><span class="agent-chip Cost">Cost</span></td><td>Spend as little as possible. A no-show means paying for a rescue, so reliability counts.</td><td>More than $20 for one donation.</td></tr>
+      <tr><td><span class="agent-chip Need">Need</span></td><td>Feed whoever has waited longest and has room.</td><td>Feeding a shelter that got food today while another reachable shelter has waited 4+ days.</td></tr>
     </tbody></table></div>
 
   <h2 class="sec-h">Words you will see</h2>

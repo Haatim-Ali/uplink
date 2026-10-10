@@ -19,8 +19,8 @@ PORT=5050 python app.py
 
 On a Mac, use `PORT=5050` because macOS reserves port 5000 for AirPlay.
 
-- Dashboard: http://localhost:5050
-- Business view (open on a phone on the same Wi-Fi): http://YOUR-LAPTOP-IP:5050/business
+- Customer site (what a business sees; works on a phone on the same Wi-Fi): http://localhost:5050 , schedule a pickup at http://YOUR-LAPTOP-IP:5050/#/schedule (`/business` redirects there)
+- Ops dashboard (logistics, agents, evidence, for judges): http://localhost:5050/ops
 - Shelter phone (a teammate plays the shelter): http://YOUR-LAPTOP-IP:5050/shelter?id=northside-youth
 - Camera at the business: `python3 camera.py --business campus-cafe` (see below)
 - Donation records (SB 1383): http://localhost:5050/records
@@ -37,7 +37,7 @@ PORT=5050 python3 app.py  # the first line printed says which of Claude / Eleven
 `.env` is in `.gitignore`, so keys never go to GitHub. With `ANTHROPIC_API_KEY`, Claude reads the photos
 and (with `LLM_AGENTS=1`) writes the agents' arguments. With `ELEVENLABS_API_KEY`:
 
-- **Dashboard → 🔊 Voices**: Speed, Cost and Need each argue in their own voice; the debate waits for each
+- **Ops dashboard → Demo controls → Voices**: Speed, Cost and Need each argue in their own voice; the debate waits for each
   line to finish, then the outcome is announced.
 - **Shelter phone → 🔊 Voice on**: the dispatcher reads each request aloud. Tap **🎤 Answer by voice** and say
   "yes", "sorry, we're full" or "we can only take twenty"; ElevenLabs transcribes it and the agents react
@@ -110,8 +110,9 @@ Click any past negotiation (D1, D2...) and **Replay debate** to walk judges thro
 | `vision.py` / `llm.py` | Photo → food details; thin model wrapper (Anthropic, OpenAI, or OpenAI-compatible) |
 | `config.py` | Every tuning knob in one place: speeds, safety margin, cost limit, negotiation thresholds |
 | `app.py` | Flask server, live clock, planner thread, API |
-| `static/dashboard.{html,css,js}` | Dashboard layout, styles and behavior, in separate files |
-| `static/business.html`, `shelter.html`, `records.html` | Phone pages for the business and the shelter; SB 1383 records page |
+| `static/app.{html,css,js}` | Customer site: schedule a pickup, track it, receipts, help |
+| `static/dashboard.{html,css,js}` | Ops dashboard (`/ops`): live negotiation, map, decisions, activity, evidence |
+| `static/shelter.html`, `records.html` | Shelter phone page; SB 1383 records page |
 | `tests/test_core.py` | Safety rules, negotiation, adaptation, shelter phone and evidence checks |
 | `data/` | Fictional nonprofits, drivers, businesses near the venue |
 

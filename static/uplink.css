@@ -10,7 +10,7 @@
   --speed:#c2410c; --speed-soft:#fff1e8; --cost:#15803d; --cost-soft:#e8f6ec; --need:#6d28d9; --need-soft:#f1eafd;
   /* semantic */
   --ok:#15803d; --ok-soft:#e5f5ea; --bad:#b91c1c; --bad-soft:#fdeaea; --warn:#a15c07; --warn-soft:#fdf1d9;
-  --info:#1d4ed8; --info-soft:#e6eefc;
+  --info:#0f766e; --info-soft:#e0f2f0;
   /* legacy aliases used by older rules */
   --safety:#b91c1c; --result:#1d4ed8; --human:#a15c07; --adapt:#0f766e; --world:#64748b; --intake:#475569;
   /* spacing scale */
