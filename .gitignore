@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 scripts/.tunnel.pid
 scripts/.tunnel.log
+*.pt
