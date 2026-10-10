@@ -54,6 +54,7 @@ img{max-width:100%;border-radius:10px;margin-top:10px;display:none}
     <label>Category</label>
     <select id="category"><option>hot prepared</option><option>cold prepared</option><option>packaged</option><option>produce</option></select>
     <label>Allergens (comma separated)</label><input id="allergens">
+    <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="unsure" type="checkbox" style="width:auto"> Not sure about allergens (the agents may ask you)</label>
     <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="cold" type="checkbox" style="width:auto"> Must stay refrigerated</label>
     <button id="confirm">Confirm donation</button>
   </div>
@@ -75,7 +76,7 @@ $("file").onchange = e => {
 function fill(f, note){
   $("items").value = f.items.join(", "); $("servings").value = f.servings; $("safe").value = f.safe_minutes;
   $("wlo").value = f.weight_lbs[0]; $("whi").value = f.weight_lbs[1]; $("category").value = f.category;
-  $("allergens").value = f.allergens.join(", "); $("cold").checked = f.needs_cold;
+  $("allergens").value = f.allergens.join(", "); $("cold").checked = f.needs_cold; $("unsure").checked = !!f.allergens_unverified;
   $("note").textContent = note || f.notes || "";
   $("details").classList.remove("hidden"); $("ok").classList.add("hidden");
   $("details").scrollIntoView({behavior:"smooth"});
@@ -94,7 +95,7 @@ $("confirm").onclick = async () => {
     servings: +$("servings").value, safe_minutes: +$("safe").value,
     weight_lbs: [+$("wlo").value, +$("whi").value], category: $("category").value,
     allergens: $("allergens").value.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean),
-    needs_cold: $("cold").checked,
+    needs_cold: $("cold").checked, allergens_unverified: $("unsure").checked,
   };
   await fetch("/api/donate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({food,business:$("biz").value})});
   $("details").classList.add("hidden"); $("ok").classList.remove("hidden");

@@ -18,6 +18,11 @@ SOUP = {"items": ["vegetable soup"], "servings": 20, "weight_lbs": [10, 12], "al
         "category": "hot prepared", "needs_cold": False, "safe_minutes": 50}
 PB = {"items": ["peanut butter sandwiches"], "servings": 24, "weight_lbs": [6, 8], "allergens": ["peanuts", "gluten"],
       "category": "cold prepared", "needs_cold": True, "safe_minutes": 120}
+SALADS_SHORT = dict(SALADS, safe_minutes=35)
+CHILI = {"items": ["homemade chili", "cornbread"], "servings": 30, "weight_lbs": [12, 15], "allergens": ["gluten"],
+         "category": "hot prepared", "needs_cold": False, "safe_minutes": 120, "allergens_unverified": True}
+PAD_THAI = {"items": ["pad thai"], "servings": 20, "weight_lbs": [8, 10], "allergens": ["soy", "eggs"],
+            "category": "hot prepared", "needs_cold": False, "safe_minutes": 90, "allergens_unverified": True}
 
 SCENARIOS = {
     "lunch_rush": {
@@ -50,7 +55,68 @@ SCENARIOS = {
             {"at": 4, "type": "decline", "nonprofit": "grace-kitchen"},
         ],
     },
+    "majority_dissent": {
+        "name": "majority_dissent", "title": "Majority with dissent: Cost is outvoted on a paid courier; its objection stays on record",
+        "setup": {
+            "start": "18:00",
+            "note": "18:00. Evening surge pricing on couriers. Sam is the only volunteer left, across town.",
+            "drivers_off": ["courier-b", "maria", "jordan", "grace-van"],
+            "drivers": {"courier-a": {"base_usd": 10}, "sam": {"reliability": 0.5, "lat": 37.3405, "lng": -121.9301}},
+        },
+        "events": [
+            {"at": 0, "type": "donation", "business": "lakeside-hotel", "food": PASTA},
+        ],
+    },
+    "unacceptable_compromise": {
+        "name": "unacceptable_compromise", "title": "Unacceptable compromise: the majority's plan crosses an agent's red line",
+        "setup": {
+            "start": "19:30",
+            "note": "19:30. Couriers are offline and most volunteers have gone home. Grace Kitchen got food this morning.",
+            "drivers_off": ["courier-a", "courier-b", "maria", "jordan"],
+            "drivers": {"sam": {"reliability": 0.45}},
+            "nonprofits": {"grace-kitchen": {"last_donation_days": 0}},
+        },
+        "events": [
+            {"at": 0, "type": "donation", "business": "lakeside-hotel", "food": PASTA},
+            {"at": 3, "type": "cancel", "driver": "sam"},
+        ],
+    },
+    "irreconcilable": {
+        "name": "irreconcilable", "title": "Irreconcilable goals: no plan wins a majority, so a human decides",
+        "setup": {
+            "start": "16:00",
+            "note": "16:00. Surge pricing on couriers. One courier and one volunteer (Jordan, across town) available. "
+                    "Valley Food Bank hasn't had fresh food in 6 days; Northside is full.",
+            "drivers_off": ["courier-b", "maria", "sam", "grace-van"],
+            "drivers": {"courier-a": {"base_usd": 8}, "jordan": {"lat": 37.3405, "lng": -121.9301}},
+            "nonprofits": {"valley-food-bank": {"last_donation_days": 6}, "grace-kitchen": {"last_donation_days": 0},
+                           "northside-youth": {"full": True}},
+        },
+        "events": [
+            {"at": 0, "type": "donation", "business": "lakeside-hotel", "food": SALADS_SHORT},
+        ],
+    },
+    "insufficient_evidence": {
+        "name": "insufficient_evidence", "title": "Insufficient evidence: agents ask the business instead of guessing",
+        "events": [
+            {"at": 0, "type": "donation", "business": "corner-bakery", "food": CHILI},
+            {"at": 2, "type": "donation", "business": "campus-cafe", "food": PAD_THAI},
+            {"at": 9, "type": "confirm", "business": "corner-bakery", "allergens": ["gluten"]},
+        ],
+    },
 }
+
+
+POLICIES = {
+    "baseline": "Nearest shelter",
+    "solo:Speed": "Speed alone",
+    "solo:Cost": "Cost alone",
+    "solo:Need": "Need alone",
+    "agents": "Agents together",
+}
+METRICS = [("meals_delivered_safely", "Meals delivered safely"), ("servings_lost", "Servings lost"),
+           ("money_spent", "Money spent ($)"), ("shelters_fed", "Shelters fed"),
+           ("avg_spare_minutes", "Avg minutes to spare (perishable food)"), ("human_escalations", "Asked a human")]
 
 
 def run(name, policy, max_minutes=600):
@@ -65,16 +131,46 @@ def run(name, policy, max_minutes=600):
 
 
 def compare():
+    """Run every scenario under every policy. Same events, same safety rules (except the nearest-shelter
+    baseline, which has none). The single-agent policies answer: is the team better than any one agent?"""
     rows = []
     for name, sc in SCENARIOS.items():
-        b, a = run(name, "baseline"), run(name, "agents")
-        rows.append({"scenario": name, "title": sc["title"], "baseline": b.metrics(), "agents": a.metrics()})
+        res = {}
+        for pol in POLICIES:
+            m = run(name, pol).metrics()
+            m["avg_spare_minutes"] = round(m["spare_minutes"] / m["deliveries"]) if m["deliveries"] else 0
+            res[pol] = m
+        rows.append({"scenario": name, "title": sc["title"], "results": res})
     totals = {}
-    for pol in ("baseline", "agents"):
-        totals[pol] = {k: round(sum(r[pol][k] for r in rows), 2) for k in rows[0][pol]}
-    return {"rows": rows, "totals": totals}
+    for pol in POLICIES:
+        totals[pol] = {k: round(sum(r["results"][pol][k] for r in rows), 2) for k, _ in METRICS}
+        n = sum(r["results"][pol]["deliveries"] for r in rows)
+        totals[pol]["avg_spare_minutes"] = round(sum(r["results"][pol]["spare_minutes"] for r in rows) / n) if n else 0
+        outcomes = {}
+        for r in rows:
+            for k, v in r["results"][pol]["outcomes"].items():
+                outcomes[k] = outcomes.get(k, 0) + v
+        totals[pol]["outcomes"] = outcomes
+    return {"policies": POLICIES, "order": list(POLICIES), "metrics": dict(METRICS), "rows": rows, "totals": totals}
+
+
+def markdown(c):
+    head = "| Metric | " + " | ".join(c["policies"].values()) + " |\n|---" + "|---:" * len(c["policies"]) + "|\n"
+    body = "".join(f"| {label} | " + " | ".join(str(c["totals"][p][k]) for p in c["policies"]) + " |\n"
+                   for k, label in c["metrics"].items())
+    out = head + body + "\n**How the team's negotiations ended:** " + ", ".join(
+        f"{k.replace('_', ' ')} {v}" for k, v in sorted(c["totals"]["agents"]["outcomes"].items(), key=lambda x: -x[1])) + "\n"
+    for r in c["rows"]:
+        out += f"\n**{r['title']}**\n\n" + "| Metric | " + " | ".join(c["policies"].values()) + " |\n|---" + "|---:" * len(c["policies"]) + "|\n"
+        out += "".join(f"| {label} | " + " | ".join(str(r["results"][p][k]) for p in c["policies"]) + " |\n"
+                       for k, label in c["metrics"].items())
+        oc = r["results"]["agents"]["outcomes"]
+        out += "\nTeam outcomes: " + (", ".join(f"{k.replace('_', ' ')} {v}" for k, v in oc.items()) or "none") + "\n"
+    return out
 
 
 if __name__ == "__main__":
     import json
-    print(json.dumps(compare(), indent=1))
+    import sys
+    c = compare()
+    print(json.dumps(c, indent=1) if "--json" in sys.argv else markdown(c))

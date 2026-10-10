@@ -73,7 +73,11 @@ table.matrix{width:100%;border-collapse:collapse;font-size:12px}
 tr.winner td{background:#f0f6fd}
 .outcome{margin-top:10px;padding:8px 10px;border-radius:8px;font-weight:600}
 .outcome.consensus{background:#e3f3e8;color:#1f6b39}.outcome.majority{background:#eef3fb;color:#1f4f87}
-.outcome.urgent{background:#fdf0e3;color:#8a4a12}.outcome.escalate{background:#fbf0d9;color:#7a5410}
+.outcome.urgent{background:#fdf0e3;color:#8a4a12}.outcome.irreconcilable,.outcome.unacceptable{background:#fbf0d9;color:#7a5410}
+.st.awaiting_info{background:#efe9fb;color:var(--need)}
+.vote.veto{color:#fff;background:var(--bad);border-radius:4px;padding:0 4px}
+.tally{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:12px}
+.tally span{background:#f0efea;border-radius:99px;padding:2px 8px}
 .human{margin-top:10px;border:2px solid var(--human);border-radius:10px;padding:10px;background:#fffaf0}
 .human button{font:inherit;margin:4px 6px 0 0;padding:6px 10px;border-radius:6px;border:1px solid var(--human);background:#fff;cursor:pointer}
 .empty{color:var(--muted);font-style:italic}
@@ -96,7 +100,7 @@ dialog th:first-child,dialog td:first-child{text-align:left}
   <button id="pause">Pause</button>
   <a class="btn" href="/business" target="_blank">Business view ↗</a>
   <a class="btn" href="/records" target="_blank">Donation records ↗</a>
-  <button id="compare">Agents vs baseline</button>
+  <button id="compare">Team vs baselines</button>
   <span class="badge" id="mode"></span>
   <span class="clock" id="clock">12:00</span>
 </header>
@@ -136,8 +140,9 @@ dialog th:first-child,dialog td:first-child{text-align:left}
 </main>
 
 <dialog id="dlg">
-  <h2 style="margin-top:0">Negotiating agents vs nearest-shelter baseline</h2>
-  <p style="color:var(--muted);margin-top:-6px">Same scripted scenarios and events for both. The baseline always sends food to the nearest shelter that takes it, with the nearest free driver, and skips the safety checks.</p>
+  <h2 style="margin-top:0">Can the agents decide better together than alone?</h2>
+  <p style="color:var(--muted);margin-top:-6px">Same scripted scenarios and events for every column. <b>Nearest shelter</b> sends food to the closest shelter that takes it with the closest free driver and skips the safety checks.
+  <b>Speed / Cost / Need alone</b> use the same safety rules as the team, but one agent decides by itself with no negotiation. <b>Green</b> = best in the row.</p>
   <div id="cmp">Running…</div>
   <p><button onclick="dlg.close()">Close</button></p>
 </dialog>
@@ -210,28 +215,46 @@ function drawNegotiation(){
     const win = n.plan && n.plan.id===pid && roundSel===n.rounds.length-1;
     const cells = AGENTS.map(a=>{
       const v = r.votes[pid][a], sc = (n.scores[pid]||{})[a] ?? 0;
-      return `<td title="${esc(v.reason)}"><span class="vote ${v.accept?"yes":"no"}">${v.accept?"✓ accept":"✗ object"}</span>
+      const veto = !v.accept && v.reason.startsWith("Veto");
+      return `<td title="${esc(v.reason)}"><span class="vote ${v.accept?"yes":veto?"veto":"no"}">${v.accept?"✓ accept":veto?"⛔ veto":"✗ object"}</span>
         <div class="bar"><i style="width:${Math.round(sc*100)}%;background:${COLORS[a]}"></i></div></td>`;
     }).join("");
     return `<tr class="${win?"winner":""}"><td>${nm(pid)}</td>${cells}</tr>`;
   }).join("");
-  const label = {consensus:"Agreed 3 of 3", majority:"Majority decision, dissent kept on record", urgent:"Time is short: acting on the best-supported plan", escalate:"No agreement: asking a human"}[n.outcome];
+  const label = {consensus:"Agreed 3 of 3", majority:"Majority decision, dissent kept on record", urgent:"Time is short: acting on the best-supported plan",
+    irreconcilable:"Irreconcilable: no plan has a majority, asking a human", unacceptable:"Unacceptable compromise: the majority's plan crosses a red line, asking a human"}[n.outcome];
   const chosen = n.plan ? ` → ${nm(n.plan.id)}` : "";
   const dissent = (n.dissent||[]).map(x=>`<div style="font-weight:400;margin-top:4px">${x.agent}: ${esc(x.reason)}</div>`).join("");
   $("neg").innerHTML = `
     <div style="margin-bottom:8px"><b>${esc(n.donation)}</b> · ${esc(n.food)} <span class="badge" style="background:#eee;color:#555">${n.mode==="llm"?"AI reasoning":"rules reasoning"}</span></div>
     <div class="agents">${cards}</div>
     <table class="matrix"><thead><tr><th>Plans on the table (round ${r.round})</th>${AGENTS.map(a=>`<th style="color:${COLORS[a]}">${a}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>
-    ${roundSel===n.rounds.length-1?`<div class="outcome ${n.outcome}">${label}${chosen}${dissent}</div>`:""}`;
+    ${roundSel===n.rounds.length-1?`<div class="outcome ${n.outcome}">${label}${chosen}${dissent}</div>`:""}
+    ${tally()}`;
+}
+
+function tally(){
+  const o = S.outcomes || {}, names = {consensus:"agreed", majority:"majority", urgent:"time short", unacceptable:"unacceptable compromise",
+    irreconcilable:"irreconcilable", insufficient_evidence:"asked for evidence", over_budget:"over budget", human_timeout:"fallback rule used"};
+  const parts = Object.entries(o).map(([k,v])=>`<span>${names[k]||k}: <b>${v}</b></span>`).join("");
+  return parts ? `<div class="tally"><span style="background:none;padding-left:0;color:var(--muted)">How negotiations ended so far:</span>${parts}</div>` : "";
 }
 
 function drawHuman(){
   const waiting = S.donations.filter(d=>d.status==="awaiting_human");
+  const asking = S.donations.filter(d=>d.status==="awaiting_info");
   $("human").innerHTML = waiting.map(d=>`
-    <div class="human"><b>Coordinator needed for ${d.id}</b> (${esc(d.food.items.join(", "))}, ${d.minutes_left} min until unsafe). The agents could not agree or the cost is over the limit.
-      <div>${d.options.map(o=>`<button onclick="approve('${d.id}','${o.id}')">Approve ${esc(o.np_name)} via ${esc(o.driver_name)} · ${o.dur} min · $${o.cost.toFixed(2)}</button>`).join("")}</div></div>`).join("");
+    <div class="human"><b>Coordinator needed for ${d.id}</b> (${esc(d.food.items.join(", "))}, ${d.minutes_left} min until unsafe).
+      <div style="margin-top:4px">Why: ${esc(d.why||"the agents could not agree")}.</div>
+      <div>${d.options.map(o=>`<button onclick="approve('${d.id}','${o.id}')">Approve ${esc(o.np_name)} via ${esc(o.driver_name)} · ${o.dur} min · $${o.cost.toFixed(2)}</button>`).join("")}</div></div>`).join("")
+  + asking.map(d=>`
+    <div class="human" style="border-color:var(--need)"><b>Agents are asking ${esc(d.business_name)} about ${d.id}</b> (${esc(d.food.items.join(", "))}):
+      "Is this free of ${esc(d.asked_about)}?" Not enough evidence to decide yet; they act on what they know if there's no answer.
+      <div><button onclick="confirmInfo('${d.id}',true)">Business: listed allergens only (${esc(d.food.allergens.join(", ")||"none")})</button>
+      <button onclick="confirmInfo('${d.id}',false)">Business: can't say for sure</button></div></div>`).join("");
 }
 async function approve(d,p){ await post("/api/approve",{donation:d,plan:p}); refresh(); }
+async function confirmInfo(id, sure){ const d = S.donations.find(x=>x.id===id); await post("/api/confirm",{donation:id, allergens: sure ? d.food.allergens : null}); refresh(); }
 
 // ---------- lists ----------
 function drawLists(){
@@ -239,8 +262,9 @@ function drawLists(){
   $("log").innerHTML = S.decisions.slice().reverse().map(x=>`<div><span class="v ${x.verdict}">${x.verdict==="allowed"?"ALLOWED":"BLOCKED"}</span>${esc(x.donation)} · ${esc(x.text)}</div>`).join("") || "<p class='empty'>No decisions yet.</p>";
   $("dons").innerHTML = S.donations.slice().reverse().map(d=>{
     const live = !["delivered","spoiled","expired"].includes(d.status);
+    const statusText = {awaiting_info:"asking business", awaiting_human:"asking human"}[d.status] || d.status.replace("_"," ");
     const where = d.plan ? `${esc(d.plan.np_name)} via ${esc(d.plan.driver_name)}` : "planning…";
-    return `<div class="don"><span class="st ${d.status}">${d.status.replace("_"," ")}</span><b>${d.id}</b> ${esc(d.food.items.join(", "))} · ${d.food.servings} servings<br>
+    return `<div class="don"><span class="st ${d.status}">${statusText}</span><b>${d.id}</b> ${esc(d.food.items.join(", "))} · ${d.food.servings} servings<br>
       <span style="color:var(--muted)">${esc(d.business_name)} → ${where}</span>
       ${live?`<br><span class="timer ${d.minutes_left<30?"low":""}">${d.minutes_left} min until unsafe (${d.safe_until})</span>`:""}</div>`;
   }).join("") || "<p class='empty'>No donations yet.</p>";
@@ -276,13 +300,17 @@ const dlg = $("dlg");
 $("compare").onclick = async()=>{
   dlg.showModal(); $("cmp").textContent = "Running all scenarios…";
   const r = await (await fetch("/api/compare")).json();
-  const M = [["meals_delivered_safely","Meals delivered safely",1],["servings_lost","Servings lost",-1],["money_spent","Money spent ($)",-1],["shelters_fed","Shelters fed",1],["human_escalations","Asked a human",0]];
-  const block = (title,b,a)=>`<tr><th colspan="3" style="text-align:left;padding-top:14px">${esc(title)}</th></tr>` + M.map(([k,l,dir])=>{
-    const better = dir && (dir>0 ? a[k]>b[k] : a[k]<b[k]);
-    return `<tr><td>${l}</td><td>${b[k]}</td><td class="${better?"better":""}">${a[k]}</td></tr>`;}).join("");
-  $("cmp").innerHTML = `<table><thead><tr><th></th><th>Baseline</th><th>Agents</th></tr></thead><tbody>
-    ${block("All scenarios",r.totals.baseline,r.totals.agents)}
-    ${r.rows.map(x=>block(x.title,x.baseline,x.agents)).join("")}</tbody></table>`;
+  const P = r.order;  // the server sorts JSON keys, so the column order comes separately
+  const M = [["meals_delivered_safely","Meals delivered safely",1],["servings_lost","Servings lost",-1],["money_spent","Money spent ($)",-1],
+             ["shelters_fed","Shelters fed",1],["avg_spare_minutes","Avg minutes to spare (perishable)",1],["human_escalations","Asked a human",0]];
+  const outcomeLine = o => Object.entries(o||{}).map(([k,v])=>`${k.replace(/_/g," ")} ${v}`).join(", ") || "none";
+  const block = (title,res)=>`<tr><th colspan="${P.length+1}" style="text-align:left;padding-top:14px">${esc(title)}</th></tr>` + M.map(([k,l,dir])=>{
+    const vals = P.map(p=>res[p][k]); const best = dir>0 ? Math.max(...vals) : Math.min(...vals);
+    return `<tr><td>${l}</td>${P.map(p=>`<td class="${dir&&res[p][k]===best?"better":""}">${res[p][k]}</td>`).join("")}</tr>`;}).join("")
+    + `<tr><td colspan="${P.length+1}" style="text-align:left;color:var(--muted);font-size:12px">Team outcomes: ${outcomeLine(res.agents.outcomes)}</td></tr>`;
+  $("cmp").innerHTML = `<table><thead><tr><th></th>${P.map(p=>`<th>${esc(r.policies[p])}</th>`).join("")}</tr></thead><tbody>
+    ${block("All scenarios",r.totals)}
+    ${r.rows.map(x=>block(x.title,x.results)).join("")}</tbody></table>`;
 };
 
 refresh(); setInterval(refresh, 1000);
