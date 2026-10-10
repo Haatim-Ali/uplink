@@ -1,4 +1,5 @@
 """Scripted, repeatable scenarios. The same events run against both policies."""
+import copy
 
 PIZZA = {"items": ["pepperoni pizza"], "servings": 12, "weight_lbs": [3, 5], "allergens": ["dairy", "gluten"],
          "category": "hot prepared", "needs_cold": False, "safe_minutes": 120}
@@ -24,6 +25,9 @@ CHILI = {"items": ["homemade chili", "cornbread"], "servings": 30, "weight_lbs":
 PAD_THAI = {"items": ["pad thai"], "servings": 20, "weight_lbs": [8, 10], "allergens": ["soy", "eggs"],
             "category": "hot prepared", "needs_cold": False, "safe_minutes": 90, "allergens_unverified": True}
 
+PRODUCE = {"items": ["mixed produce crates"], "servings": 120, "weight_lbs": [60, 80], "allergens": [],
+           "category": "produce", "needs_cold": False, "safe_minutes": 720}
+
 SCENARIOS = {
     "lunch_rush": {
         "name": "lunch_rush", "title": "Lunch rush: four donations, a full shelter and a no-show",
@@ -44,6 +48,15 @@ SCENARIOS = {
             {"at": 2, "type": "cancel", "driver": "sam"},
             {"at": 3, "type": "cancel", "driver": "maria"},
             {"at": 5, "type": "donation", "business": "campus-cafe", "food": PB},
+        ],
+    },
+    "standoff": {
+        "name": "standoff", "title": "Standoff: every safe option is expensive, so the agents ask a coordinator",
+        "events": [
+            {"at": 0, "type": "cancel", "driver": "maria"},
+            {"at": 0, "type": "cancel", "driver": "jordan"},
+            {"at": 0, "type": "cancel", "driver": "sam"},
+            {"at": 1, "type": "donation", "business": "north-market", "food": PRODUCE},
         ],
     },
     "new_pantry": {
@@ -167,6 +180,60 @@ def markdown(c):
         oc = r["results"]["agents"]["outcomes"]
         out += "\nTeam outcomes: " + (", ".join(f"{k.replace('_', ' ')} {v}" for k, v in oc.items()) or "none") + "\n"
     return out
+
+
+# ---------------- randomized evidence ----------------
+
+FOODS = [PIZZA, SANDWICHES, GRANOLA, CURRY, PASTA, SALADS, YOGURT, SOUP, PB, PRODUCE]
+BUSINESSES = ["campus-cafe", "tech-cafeteria", "corner-bakery", "lakeside-hotel", "north-market"]
+DRIVERS = ["maria", "jordan", "sam", "courier-a", "courier-b"]
+SHELTERS = ["harbor-house", "eastside-pantry", "grace-kitchen", "northside-youth", "valley-food-bank"]
+
+
+def random_scenario(seed):
+    """A seeded random lunch rush: 3-6 donations, a couple of no-shows, maybe a full shelter or a new pantry."""
+    import random
+    rng = random.Random(seed)
+    events = []
+    for _ in range(rng.randint(3, 6)):
+        f = dict(rng.choice(FOODS))
+        f["servings"] = max(5, int(f["servings"] * rng.uniform(0.6, 1.4)))
+        f["safe_minutes"] = max(30, int(f["safe_minutes"] * rng.uniform(0.6, 1.1)))
+        events.append({"at": rng.randint(0, 20), "type": "donation", "business": rng.choice(BUSINESSES), "food": f})
+    for drv in rng.sample(DRIVERS, rng.randint(0, 2)):
+        events.append({"at": rng.randint(1, 25), "type": "cancel", "driver": drv})
+    if rng.random() < 0.6:
+        events.append({"at": rng.randint(2, 25), "type": "decline", "nonprofit": rng.choice(SHELTERS)})
+    if rng.random() < 0.3:
+        events.append({"at": rng.randint(2, 25), "type": "new_pantry"})
+    return {"name": f"random-{seed}", "title": f"Random lunch rush #{seed}", "events": events}
+
+
+def run_scenario(sc, policy, max_minutes=900):
+    from world import World
+    w = World(copy.deepcopy(sc), policy=policy, live=False)
+    for _ in range(max_minutes):
+        w.tick()
+        if w.done():
+            break
+    return w.metrics()
+
+
+def compare_random(n=50, first_seed=1):
+    """Run the same n random scenarios through both policies. Returns totals, per-run results and win counts."""
+    runs = []
+    for seed in range(first_seed, first_seed + n):
+        sc = random_scenario(seed)
+        runs.append({"seed": seed, "baseline": run_scenario(sc, "baseline"), "agents": run_scenario(sc, "agents")})
+    keys = [k for k, v in runs[0]["agents"].items() if isinstance(v, (int, float))]
+    totals = {p: {k: round(sum(r[p][k] for r in runs), 2) for k in keys} for p in ("baseline", "agents")}
+    lost = [(r["agents"]["servings_lost"], r["baseline"]["servings_lost"]) for r in runs]
+    wins = {
+        "less_food_lost": sum(a < b for a, b in lost),
+        "same_food_lost": sum(a == b for a, b in lost),
+        "more_food_lost": sum(a > b for a, b in lost),
+    }
+    return {"n": n, "totals": totals, "wins": wins, "runs": runs}
 
 
 if __name__ == "__main__":

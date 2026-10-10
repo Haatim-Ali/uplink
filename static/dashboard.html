@@ -6,89 +6,7 @@
 <title>Food Rescue Agents</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>
-:root{
-  --bg:#f5f4f0; --panel:#ffffff; --ink:#1d1d1b; --muted:#6b6a64; --line:#e3e1da;
-  --speed:#d9622b; --cost:#2f8f4e; --need:#7a4fc9; --safety:#c23b3b; --result:#2563a8;
-  --human:#b7791f; --adapt:#13858a; --world:#77756d; --intake:#4a6b8a;
-  --ok:#2f8f4e; --bad:#c23b3b;
-}
-*{box-sizing:border-box}
-body{margin:0;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
-header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 16px;background:var(--ink);color:#fff}
-header h1{font-size:17px;margin:0 12px 0 0;letter-spacing:.2px}
-header .clock{font:600 20px ui-monospace,Menlo,monospace;margin-left:auto}
-header select,header button,header a.btn{font:inherit;border-radius:6px;border:1px solid #555;background:#2b2b28;color:#fff;padding:5px 10px;cursor:pointer;text-decoration:none}
-header button.primary{background:#fff;color:var(--ink);border-color:#fff;font-weight:600}
-.badge{font-size:11px;padding:2px 7px;border-radius:99px;background:#3a3a36;color:#ddd}
-main{padding:14px 16px;display:grid;gap:14px}
-.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
-.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.kpi b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
-.kpi span{color:var(--muted);font-size:12px}
-.kpi.bad b{color:var(--bad)}
-.grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px}
-.grid3{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:14px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
-.panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 8px}
-#map{height:430px;border-radius:8px}
-.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.actions button{font:inherit;padding:7px 12px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer}
-.actions button.warn{border-color:#e7b4b4;background:#fdf3f3}
-.actions button.info{border-color:#b9cfe6;background:#f2f7fc}
-.scroll{max-height:380px;overflow:auto}
-.feed div{padding:5px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:44px 74px 1fr;gap:6px}
-.feed time{color:var(--muted);font:12px ui-monospace,monospace}
-.who{font-weight:600;font-size:12px}
-.who.Speed{color:var(--speed)}.who.Cost{color:var(--cost)}.who.Need{color:var(--need)}.who.Safety{color:var(--safety)}
-.who.Result{color:var(--result)}.who.Human{color:var(--human)}.who.Adapt{color:var(--adapt)}.who.Intake{color:var(--intake)}
-.who.World,.who.System,.who.Directory,.who.Baseline{color:var(--world)}
-.feed .objection{color:#5a3a3a}
-.log div{padding:4px 0;border-bottom:1px solid var(--line);font-size:13px}
-.v{font:600 11px ui-monospace,monospace;padding:1px 6px;border-radius:4px;margin-right:6px}
-.v.allowed{background:#e3f3e8;color:var(--ok)}.v.blocked{background:#fbe5e5;color:var(--bad)}
-.don{padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
-.don .st{float:right;font-size:11px;padding:1px 7px;border-radius:99px;background:#eee}
-.st.delivered{background:#e3f3e8;color:var(--ok)}.st.spoiled,.st.expired{background:#fbe5e5;color:var(--bad)}
-.st.en_route{background:#e5eef8;color:var(--result)}.st.awaiting_human{background:#fbf0d9;color:var(--human)}
-.timer{font-variant-numeric:tabular-nums;color:var(--muted)}
-.timer.low{color:var(--bad);font-weight:600}
-/* negotiation panel */
-.neg-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
-.rounds button{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer}
-.rounds button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
-.agents{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
-.agent{border:1px solid var(--line);border-top:4px solid;border-radius:8px;padding:8px;font-size:12px;min-height:92px}
-.agent.Speed{border-top-color:var(--speed)}.agent.Cost{border-top-color:var(--cost)}.agent.Need{border-top-color:var(--need)}
-.agent h3{margin:0 0 2px;font-size:14px}
-.agent .goal{color:var(--muted);margin-bottom:6px}
-.agent .w{float:right;font-size:11px;color:var(--muted)}
-table.matrix{width:100%;border-collapse:collapse;font-size:12px}
-.matrix th,.matrix td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
-.matrix th{color:var(--muted);font-weight:600}
-.bar{height:6px;background:#eceae4;border-radius:3px;overflow:hidden;margin-top:3px}
-.bar i{display:block;height:100%}
-.vote{font-weight:700}
-.vote.yes{color:var(--ok)}.vote.no{color:var(--bad)}
-tr.winner td{background:#f0f6fd}
-.outcome{margin-top:10px;padding:8px 10px;border-radius:8px;font-weight:600}
-.outcome.consensus{background:#e3f3e8;color:#1f6b39}.outcome.majority{background:#eef3fb;color:#1f4f87}
-.outcome.urgent{background:#fdf0e3;color:#8a4a12}.outcome.irreconcilable,.outcome.unacceptable{background:#fbf0d9;color:#7a5410}
-.st.awaiting_info{background:#efe9fb;color:var(--need)}
-.vote.veto{color:#fff;background:var(--bad);border-radius:4px;padding:0 4px}
-.tally{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:12px}
-.tally span{background:#f0efea;border-radius:99px;padding:2px 8px}
-.human{margin-top:10px;border:2px solid var(--human);border-radius:10px;padding:10px;background:#fffaf0}
-.human button{font:inherit;margin:4px 6px 0 0;padding:6px 10px;border-radius:6px;border:1px solid var(--human);background:#fff;cursor:pointer}
-.empty{color:var(--muted);font-style:italic}
-dialog{border:none;border-radius:12px;padding:20px;max-width:820px;width:95%}
-dialog table{width:100%;border-collapse:collapse;font-size:13px}
-dialog th,dialog td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
-dialog th:first-child,dialog td:first-child{text-align:left}
-.better{color:var(--ok);font-weight:700}
-.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:8px;display:none}
-@media (max-width:1100px){.grid,.grid3{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(3,1fr)}}
-</style>
+<link rel="stylesheet" href="/static/dashboard.css">
 </head>
 <body>
 <header>
@@ -98,9 +16,10 @@ dialog th:first-child,dialog td:first-child{text-align:left}
   <button id="blank">Empty world</button>
   <select id="speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select>
   <button id="pause">Pause</button>
-  <a class="btn" href="/business" target="_blank">Business view ↗</a>
-  <a class="btn" href="/records" target="_blank">Donation records ↗</a>
-  <button id="compare">Team vs baselines</button>
+  <a class="btn" href="/business" target="_blank">Business ↗</a>
+  <a class="btn" href="/shelter" target="_blank">Shelter ↗</a>
+  <a class="btn" href="/records" target="_blank">Records ↗</a>
+  <button id="compare">Evidence</button>
   <span class="badge" id="mode"></span>
   <span class="clock" id="clock">12:00</span>
 </header>
@@ -126,7 +45,7 @@ dialog th:first-child,dialog td:first-child{text-align:left}
     </div>
     <div class="panel">
       <div class="neg-head"><h2 style="margin:0">Negotiation · no boss</h2><div class="rounds" id="rounds"></div></div>
-      <div id="history" style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:4px"></div>
+      <div id="history"></div>
       <div id="neg"><p class="empty">Waiting for a donation. Run a scenario or send one from the Business view.</p></div>
       <div id="human"></div>
     </div>
@@ -140,180 +59,13 @@ dialog th:first-child,dialog td:first-child{text-align:left}
 </main>
 
 <dialog id="dlg">
-  <h2 style="margin-top:0">Can the agents decide better together than alone?</h2>
-  <p style="color:var(--muted);margin-top:-6px">Same scripted scenarios and events for every column. <b>Nearest shelter</b> sends food to the closest shelter that takes it with the closest free driver and skips the safety checks.
-  <b>Speed / Cost / Need alone</b> use the same safety rules as the team, but one agent decides by itself with no negotiation. <b>Green</b> = best in the row.</p>
+  <h2 class="dlg-title">Negotiating agents vs a simple baseline</h2>
+  <p class="dlg-sub">Same scenarios, same events. The baseline sends food to the nearest open shelter with room and the nearest free driver. It skips fridge, allergen and timing checks, driver reliability, cost and fairness, and never negotiates.</p>
   <div id="cmp">Running…</div>
-  <p><button onclick="dlg.close()">Close</button></p>
+  <p><button class="dlg-close" onclick="dlg.close()">Close</button></p>
 </dialog>
-<div class="toast" id="toast"></div>
+<div id="toasts"></div>
 
-<script>
-const AGENTS = ["Speed","Cost","Need"];
-const GOALS = {Speed:"Fast, reliable, big safety margin", Cost:"Spend as little as possible", Need:"Feed whoever needs it most"};
-const COLORS = {Speed:"var(--speed)",Cost:"var(--cost)",Need:"var(--need)"};
-let S = null, roundSel = null, lastNegKey = null, pinned = null;
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-
-function toast(msg){ const t=$("toast"); t.textContent=msg; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display="none",2600); }
-async function post(url, body){ const r = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}); const j = await r.json().catch(()=>({})); if(!r.ok) toast(j.error||"Request failed"); return j; }
-
-// ---------- map ----------
-let map=null, layers={};
-try{
-  map = L.map("map",{zoomControl:true}).setView([37.377,-121.97],13);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"© OpenStreetMap"}).addTo(map);
-  layers = {np:L.layerGroup().addTo(map), biz:L.layerGroup().addTo(map), drv:L.layerGroup().addTo(map), route:L.layerGroup().addTo(map)};
-}catch(e){ $("map").innerHTML = "<p class='empty' style='padding:12px'>Map needs internet for its tiles. Everything else still works.</p>"; }
-
-function drawMap(){
-  if(!map) return;
-  Object.values(layers).forEach(l=>l.clearLayers());
-  S.nonprofits.forEach(n=>{
-    const color = n.full ? "#c23b3b" : n.id==="maple-pantry" ? "#13858a" : "#2f8f4e";
-    L.circleMarker([n.lat,n.lng],{radius:9,color,fillColor:color,fillOpacity:.85,weight:2})
-      .bindTooltip(`<b>${esc(n.name)}</b><br>${n.has_fridge?"fridge":"no fridge"} · open until ${n.open_until}<br>${n.received}/${n.capacity_servings} servings · last fed ${n.last_donation_days}d ago${n.full?"<br><b>FULL</b>":""}`)
-      .addTo(layers.np);
-  });
-  S.businesses.forEach(b=>{
-    L.marker([b.lat,b.lng],{icon:L.divIcon({className:"",html:`<div style="width:14px;height:14px;background:#1d1d1b;border:2px solid #fff;border-radius:3px"></div>`})})
-      .bindTooltip(esc(b.name)).addTo(layers.biz);
-  });
-  S.donations.filter(d=>d.status==="en_route" && d.plan).forEach(d=>{
-    const dr = S.drivers.find(x=>x.id===d.plan.driver);
-    const pts = d.picked ? [[dr.lat,dr.lng],[d.dest.lat,d.dest.lng]] : [[dr.lat,dr.lng],[d.origin.lat,d.origin.lng],[d.dest.lat,d.dest.lng]];
-    L.polyline(pts,{color:"#2563a8",weight:3,dashArray:"6 6"}).addTo(layers.route);
-  });
-  S.drivers.forEach(dr=>{
-    const color = dr.status==="off" ? "#999" : dr.type==="paid" ? "#d9622b" : dr.type==="volunteer" ? "#2563a8" : "#7a4fc9";
-    L.marker([dr.lat,dr.lng],{icon:L.divIcon({className:"",iconSize:[26,26],html:`<div title="${esc(dr.name)}" style="width:26px;height:26px;border-radius:50%;background:${color};color:#fff;display:grid;place-items:center;font:700 11px system-ui;border:2px solid #fff;box-shadow:0 1px 3px #0005;opacity:${dr.status==="busy"?1:.75}">${esc(dr.name[0])}</div>`})})
-      .bindTooltip(`${esc(dr.name)} · ${dr.status} · ${Math.round(dr.reliability*100)}% reliable`).addTo(layers.drv);
-  });
-}
-
-// ---------- negotiation ----------
-function drawNegotiation(){
-  const hist = S.negotiations || [];
-  $("history").innerHTML = hist.length > 1 ? `<span style="font-size:12px;color:var(--muted);align-self:center">Past negotiations:</span>` +
-    hist.map(h=>`<button class="hb" style="font:12px system-ui;border:1px solid var(--line);border-radius:6px;padding:2px 7px;cursor:pointer;background:${(pinned===h.seq)||(!pinned&&S.negotiation&&S.negotiation.seq===h.seq)?"#1d1d1b;color:#fff":"#fff"}" onclick="pinned=(pinned===${h.seq}?null:${h.seq});lastNegKey=null;drawNegotiation()">${h.time} ${h.donation}</button>`).join("") +
-    (pinned?` <button style="font:12px system-ui;border:none;background:none;color:var(--result);cursor:pointer" onclick="pinned=null;lastNegKey=null;drawNegotiation()">follow live</button>`:"") : "";
-  const n = pinned ? hist.find(h=>h.seq===pinned) : S.negotiation;
-  if(S.busy && !pinned){ $("rounds").innerHTML=""; $("neg").innerHTML = `<p><b>Agents are deliberating…</b> The clock is paused until they finish.</p>`; return; }
-  if(!n){ return; }
-  const key = n.seq + "|" + n.donation + "|" + n.rounds.length + "|" + n.outcome + "|" + (n.plan?n.plan.id:"");
-  if(key!==lastNegKey){ roundSel = n.rounds.length-1; lastNegKey = key; }
-  $("rounds").innerHTML = n.rounds.map((r,i)=>`<button class="${i===roundSel?"on":""}" onclick="roundSel=${i};drawNegotiation()">R${r.round}</button>`).join(" ");
-  const r = n.rounds[roundSel];
-  const planIds = Object.keys(r.votes);
-  const nm = id => { const [np,dr] = id.split("|"); const N = S.nonprofits.find(x=>x.id===np); const D = S.drivers.find(x=>x.id===dr); return `${N?N.name:np} <span style="color:var(--muted)">via ${D?D.name:dr}</span>`; };
-  const cards = AGENTS.map(a=>{
-    const pid = r.proposals[a];
-    return `<div class="agent ${a}"><span class="w">vote ×${(n.weights||{})[a]??1}</span><h3>${a}</h3><div class="goal">${GOALS[a]}</div><div>Wants: <b>${nm(pid)}</b></div></div>`;
-  }).join("");
-  const rows = planIds.map(pid=>{
-    const win = n.plan && n.plan.id===pid && roundSel===n.rounds.length-1;
-    const cells = AGENTS.map(a=>{
-      const v = r.votes[pid][a], sc = (n.scores[pid]||{})[a] ?? 0;
-      const veto = !v.accept && v.reason.startsWith("Veto");
-      return `<td title="${esc(v.reason)}"><span class="vote ${v.accept?"yes":veto?"veto":"no"}">${v.accept?"✓ accept":veto?"⛔ veto":"✗ object"}</span>
-        <div class="bar"><i style="width:${Math.round(sc*100)}%;background:${COLORS[a]}"></i></div></td>`;
-    }).join("");
-    return `<tr class="${win?"winner":""}"><td>${nm(pid)}</td>${cells}</tr>`;
-  }).join("");
-  const label = {consensus:"Agreed 3 of 3", majority:"Majority decision, dissent kept on record", urgent:"Time is short: acting on the best-supported plan",
-    irreconcilable:"Irreconcilable: no plan has a majority, asking a human", unacceptable:"Unacceptable compromise: the majority's plan crosses a red line, asking a human"}[n.outcome];
-  const chosen = n.plan ? ` → ${nm(n.plan.id)}` : "";
-  const dissent = (n.dissent||[]).map(x=>`<div style="font-weight:400;margin-top:4px">${x.agent}: ${esc(x.reason)}</div>`).join("");
-  $("neg").innerHTML = `
-    <div style="margin-bottom:8px"><b>${esc(n.donation)}</b> · ${esc(n.food)} <span class="badge" style="background:#eee;color:#555">${n.mode==="llm"?"AI reasoning":"rules reasoning"}</span></div>
-    <div class="agents">${cards}</div>
-    <table class="matrix"><thead><tr><th>Plans on the table (round ${r.round})</th>${AGENTS.map(a=>`<th style="color:${COLORS[a]}">${a}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>
-    ${roundSel===n.rounds.length-1?`<div class="outcome ${n.outcome}">${label}${chosen}${dissent}</div>`:""}
-    ${tally()}`;
-}
-
-function tally(){
-  const o = S.outcomes || {}, names = {consensus:"agreed", majority:"majority", urgent:"time short", unacceptable:"unacceptable compromise",
-    irreconcilable:"irreconcilable", insufficient_evidence:"asked for evidence", over_budget:"over budget", human_timeout:"fallback rule used"};
-  const parts = Object.entries(o).map(([k,v])=>`<span>${names[k]||k}: <b>${v}</b></span>`).join("");
-  return parts ? `<div class="tally"><span style="background:none;padding-left:0;color:var(--muted)">How negotiations ended so far:</span>${parts}</div>` : "";
-}
-
-function drawHuman(){
-  const waiting = S.donations.filter(d=>d.status==="awaiting_human");
-  const asking = S.donations.filter(d=>d.status==="awaiting_info");
-  $("human").innerHTML = waiting.map(d=>`
-    <div class="human"><b>Coordinator needed for ${d.id}</b> (${esc(d.food.items.join(", "))}, ${d.minutes_left} min until unsafe).
-      <div style="margin-top:4px">Why: ${esc(d.why||"the agents could not agree")}.</div>
-      <div>${d.options.map(o=>`<button onclick="approve('${d.id}','${o.id}')">Approve ${esc(o.np_name)} via ${esc(o.driver_name)} · ${o.dur} min · $${o.cost.toFixed(2)}</button>`).join("")}</div></div>`).join("")
-  + asking.map(d=>`
-    <div class="human" style="border-color:var(--need)"><b>Agents are asking ${esc(d.business_name)} about ${d.id}</b> (${esc(d.food.items.join(", "))}):
-      "Is this free of ${esc(d.asked_about)}?" Not enough evidence to decide yet; they act on what they know if there's no answer.
-      <div><button onclick="confirmInfo('${d.id}',true)">Business: listed allergens only (${esc(d.food.allergens.join(", ")||"none")})</button>
-      <button onclick="confirmInfo('${d.id}',false)">Business: can't say for sure</button></div></div>`).join("");
-}
-async function approve(d,p){ await post("/api/approve",{donation:d,plan:p}); refresh(); }
-async function confirmInfo(id, sure){ const d = S.donations.find(x=>x.id===id); await post("/api/confirm",{donation:id, allergens: sure ? d.food.allergens : null}); refresh(); }
-
-// ---------- lists ----------
-function drawLists(){
-  $("feed").innerHTML = S.feed.slice().reverse().map(f=>`<div><time>${f.time}</time><span class="who ${f.agent}">${f.agent}</span><span class="${f.type==="objection"?"objection":""}">${esc(f.text)}</span></div>`).join("") || "<p class='empty'>Nothing yet.</p>";
-  $("log").innerHTML = S.decisions.slice().reverse().map(x=>`<div><span class="v ${x.verdict}">${x.verdict==="allowed"?"ALLOWED":"BLOCKED"}</span>${esc(x.donation)} · ${esc(x.text)}</div>`).join("") || "<p class='empty'>No decisions yet.</p>";
-  $("dons").innerHTML = S.donations.slice().reverse().map(d=>{
-    const live = !["delivered","spoiled","expired"].includes(d.status);
-    const statusText = {awaiting_info:"asking business", awaiting_human:"asking human"}[d.status] || d.status.replace("_"," ");
-    const where = d.plan ? `${esc(d.plan.np_name)} via ${esc(d.plan.driver_name)}` : "planning…";
-    return `<div class="don"><span class="st ${d.status}">${statusText}</span><b>${d.id}</b> ${esc(d.food.items.join(", "))} · ${d.food.servings} servings<br>
-      <span style="color:var(--muted)">${esc(d.business_name)} → ${where}</span>
-      ${live?`<br><span class="timer ${d.minutes_left<30?"low":""}">${d.minutes_left} min until unsafe (${d.safe_until})</span>`:""}</div>`;
-  }).join("") || "<p class='empty'>No donations yet.</p>";
-}
-
-function drawKpis(){
-  const i = S.impact;
-  $("k-meals").textContent = i.meals; $("k-lbs").textContent = i.lbs; $("k-orgs").textContent = i.orgs;
-  $("k-lost").textContent = i.spoiled; $("k-cost").textContent = "$"+i.cost.toFixed(2); $("k-esc").textContent = i.escalations;
-  $("clock").textContent = S.now + (S.paused?" ⏸":"");
-  $("mode").textContent = `Agents: ${S.mode.agents} · Vision: ${S.mode.vision}`;
-  $("pause").textContent = S.paused ? "Resume" : "Pause";
-}
-
-async function refresh(){
-  try{
-    S = await (await fetch("/api/state")).json();
-    if(!$("scenario").options.length){
-      $("scenario").innerHTML = S.scenarios.map(s=>`<option value="${s.name}">${esc(s.title)}</option>`).join("");
-    }
-    $("speed").value = String(S.speed);
-    drawKpis(); drawMap(); drawNegotiation(); drawHuman(); drawLists();
-  }catch(e){ console.error(e); }
-}
-
-$("start").onclick = async()=>{ await post("/api/reset",{scenario:$("scenario").value}); lastNegKey=null; pinned=null; refresh(); };
-$("blank").onclick = async()=>{ await post("/api/reset",{}); lastNegKey=null; pinned=null; refresh(); };
-$("speed").onchange = e=>post("/api/control",{speed:+e.target.value});
-$("pause").onclick = ()=>post("/api/control",{paused:!S.paused}).then(refresh);
-document.querySelectorAll("[data-ev]").forEach(b=>b.onclick=async()=>{ await post("/api/event/"+b.dataset.ev); refresh(); });
-
-const dlg = $("dlg");
-$("compare").onclick = async()=>{
-  dlg.showModal(); $("cmp").textContent = "Running all scenarios…";
-  const r = await (await fetch("/api/compare")).json();
-  const P = r.order;  // the server sorts JSON keys, so the column order comes separately
-  const M = [["meals_delivered_safely","Meals delivered safely",1],["servings_lost","Servings lost",-1],["money_spent","Money spent ($)",-1],
-             ["shelters_fed","Shelters fed",1],["avg_spare_minutes","Avg minutes to spare (perishable)",1],["human_escalations","Asked a human",0]];
-  const outcomeLine = o => Object.entries(o||{}).map(([k,v])=>`${k.replace(/_/g," ")} ${v}`).join(", ") || "none";
-  const block = (title,res)=>`<tr><th colspan="${P.length+1}" style="text-align:left;padding-top:14px">${esc(title)}</th></tr>` + M.map(([k,l,dir])=>{
-    const vals = P.map(p=>res[p][k]); const best = dir>0 ? Math.max(...vals) : Math.min(...vals);
-    return `<tr><td>${l}</td>${P.map(p=>`<td class="${dir&&res[p][k]===best?"better":""}">${res[p][k]}</td>`).join("")}</tr>`;}).join("")
-    + `<tr><td colspan="${P.length+1}" style="text-align:left;color:var(--muted);font-size:12px">Team outcomes: ${outcomeLine(res.agents.outcomes)}</td></tr>`;
-  $("cmp").innerHTML = `<table><thead><tr><th></th>${P.map(p=>`<th>${esc(r.policies[p])}</th>`).join("")}</tr></thead><tbody>
-    ${block("All scenarios",r.totals)}
-    ${r.rows.map(x=>block(x.title,x.results)).join("")}</tbody></table>`;
-};
-
-refresh(); setInterval(refresh, 1000);
-</script>
+<script src="/static/dashboard.js"></script>
 </body>
 </html>

@@ -28,6 +28,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 import llm
+from config import CONCESSION, THRESHOLDS, TIGHT_SLACK, URGENT_MINUTES
 
 AGENTS = ["Speed", "Cost", "Need"]
 GOALS = {
@@ -35,9 +36,6 @@ GOALS = {
     "Cost": "spend as little money as possible (volunteers and nonprofit vans are free; paid couriers cost money)",
     "Need": "send food where it helps most: shelters that have waited longest for a donation and have room",
 }
-THRESHOLDS = [0.9, 0.78, 0.65]  # accept if a plan scores at least this share of the agent's best
-CONCESSION = [0.0, 0.45, 0.75]  # how much an agent weighs the least-happy other agent when revising
-URGENT_MINUTES = 30
 # red lines: an agent vetoes any plan past these, in every round
 SPEED_MIN_SLACK = 10       # minutes to spare before the food is unsafe
 SPEED_MIN_RELIABILITY = 0.5
@@ -165,8 +163,9 @@ def propose_reason(agent, p, world, compromise=False):
 def object_reason(agent, p, best, world):
     """Return (text, kind). kind is used later to check whether the objection proved right."""
     if agent == "Speed":
-        if p["reliability"] < 0.75:
-            return f"Object: {p['driver_name']} is only {p['reliability']:.0%} reliable; a no-show could spoil this food.", "reliability"
+        if p["reliability"] < 0.75 or (p["slack"] < TIGHT_SLACK and p["reliability"] < 0.9):
+            return (f"Object: {p['driver_name']} is only {p['reliability']:.0%} reliable and there's just {p['slack']} min "
+                    "of margin; a no-show would spoil this food."), "reliability"
         return f"Object: only {p['slack']} min margin; {short(best)} leaves {best['slack']}.", "time"
     if agent == "Cost":
         if p["cost"] <= best["cost"]:
@@ -194,7 +193,9 @@ def _rules_round(world, d, plans, S, V, r):
     return proposals
 
 
-def _rules_vote(agent, pid, S, best_score, r):
+def _rules_vote(agent, pid, S, best_score, r, plan=None):
+    if agent == "Speed" and plan and plan["slack"] < TIGHT_SLACK and plan["reliability"] < 0.9:
+        return False  # tight margin + unreliable driver: Speed won't sign off
     return S[pid][agent] >= THRESHOLDS[r] * best_score[agent]
 
 
@@ -308,7 +309,7 @@ def negotiate(world, d, plans):
                     kind = object_reason(a, p, best_plan[a], world)[1]
                     why = ("Accept: " if acc else "Object: ") + why if why else ("Accept." if acc else "Object.")
                 else:
-                    acc = _rules_vote(a, pid, S, best_score, r)
+                    acc = _rules_vote(a, pid, S, best_score, r, p)
                     if acc:
                         why, kind = "Accept: good enough for my goal.", None
                     else:

@@ -3,22 +3,19 @@
 The agents are real; the world around them is simulated (1 tick = 1 minute).
 """
 import itertools
+import time
 import json
 import math
 import os
 
 import agents
+from config import (COST_LIMIT, HANDOFF_MIN, HUMAN_TIMEOUT, PHONE_ONLINE_SECONDS, RELIABILITY_PENALTY,
+                    SAFETY_MARGIN, SHELTER_TIMEOUT, SPEED_KMH, START, WEIGHT_BONUS)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
-SPEED_KMH = 28.0
-HANDOFF_MIN = 2
-SAFETY_MARGIN = 5          # food must arrive at least this many minutes before it's unsafe
-COST_LIMIT = 25            # plans costing more than this need a human
-HUMAN_TIMEOUT = 15         # if no human answers and food has this little time left, act anyway
 EVIDENCE_WAIT = 15         # wait at most this long for the business to answer a question...
 EVIDENCE_DEADLINE = 30     # ...and never past this many minutes before the food is unsafe
-START = 12 * 60            # sim clock starts at 12:00
 
 
 def load(name):
@@ -79,10 +76,12 @@ class World:
         self.outcomes = {}         # how each negotiation ended (consensus, majority, urgent, ...)
         self.negotiation = None
         self.negotiations = []
+        self.phones = {}              # nonprofit id -> last time its phone page checked in (real seconds)
         self.events = []
         self.scenario_name = None
         self.busy = False
         self._ids = itertools.count(1)
+        self._neg_ids = itertools.count(1)
         if scenario:
             self.load_scenario(scenario)
 
@@ -124,8 +123,15 @@ class World:
 
     def committed(self, np_id, exclude=None):
         """Servings already on their way to this nonprofit."""
-        return sum(d["food"]["servings"] for d in self.donations
-                   if d["status"] == "en_route" and d["plan"]["np"] == np_id and d is not exclude)
+        total = 0
+        for d in self.donations:
+            if d is exclude:
+                continue
+            if d["status"] == "en_route" and d["plan"]["np"] == np_id:
+                total += d["food"]["servings"]
+            elif d["status"] == "awaiting_shelter" and d["ask"]["plan"]["np"] == np_id:
+                total += d["food"]["servings"]  # asked and waiting for an answer: hold the room
+        return total
 
     # ---------------- plans ----------------
     def make_plan(self, d, n, dr):
@@ -152,14 +158,17 @@ class World:
                     continue
             elif dr["status"] != "free":
                 continue
-            if dr.get("owner") and dr["owner"] != n["id"]:
-                continue
+            if dr.get("owner") and dr["owner"] != n["id"] and not d.get("locked_driver"):
+                continue  # a nonprofit's van serves its own shelter, unless it's already carrying this food
             out.append(dr)
         return out
 
     def safe_plans(self, d, log=True, food=None):
         """Every (nonprofit, driver) plan that passes the safety rules."""
         ok, removed = self.search_directory(food or d["food"])
+        skip = d.get("skip", [])
+        removed += [(n, "didn't answer this request") for n in ok if n["id"] in skip]
+        ok = [n for n in ok if n["id"] not in skip]
         plans, late = [], 0
         for n in ok:
             for dr in self.usable_drivers(d, n):
@@ -181,7 +190,9 @@ class World:
 
     # ---------------- feed ----------------
     def say(self, agent, text, kind="info", donation=None):
-        self.feed.append({"time": hhmm(self.now), "agent": agent, "type": kind, "text": text, "donation": donation})
+        self._feed_seq = getattr(self, "_feed_seq", 0) + 1
+        self.feed.append({"seq": self._feed_seq, "time": hhmm(self.now), "agent": agent, "type": kind, "text": text,
+                          "donation": donation})
         self.feed = self.feed[-300:]
 
     def decide(self, d, verdict, text):
@@ -230,8 +241,11 @@ class World:
             d["reconsider"] = False
             if d["status"] == "new":
                 d["status"] = "stuck"
-                self.impact["escalations"] += 1
-                self.say("Human", f"{d['id']}: no safe plan exists right now. A coordinator should step in.", "human", d["id"])
+                if not d.get("flagged_stuck"):
+                    d["flagged_stuck"] = True
+                    self.impact["escalations"] += 1
+                    self.say("Human", f"{d['id']}: no safe plan exists right now. A coordinator should step in; "
+                             "the agents keep retrying as drivers free up.", "human", d["id"])
             return None
         return plans
 
@@ -267,7 +281,7 @@ class World:
         d["reconsider"] = False
         self.outcomes[result["outcome"]] = self.outcomes.get(result["outcome"], 0) + 1
         self.negotiation = dict(result, donation=d["id"], food=", ".join(d["food"]["items"]),
-                                time=hhmm(self.now), seq=len(self.negotiations) + 1)
+                                time=hhmm(self.now), seq=next(self._neg_ids))
         self.negotiations.append(self.negotiation)
         self.negotiations = self.negotiations[-12:]
         for rnd in result["rounds"]:
@@ -284,7 +298,11 @@ class World:
             else:
                 why = f"cost ${plan['cost']:.2f} is over the ${COST_LIMIT} limit"
                 self.outcomes["over_budget"] = self.outcomes.get("over_budget", 0) + 1
-            d["options"] = result["options"]
+            d["options"] = list(result["options"])
+            if len(d["options"]) < 2:  # give the coordinator a real choice: add the best different plan
+                rest = [p for p in plans if p["id"] not in {o["id"] for o in d["options"]}]
+                if rest:
+                    d["options"].append(min(rest, key=lambda p: (p["cost"], p["dur"])))
             d["why"] = why
             if reconsidering:
                 self.say("Result", f"{d['id']}: no agreement on a better plan; keeping the current one.", "result", d["id"])
@@ -312,7 +330,7 @@ class World:
             return
         self.say("Result", f"{label}: {short_plan(plan)}, arrives {plan['arrive_hhmm']}"
                  + (f", ${plan['cost']:.2f}" if plan["cost"] else ", free") + ".", "result", d["id"])
-        self.assign(d, plan)
+        self.dispatch(d, plan)
 
     def approve(self, did, plan_id, auto=False):
         d = self.get(did)
@@ -331,8 +349,65 @@ class World:
             "timeout": "Fallback rule, not a decision-maker: no human answered in time, so the agents' top-ranked option goes",
         }[auto]
         self.say("Human", f"{who}: {short_plan(plan)} for {did}.", "human", did)
-        self.assign(d, plan)
+        self.dispatch(d, plan)
         return True
+
+    # ---------------- shelter phones ----------------
+    def phone_online(self, np_id):
+        return self.live and time.time() - self.phones.get(np_id, 0) < PHONE_ONLINE_SECONDS
+
+    def dispatch(self, d, plan):
+        """Ask the shelter first if someone is answering its phone; otherwise go straight away."""
+        if not self.phone_online(plan["np"]):
+            self.assign(d, plan)
+            return
+        dr = self.drivers[plan["driver"]]
+        if dr["status"] == "free":
+            dr["status"] = "reserved"   # hold the driver while the shelter decides
+        d["ask"] = {"plan": plan, "asked_at": self.now}
+        d["status"] = "awaiting_shelter"
+        self.say("Contact", f"Asking {plan['np_name']} to accept {d['id']} ({d['food']['servings']} servings of "
+                 f"{', '.join(d['food']['items'])}, arriving {plan['arrive_hhmm']}). Waiting for their reply.", "contact", d["id"])
+
+    def respond(self, did, accept):
+        d = self.get(did)
+        if not d or d["status"] != "awaiting_shelter":
+            return False
+        plan = d.pop("ask")["plan"]
+        n = self.nonprofits[plan["np"]]
+        if accept:
+            plan = self.make_plan(d, n, self.drivers[plan["driver"]])  # refresh the ETA: time passed while they decided
+            self.say("Contact", f"{n['name']} accepted {did}. Driver on the way, arriving {plan['arrive_hhmm']}.", "contact", did)
+            self.assign(d, plan)
+            return True
+        self._release(d, plan)
+        d["status"] = "new"
+        self.say("Contact", f"{n['name']} declined {did}.", "contact", did)
+        self.decline(plan["np"])
+        return True
+
+    def _release(self, d, plan):
+        dr = self.drivers[plan["driver"]]
+        if dr["status"] == "reserved" and d.get("locked_driver") != dr["id"]:
+            dr["status"] = "free"
+
+    def shelter_view(self, np_id):
+        self.phones[np_id] = time.time()
+        n = self.nonprofits.get(np_id)
+        if not n:
+            return None
+        asks = [{"donation": d["id"], "business": d["business_name"], "food": d["food"],
+                 "arrive": d["ask"]["plan"]["arrive_hhmm"], "driver": d["ask"]["plan"]["driver_name"],
+                 "minutes_left": d["safe_until"] - self.now,
+                 "waiting": self.now - d["ask"]["asked_at"], "timeout": SHELTER_TIMEOUT}
+                for d in self.donations if d["status"] == "awaiting_shelter" and d["ask"]["plan"]["np"] == np_id]
+        coming = [{"donation": d["id"], "items": ", ".join(d["food"]["items"]), "servings": d["food"]["servings"],
+                   "eta": d["plan"]["arrive_hhmm"], "driver": d["plan"]["driver_name"]}
+                  for d in self.donations if d["status"] == "en_route" and d["plan"]["np"] == np_id]
+        got = [r for r in self.records if r["recipient"] == n["name"]]
+        return {"now": hhmm(self.now), "nonprofit": {k: n[k] for k in ("id", "name", "full", "open_until", "has_fridge",
+                                                                         "capacity_servings", "received")},
+                "asks": asks, "coming": coming, "received": got}
 
     def assign(self, d, plan):
         dr = self.drivers[plan["driver"]]
@@ -444,13 +519,17 @@ class World:
         if carrying:
             return  # already has the food on board; finishes the trip
         old = dr["reliability"]
-        dr["reliability"] = round(max(0.1, old - 0.3), 2)
+        dr["reliability"] = round(max(0.1, old - RELIABILITY_PENALTY), 2)
         dr["status"] = "off"
         self.say("World", f"{dr['name']} cancelled. Reliability {old:.0%} → {dr['reliability']:.0%}; every agent now sees that.", "event")
         for d in self.donations:
+            if d["status"] == "awaiting_shelter" and d["ask"]["plan"]["driver"] == driver_id:
+                d.pop("ask")
+                d["status"] = "new"
+                self.say("World", f"{d['id']} needs a new driver.", "event", d["id"])
             if d["status"] == "en_route" and d["plan"]["driver"] == driver_id:
                 for agent in sorted({x["agent"] for x in d.get("objections", []) if x["driver"] == driver_id}):
-                    self.weights[agent] = round(self.weights[agent] + 0.25, 2)
+                    self.weights[agent] = round(self.weights[agent] + WEIGHT_BONUS, 2)
                     self.say("Adapt", f"{agent} warned that {dr['name']} might not show, and was right. "
                              f"{agent}'s vote now weighs {self.weights[agent]}.", "adapt", d["id"])
                 d["status"] = "new"
@@ -465,6 +544,7 @@ class World:
         for d in self.donations:
             if d["status"] in ("stuck", "awaiting_human"):
                 d["status"] = "new"
+                d["skip"] = []
             elif d["status"] == "en_route" and self.now < d["t_pick"] and self.policy == "agents":
                 d["reconsider"] = True
 
@@ -480,8 +560,16 @@ class World:
                     if self.now >= d["t_arr"]:
                         self.arrive(d)
             for d in self.donations:
-                if d["status"] in ("new", "stuck", "awaiting_human", "awaiting_info") and self.now > d["safe_until"]:
+                if d["status"] in ("new", "stuck", "awaiting_human", "awaiting_info", "awaiting_shelter") and self.now > d["safe_until"]:
+                    if d.get("ask"):
+                        self._release(d, d.pop("ask")["plan"])
                     self.expire(d)
+                elif d["status"] == "awaiting_shelter" and self.now - d["ask"]["asked_at"] >= SHELTER_TIMEOUT:
+                    plan = d.pop("ask")["plan"]
+                    self._release(d, plan)
+                    d.setdefault("skip", []).append(plan["np"])
+                    d["status"] = "new"
+                    self.say("Contact", f"No answer from {plan['np_name']} after {SHELTER_TIMEOUT} min. Trying elsewhere.", "contact", d["id"])
                 elif d["status"] == "awaiting_human" and d["safe_until"] - self.now <= HUMAN_TIMEOUT and d["options"]:
                     self.outcomes["human_timeout"] = self.outcomes.get("human_timeout", 0) + 1
                     if not self.approve(d["id"], d["options"][0]["id"], auto="timeout"):
@@ -518,6 +606,7 @@ class World:
             d["origin"] = pos(n)
             d["locked_driver"] = dr["id"]
             d["status"] = "new"
+            d.setdefault("skip", []).append(n["id"])
             self.say("World", f"{d['id']} arrived at {n['name']} but it's {why}. Turned away.", "event", d["id"])
             return
         dr["status"] = "free"
@@ -604,9 +693,17 @@ def short_plan(p):
 
 
 def baseline_plan(world, d):
-    """The simple approach to beat: nearest shelter that takes this food type, nearest free driver.
-    No fridge, hours, allergen, capacity or timer checks, and no negotiation."""
-    nps = [n for n in world.nonprofits.values() if d["food"]["category"] in n["accepts"] and not n["full"]]
+    """The simple approach to beat, as a busy coordinator with a phone list would do it:
+    nearest shelter that takes this food type, is open right now, isn't full and has room,
+    with the nearest free driver. It never retries a shelter that already turned this food away.
+    It does NOT check fridges, allergens, whether food arrives in time or before closing,
+    driver reliability, cost, or which shelter needs food most. There is no negotiation."""
+    f = d["food"]
+    skip = d.get("skip", [])
+    nps = [n for n in world.nonprofits.values()
+           if f["category"] in n["accepts"] and not n["full"] and n["open_min"] > world.now
+           and n["capacity_servings"] - n["received"] - world.committed(n["id"]) >= f["servings"]
+           and n["id"] not in skip]
     if not nps:
         return None
     n = min(nps, key=lambda n: km(d["origin"], n))
