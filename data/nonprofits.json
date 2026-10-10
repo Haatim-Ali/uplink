@@ -1,23 +1,121 @@
 [
-  {"id": "harbor-house", "name": "Harbor House Shelter", "lat": 37.3762, "lng": -121.9702,
-   "accepts": ["hot prepared", "cold prepared", "packaged"], "has_fridge": true,
-   "open_until": "20:00", "capacity_servings": 60, "last_donation_days": 0, "avoid_allergens": []},
-  {"id": "eastside-pantry", "name": "Eastside Pantry", "lat": 37.3832, "lng": -121.9688,
-   "accepts": ["hot prepared", "cold prepared", "packaged", "produce"], "has_fridge": false,
-   "open_until": "19:00", "capacity_servings": 80, "last_donation_days": 3, "avoid_allergens": []},
-  {"id": "grace-kitchen", "name": "Grace Community Kitchen", "lat": 37.3552, "lng": -121.9548,
-   "accepts": ["hot prepared", "cold prepared", "packaged"], "has_fridge": true,
-   "open_until": "21:00", "capacity_servings": 70, "last_donation_days": 4, "avoid_allergens": []},
-  {"id": "riverside-family", "name": "Riverside Family Center", "lat": 37.3991, "lng": -121.9452,
-   "accepts": ["hot prepared", "packaged"], "has_fridge": true,
-   "open_until": "12:40", "capacity_servings": 40, "last_donation_days": 2, "avoid_allergens": []},
-  {"id": "northside-youth", "name": "Northside Youth Shelter", "lat": 37.4102, "lng": -121.9898,
-   "accepts": ["hot prepared", "cold prepared", "packaged"], "has_fridge": true,
-   "open_until": "22:00", "capacity_servings": 50, "last_donation_days": 5, "avoid_allergens": ["peanuts"]},
-  {"id": "valley-food-bank", "name": "Valley Food Bank", "lat": 37.3401, "lng": -121.9198,
-   "accepts": ["cold prepared", "packaged", "produce"], "has_fridge": true,
-   "open_until": "18:00", "capacity_servings": 400, "last_donation_days": 1, "avoid_allergens": []},
-  {"id": "hope-pantry", "name": "St. Hope Pantry", "lat": 37.3701, "lng": -122.0052,
-   "accepts": ["packaged", "produce"], "has_fridge": false,
-   "open_until": "17:00", "capacity_servings": 100, "last_donation_days": 6, "avoid_allergens": []}
+ {
+  "id": "harbor-house",
+  "name": "Harbor House Shelter",
+  "lat": 37.3762,
+  "lng": -121.9702,
+  "accepts": [
+   "hot prepared",
+   "cold prepared",
+   "packaged"
+  ],
+  "has_fridge": true,
+  "open_until": "20:00",
+  "capacity_servings": 60,
+  "last_donation_days": 0,
+  "avoid_allergens": [],
+  "category_limits": {
+   "hot prepared": 40
+  }
+ },
+ {
+  "id": "eastside-pantry",
+  "name": "Eastside Pantry",
+  "lat": 37.3832,
+  "lng": -121.9688,
+  "accepts": [
+   "hot prepared",
+   "cold prepared",
+   "packaged",
+   "produce"
+  ],
+  "has_fridge": false,
+  "open_until": "19:00",
+  "capacity_servings": 80,
+  "last_donation_days": 3,
+  "avoid_allergens": []
+ },
+ {
+  "id": "grace-kitchen",
+  "name": "Grace Community Kitchen",
+  "lat": 37.3552,
+  "lng": -121.9548,
+  "accepts": [
+   "hot prepared",
+   "cold prepared",
+   "packaged"
+  ],
+  "has_fridge": true,
+  "open_until": "21:00",
+  "capacity_servings": 70,
+  "last_donation_days": 4,
+  "avoid_allergens": []
+ },
+ {
+  "id": "riverside-family",
+  "name": "Riverside Family Center",
+  "lat": 37.3991,
+  "lng": -121.9452,
+  "accepts": [
+   "hot prepared",
+   "packaged"
+  ],
+  "has_fridge": true,
+  "open_until": "12:40",
+  "capacity_servings": 40,
+  "last_donation_days": 2,
+  "avoid_allergens": []
+ },
+ {
+  "id": "northside-youth",
+  "name": "Northside Youth Shelter",
+  "lat": 37.4102,
+  "lng": -121.9898,
+  "accepts": [
+   "hot prepared",
+   "cold prepared",
+   "packaged"
+  ],
+  "has_fridge": true,
+  "open_until": "22:00",
+  "capacity_servings": 50,
+  "last_donation_days": 5,
+  "avoid_allergens": [
+   "peanuts"
+  ]
+ },
+ {
+  "id": "valley-food-bank",
+  "name": "Valley Food Bank",
+  "lat": 37.3401,
+  "lng": -121.9198,
+  "accepts": [
+   "cold prepared",
+   "packaged",
+   "produce"
+  ],
+  "has_fridge": true,
+  "open_until": "18:00",
+  "capacity_servings": 400,
+  "last_donation_days": 1,
+  "avoid_allergens": []
+ },
+ {
+  "id": "hope-pantry",
+  "name": "St. Hope Pantry",
+  "lat": 37.3701,
+  "lng": -122.0052,
+  "accepts": [
+   "packaged",
+   "produce"
+  ],
+  "has_fridge": false,
+  "open_until": "17:00",
+  "capacity_servings": 100,
+  "last_donation_days": 6,
+  "avoid_allergens": [],
+  "category_limits": {
+   "packaged": 60
+  }
+ }
 ]

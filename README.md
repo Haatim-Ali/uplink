@@ -1,8 +1,8 @@
 # Uplink
 
-**AI agents that negotiate where leftover food goes.**
+**Uplink notices leftover food on its own, and a network of AI agents negotiates where it goes.**
 
-One photo of leftover food becomes a completed donation. Three AI agents with competing goals (Speed, Cost, Need) negotiate where the food goes and who drives it, with no boss. Safety rules in code remove unsafe plans before anyone argues. When something breaks, they renegotiate on their own. When they truly can't agree, a plan crosses one agent's red line, or the decision hinges on a fact nobody has confirmed, they stop and ask a person instead of forcing a consensus.
+A camera at the business spots surplus at closing time, with no photo or form. Every business, shelter and driver has its own agent: shelters accept, decline or counter-offer ("we'll take 20 of 40"), drivers bid for the pickup, and three coordinator agents (Speed, Cost, Need) negotiate over the offers with no boss. Safety rules in code remove unsafe options before anyone argues, and a real person can answer for a shelter from their phone. When the agents truly can't agree, a plan crosses one agent's red line, or the decision hinges on a fact nobody has confirmed, they stop and ask a person instead of forcing a consensus.
 
 Built for the Cisco Cloud AI track, "When AI Agents Disagree" (Level 3).
 
@@ -22,6 +22,7 @@ On a Mac, use `PORT=5050` because macOS reserves port 5000 for AirPlay.
 - Dashboard: http://localhost:5050
 - Business view (open on a phone on the same Wi-Fi): http://YOUR-LAPTOP-IP:5050/business
 - Shelter phone (a teammate plays the shelter): http://YOUR-LAPTOP-IP:5050/shelter?id=northside-youth
+- Camera at the business: `python3 camera.py --business campus-cafe` (see below)
 - Donation records (SB 1383): http://localhost:5050/records
 
 It runs with **no API key**: vision returns a demo pizza result and the agents use rules-based reasoning. The map needs internet for its tiles.
@@ -36,20 +37,32 @@ LLM_AGENTS=1 python app.py         # agents also propose, vote and explain with 
 
 Optional: `ANTHROPIC_MODEL`, `OPENAI_MODEL`, and `AGENT_MODEL` (a faster model for the agents). Any failed model call falls back to rules, so the demo never hangs on an error. The clock pauses while agents deliberate. Red lines are enforced in code in both modes; the model is told about them but can't override them.
 
+## Camera at the business
+
+```bash
+pip3 install ultralytics opencv-python requests   # one time; the detector downloads on first run
+python3 camera.py --business campus-cafe          # with the server already running
+python3 camera.py --business campus-cafe --image test.jpg   # test with a photo
+```
+
+A ready-made detector (YOLO) counts pizza, sandwiches, hot dogs, donuts, cake and fruit/veg on every frame, smoothed over ~15 frames so a passing hand doesn't count. The dashboard shows what it sees. At closing time (press **C** in the camera window or click **Closing time (camera)** on the dashboard) it donates what's left, one donation per kind of food since the safety rules differ. If the server has an AI key, the vision model describes the snapshot in detail. Video never leaves the laptop. Tune servings per item in `camera.py`'s `FOOD` table with real food.
+
 ## Demo script
 
+0. Point the webcam at real leftover food and start `camera.py`. Click **Closing time (camera)**: the camera's donation appears and the network starts negotiating with no one touching anything.
 1. A teammate opens the **Shelter** page on their phone and picks a shelter.
 2. Pick **Lunch rush** and click **Run scenario**. The debate plays back message by message; objections shake; "Agreed 3 of 3" lands.
-3. When the agents pick the teammate's shelter, their phone shows the request. They tap **We're full**: the agents renegotiate live. Next time they tap **Accept**.
-4. Press **Driver cancels** and **New pantry joins** to show adaptation. Pop-ups call out each event.
-5. Show the three ways the team refuses a bad consensus:
+3. When the agents pick the teammate's shelter, their phone shows the request. They tap **Take part** (a counter-offer): the donation splits and the rest goes back to the network. Next time they tap **We're full** and the agents renegotiate.
+4. Walk the judges through the **Agent network** panel: the business announces, each shelter agent answers (accept, counter-offer, decline), drivers bid, coordinators decide.
+5. Press **Driver cancels** and **New pantry joins** to show adaptation. Pop-ups call out each event.
+6. Show the three ways the team refuses a bad consensus:
    - **Unacceptable compromise**: two agents want a plan, the third vetoes it. The coordinator box explains why.
    - **Irreconcilable goals**: no plan wins a majority after 3 rounds. A human picks from the agents' top two.
    - **Insufficient evidence**: the agents ask the business "is this free of peanuts?" before committing. Answer with the buttons, or wait and watch them act on what they know.
-6. Run **Standoff** to show the agents asking a coordinator to approve an over-budget plan.
-7. Run **City mode** (set speed to 4×): 18 donations from 8 businesses, volunteers starting shifts, a no-show, a full shelter and a new pantry. Point out a combined trip, and the food hall moment where Cost wanted to combine trips but Need objected that Grace Kitchen was already getting food, so they compromised.
-8. Send a real photo from the Business view on a phone (tick "Not sure about allergens" to trigger the question).
-9. Click **Evidence** for the 50-run comparison chart, and open the scripted table for team vs each agent alone.
+7. Run **Standoff** to show the agents asking a coordinator to approve an over-budget plan.
+8. Run **City mode** (set speed to 4×): 18 donations from 8 businesses, volunteers starting shifts, a no-show, a full shelter and a new pantry. Point out a combined trip, and the food hall moment where Cost wanted to combine trips but Need objected that Grace Kitchen was already getting food, so they compromised.
+9. Send a real photo from the Business view on a phone (tick "Not sure about allergens" to trigger the question).
+10. Click **Evidence** for the 50-run comparison chart, and open the scripted table for team vs each agent alone.
 
 Click any past negotiation (D1, D2...) and **Replay debate** to walk judges through one decision, including vetoes.
 
@@ -58,7 +71,9 @@ Click any past negotiation (D1, D2...) and **Replay debate** to walk judges thro
 | File | What it does |
 | --- | --- |
 | `world.py` | Simulated city: capability directory, **safety rules**, drivers, clock, events, impact, records, the nearest-shelter **baseline** and the **single-agent** policies |
-| `agents.py` | Speed, Cost, Need agents, their **red lines**, the **negotiation protocol** (rules or LLM) and the **evidence check** |
+| `network.py` | **Shelter agents** (accept, counter-offer, decline) and **driver agents** (bid or refuse) |
+| `agents.py` | Speed, Cost, Need coordinator agents, their **red lines**, the **negotiation protocol** (rules or LLM) and the **evidence check** |
+| `camera.py` | **Camera at the business**: webcam food detection that donates at closing time |
 | `scenarios.py` | Scripted scenarios, the comparison of 5 policies (`python scenarios.py`), and a seeded random-scenario generator |
 | `vision.py` / `llm.py` | Photo → food details; thin model wrapper (Anthropic, OpenAI, or OpenAI-compatible) |
 | `config.py` | Every tuning knob in one place: speeds, safety margin, cost limit, negotiation thresholds |
@@ -67,6 +82,8 @@ Click any past negotiation (D1, D2...) and **Replay debate** to walk judges thro
 | `static/business.html`, `shelter.html`, `records.html` | Phone pages for the business and the shelter; SB 1383 records page |
 | `tests/test_core.py` | Safety rules, negotiation, adaptation, shelter phone and evidence checks |
 | `data/` | Fictional nonprofits, drivers, businesses near the venue |
+
+**The network protocol.** For each donation: the business agent announces it; the directory finds shelters that can safely take it; each shelter agent answers from its own point of view (accept, counter-offer for part of it, or decline, based on its room and daily limits); each driver agent bids on each trip or refuses if it's beyond its range; the coordinators negotiate over the resulting offer × bid plans. If a counter-offer wins, the rest of the food is split off and announced again, so nothing is stranded.
 
 **Negotiation (no central decision-maker).** Each round every agent proposes a plan, then votes accept/object on every plan on the table, with reasons. Round 1 is each agent's favourite; later rounds concede toward plans the others can live with and steer clear of plans someone vetoed. A plan everyone accepts wins.
 
@@ -103,7 +120,7 @@ Plans over $25 also go to a human.
 python3 tests/test_core.py      # or: python3 -m pytest
 ```
 
-16 checks: cold food never goes somewhere without a fridge, allergens and capacity are respected, every plan arrives in time, the three agents genuinely disagree, short time forces a decision, cancellations lower reliability and trigger a replan, a new pantry is discoverable, the standoff escalates, the shelter phone flow works, pending requests hold capacity, scenarios are repeatable, and the agents never lose more food than the baseline. Run them before every push.
+24 checks: cold food never goes somewhere without a fridge, allergens and capacity are respected, every plan arrives in time, the three agents genuinely disagree, short time forces a decision, cancellations lower reliability and trigger a replan, a new pantry is discoverable, the standoff escalates, the shelter phone flow works, pending requests hold capacity, scenarios are repeatable, the agents never lose more food than the baseline, shelter agents accept, counter-offer and decline correctly, counter-offers split without losing food, drivers refuse trips beyond their range, network messages are logged, and camera counts become separate donations by food type. Run them before every push.
 
 ## Results
 
@@ -113,31 +130,34 @@ python3 tests/test_core.py      # or: python3 -m pytest
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
 |---|---:|---:|---:|---:|---:|
-| Meals delivered safely | 763 | 934 | 914 | 934 | 934 |
-| Servings lost | 171 | 0 | 20 | 0 | 0 |
-| Money spent ($) | 172.76 | 263.93 | 149.73 | 191.21 | 139.18 |
-| Shelters fed | 17 | 19 | 19 | 22 | 22 |
-| Avg minutes to spare (perishable food) | 76 | 73 | 68 | 67 | 67 |
-| Asked a human | 0 | 1 | 3 | 1 | 7 |
+| Meals delivered safely | 763 | 934 | 934 | 934 | 934 |
+| Servings lost | 171 | 0 | 0 | 0 | 0 |
+| Money spent ($) | 186.47 | 259.99 | 99.38 | 200.24 | 228.59 |
+| Shelters fed | 17 | 20 | 20 | 22 | 23 |
+| Avg minutes to spare (perishable food) | 76 | 73 | 69 | 66 | 68 |
+| Asked a human | 0 | 1 | 1 | 1 | 6 |
 
-How the team's negotiations ended: consensus 38, majority 4, unacceptable 2, insufficient evidence 2, irreconcilable 1
+**How the team's negotiations ended:** consensus 40, unacceptable 4, insufficient evidence 2, majority 1, irreconcilable 1
+
+With shelter and driver agents, the team fed the most shelters (23) and lost no food, but it is no longer the cheapest policy on these scripted cases ($228.59 vs $99.38 for Cost alone). The difference is mostly *Standoff*: Need and Speed wanted to send produce to the pantry that had waited 6 days, Cost vetoed the $35 courier as over its $20 red line, and the scripted stand-in coordinator chose the agents' top-ranked option, which split the food and needed a second paid trip. On the 100 random runs below, the team is still 28% cheaper than the baseline.
 
 **100 random lunch rushes the rules were never tuned on** (`python3 -c "import scenarios; print(scenarios.compare_random(100, 1001)['totals'])"`):
 
-| Metric | Baseline | Negotiating agents | Change |
+| Metric | Baseline | Agent network | Change |
 | --- | --- | --- | --- |
-| Meals delivered safely | 13,827 | 16,203 | +17% |
-| Servings lost | 3,627 | 1,251 | −66% |
-| Money spent on paid drivers | $2,045 | $894 | −56% |
-| Runs where agents lost more food | | 1 of 100 | |
+| Meals delivered safely | 13,620 | 16,778 | +23% |
+| Servings lost | 3,834 | 676 | −82% |
+| Money spent on paid drivers | $2,927 | $2,115 | −28% (−41% per meal) |
+| Runs where agents lost more food | | 0 of 100 | |
 
-The dashboard's **Evidence** button shows the same comparison on 50 runs (seeds 1–50): −55% food lost, +15% meals, −52% cost, never worse.
+The dashboard's **Evidence** button shows the same comparison on 50 runs (seeds 1–50): −77% food lost, +22% meals, −14% cost, never worse.
 
-**Lessons learned (for Devpost).** Testing on random runs surfaced two failures we fixed. (1) A baseline that retried the same closed shelter forever made us look better than we were; we made the baseline fair. (2) The agents trusted an 80%-reliable volunteer with sandwiches that had 10 minutes of margin; he cancelled and the food spoiled. Speed now objects to anything below 90% reliable when the margin is under 20 minutes. A third bug: a nonprofit's van couldn't deliver elsewhere after its own shelter filled up.
+**Lessons learned (for Devpost).** Testing on random runs surfaced two failures we fixed. (1) A baseline that retried the same closed shelter forever made us look better than we were; we made the baseline fair. (2) The agents trusted an 80%-reliable volunteer with sandwiches that had 10 minutes of margin; he cancelled and the food spoiled. Speed now objects to anything below 90% reliable when the margin is under 20 minutes. A third bug: a nonprofit's van couldn't deliver elsewhere after its own shelter filled up. (3) When drivers became agents that refuse trips beyond their range, the baseline was still allowed to send volunteers anywhere; we made it respect the same refusals. Counter-offers were the biggest single gain: food that used to be stranded because no shelter had room for all of it now gets split across shelters.
 
 ## Team split
 
-- **Agents and backend:** `agents.py`, `world.py`, `config.py` (tune scores, thresholds, red lines, LLM prompts)
+- **Agent network and coordinators:** `network.py`, `agents.py`, `world.py`, `config.py` (shelter and driver behavior, scores, red lines, LLM prompts)
+- **Camera:** `camera.py` (tune servings per item and detection with real food)
 - **Data and scenarios:** `data/`, `scenarios.py`, `tests/` (make goals clash more; add scenarios)
 - **Frontend and pitch:** `static/` (mostly `dashboard.js` and `dashboard.css`), demo script, backup video, Devpost
 

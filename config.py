@@ -26,3 +26,7 @@ TIGHT_SLACK = 20         # with less margin than this (min), Speed also objects 
 VEHICLE_SERVINGS = 150   # most servings one driver can carry at once
 JOIN_EXTRA_MIN = 3       # extra minutes to load a second donation at the same pickup
 JOIN_BONUS = 0.25        # how much Cost values a combined trip (it keeps another driver free for the next donation)
+
+# --- agent network ---
+MIN_LOT = 5              # smallest split a shelter will counter-offer, in servings
+VOLUNTEER_MAX_KM = 12    # default farthest trip a volunteer driver agrees to (drivers can set their own max_km)

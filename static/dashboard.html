@@ -41,6 +41,8 @@
         <button class="warn" data-ev="decline">Shelter says full</button>
         <button class="warn" data-ev="cancel">Driver cancels</button>
         <button class="info" data-ev="new_pantry">New pantry joins</button>
+        <button class="cam" id="closing">Closing time (camera)</button>
+        <span class="cam-status" id="cam-status">No camera connected</span>
       </div>
     </div>
     <div class="panel">
@@ -49,6 +51,11 @@
       <div id="neg"><p class="empty">Waiting for a donation. Run a scenario or send one from the Business view.</p></div>
       <div id="human"></div>
     </div>
+  </section>
+
+  <section class="panel">
+    <div class="net-head"><h2>Agent network · who said what</h2><span class="muted small" id="net-agents"></span></div>
+    <div class="net" id="net"><p class="empty">When a donation is announced, every shelter and driver agent answers here.</p></div>
   </section>
 
   <section class="grid3">

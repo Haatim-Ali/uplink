@@ -55,10 +55,12 @@ def clamp(x):
 
 def score(agent, world, d, p):
     remaining = max(1.0, d["safe_until"] - world.now)
-    if agent == "Speed":
-        return clamp(p["slack"] / remaining) * (0.6 + 0.4 * p["reliability"])
-    if agent == "Cost":
-        base = (1 - min(p["cost"], 30) / 30) * (0.55 + 0.45 * p["reliability"])
+    frac = p.get("servings", d["food"]["servings"]) / d["food"]["servings"]   # share a counter-offer takes
+    if agent == "Speed":   # a partial take leaves food still waiting for a home: riskier
+        return clamp(p["slack"] / remaining) * (0.6 + 0.4 * p["reliability"]) * (0.6 + 0.4 * frac)
+    if agent == "Cost":    # a partial take means paying for another trip for the rest: price it per serving moved
+        effective = p["cost"] / max(frac, 0.2)
+        base = (1 - min(effective, 30) / 30) * (0.55 + 0.45 * p["reliability"]) * (0.7 + 0.3 * frac)
         return clamp(base + (JOIN_BONUS if p.get("join") else 0))  # a combined trip also saves a driver
     n = world.nonprofits[p["np"]]
     incoming = world.committed(n["id"])
@@ -150,6 +152,11 @@ def propose_reason(agent, p, world, compromise=False):
     if compromise:
         why = propose_reason(agent, p, world)
         return "Not my first choice, but I can live with it to reach agreement: " + why[0].lower() + why[1:]
+    tail = f" (they offered to take {p['servings']}, not all of it)" if p.get("partial") else ""
+    return _propose_reason(agent, p, world) + tail
+
+
+def _propose_reason(agent, p, world):
     if agent == "Speed":
         return f"Arrives in {p['dur']} min with {p['slack']} min to spare ({p['reliability']:.0%} reliable)."
     if agent == "Cost":

@@ -93,7 +93,7 @@ function drawMap(){
 }
 
 // ---------- negotiation ----------
-function pin(seq){ pinned = (pinned===seq ? null : seq); lastNegKey=null; drawNegotiation(); }
+function pin(seq){ pinned = (pinned===seq ? null : seq); lastNegKey=null; drawNegotiation(); drawNetwork(); }
 function drawNegotiation(){
   const hist = S.negotiations || [];
   const shownSeq = pinned || (S.negotiation && S.negotiation.seq);
@@ -170,6 +170,28 @@ function drawHuman(){
 async function approve(d,p){ await post("/api/approve",{donation:d,plan:p}); refresh(); }
 async function confirmInfo(id, sure){ const d = S.donations.find(x=>x.id===id); await post("/api/confirm",{donation:id, allergens: sure ? d.food.allergens : null}); refresh(); }
 
+// ---------- agent network ----------
+const KIND = {announce:"Announces", accept:"Accept", counter:"Counter-offer", decline:"Decline", bid:"Bids", award:"Award", split:"Split", escalate:"Ask a human"};
+function drawNetwork(){
+  const a = S.agents_online;
+  if(a) setHTML("net-agents", `${a.businesses} business agents · ${a.shelters} shelter agents · ${a.drivers} driver agents · ${a.coordinators} coordinators`);
+  const n = pinned ? (S.negotiations||[]).find(h=>h.seq===pinned) : S.negotiation;
+  if(!n) return;
+  const all = (S.network||[]).filter(m => m.donation === n.donation);
+  let start = 0; all.forEach((m,i) => { if(m.kind === "announce") start = i; });   // the latest round only
+  const msgs = all.slice(start);
+  const col = (title, kinds) => {
+    const items = msgs.filter(m => kinds.includes(m.kind));
+    return `<div class="net-col"><h3>${title}</h3>${items.map(m => `<div class="msg ${m.kind}"><div class="msg-top"><b>${esc(m.from)}</b><span class="k ${m.kind}">${KIND[m.kind]||m.kind}</span></div>${esc(m.text)}</div>`).join("") || '<p class="empty">—</p>'}</div>`;
+  };
+  setHTML("net", `<div class="net-grid">
+    ${col("1 · Business agent", ["announce"])}
+    ${col("2 · Shelter agents answer", ["accept","counter","decline"])}
+    ${col("3 · Driver agents bid", ["bid"])}
+    ${col("4 · Coordinators decide", ["escalate","award","split"])}
+  </div>`);
+}
+
 // ---------- lists ----------
 function drawLists(){
   setHTML("feed", S.feed.slice().reverse().map(f=>`<div><time>${f.time}</time><span class="who ${f.agent}">${f.agent}</span><span class="${f.type==="objection"?"objection":""}">${esc(f.text)}</span></div>`).join("") || "<p class='empty'>Nothing yet.</p>");
@@ -182,6 +204,17 @@ function drawLists(){
       <span class="muted">${esc(d.business_name)} → ${where}</span>
       ${live?`<br><span class="timer ${d.minutes_left<30?"low":""}">${d.minutes_left} min until unsafe (${d.safe_until})</span>`:""}</div>`;
   }).join("") || "<p class='empty'>No donations yet.</p>");
+}
+
+function drawCamera(){
+  const cams = S.cameras || {};
+  const names = Object.keys(cams);
+  if(!names.length){ setHTML("cam-status", "No camera connected"); return; }
+  setHTML("cam-status", names.map(b => {
+    const biz = (S.businesses.find(x=>x.id===b)||{}).name || b;
+    const seen = Object.entries(cams[b]).filter(([k,v])=>v>0).map(([k,v])=>`${v} ${k}`).join(", ") || "nothing yet";
+    return `<span class="live-dot"></span>Camera at ${esc(biz)} sees: ${esc(seen)}`;
+  }).join(" · "));
 }
 
 function drawKpis(){
@@ -200,7 +233,7 @@ async function refresh(){
       $("scenario").innerHTML = S.scenarios.map(s=>`<option value="${s.name}">${esc(s.title)}</option>`).join("");
     }
     $("speed").value = String(S.speed);
-    drawKpis(); drawMap(); drawNegotiation(); drawHuman(); drawLists(); toastNewEvents();
+    drawKpis(); drawMap(); drawNegotiation(); drawNetwork(); drawHuman(); drawLists(); drawCamera(); toastNewEvents();
   }catch(e){ console.error(e); }
 }
 
@@ -208,6 +241,10 @@ $("start").onclick = async()=>{ await post("/api/reset",{scenario:$("scenario").
 $("blank").onclick = async()=>{ await post("/api/reset",{}); lastNegKey=null; pinned=null; play={seq:0,shown:0,total:0}; lastSeq=0; refresh(); };
 $("speed").onchange = e=>post("/api/control",{speed:+e.target.value});
 $("pause").onclick = ()=>post("/api/control",{paused:!S.paused}).then(refresh);
+$("closing").onclick = async()=>{
+  if(!Object.keys(S.cameras||{}).length){ toast("No camera connected. Start camera.py first.", "warn"); return; }
+  await post("/api/closing", {}); toast("🕘 Closing time: cameras are reporting leftover food", "info");
+};
 document.querySelectorAll("[data-ev]").forEach(b=>b.onclick=async()=>{ await post("/api/event/"+b.dataset.ev); refresh(); });
 
 const dlg = $("dlg");

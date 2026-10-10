@@ -10,6 +10,15 @@
 
 Rules mode, deterministic. Regenerate with `python scenarios.py` (the tables at the bottom are its output).
 
+## Update after adding shelter and driver agents (Sat 1:40 PM)
+
+The findings below were written before the agent network was merged (shelter agents that accept, counter-offer or decline; driver agents that bid or refuse trips beyond their range; counter-offers that split a donation). The tables at the bottom are regenerated on the merged code. **Haatim: please re-check findings 2 and 5 against the new numbers.** What changed:
+
+- **Totals across the 9 scenarios:** the team lost 0 servings and fed the most shelters (23, vs 20–22 for single agents), but it is no longer the cheapest: $228.59 vs $99.38 for Cost alone. Finding 2 ("as cheap as the cost-minimizer") no longer holds on the full set.
+- **Why:** mostly *Standoff*. Need and Speed wanted the pantry that had waited 6 days; Cost vetoed the $35 courier (over its $20 red line); the scripted stand-in coordinator took the top-ranked option, which split the food and needed a second paid trip ($72 vs $33 for one trip to the food bank). A real coordinator could choose the single trip.
+- **Random runs (100, unseen seeds 1001–1100):** vs the baseline, the network lost 82% less food (676 vs 3,834 servings), delivered 23% more meals, and spent 28% less (41% less per meal). Never worse in any run.
+- **Biggest single gain:** counter-offers. Food that used to be stranded because no shelter had room for all of it now gets split across shelters.
+
 ## What we found
 
 1. **The safety rules matter most, and we say so.** Nearest shelter lost 105 servings across the scenarios. Every policy with the safety rules lost 0, including a single agent deciding alone. Most of the gap against the simple baseline comes from the rules, not from negotiation.
@@ -42,18 +51,18 @@ Rules mode, deterministic. Regenerate with `python scenarios.py` (the tables at 
 - Scenarios 4–7 were designed to produce each kind of disagreement. They show the mechanism works, not how often these situations happen in real life.
 - In scripted runs a simulated coordinator stands in for the human (see [fallback rules](ARCHITECTURE.md#fallback-rules-disclosed)).
 
-## Full output of `python scenarios.py`
+## Full output of `python scenarios.py` (regenerated on the merged code)
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
 |---|---:|---:|---:|---:|---:|
-| Meals delivered safely | 276 | 381 | 381 | 381 | 381 |
-| Servings lost | 105 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 57.9 | 115.63 | 20.78 | 62.73 | 57.67 |
-| Shelters fed | 7 | 10 | 11 | 14 | 14 |
-| Avg minutes to spare (perishable food) | 74 | 65 | 61 | 61 | 59 |
-| Asked a human | 0 | 0 | 0 | 0 | 2 |
+| Meals delivered safely | 763 | 934 | 934 | 934 | 934 |
+| Servings lost | 171 | 0 | 0 | 0 | 0 |
+| Money spent ($) | 186.47 | 259.99 | 99.38 | 200.24 | 228.59 |
+| Shelters fed | 17 | 20 | 20 | 22 | 23 |
+| Avg minutes to spare (perishable food) | 76 | 73 | 69 | 66 | 68 |
+| Asked a human | 0 | 1 | 1 | 1 | 6 |
 
-**How the team's negotiations ended:** consensus 17, insufficient evidence 2, majority 1, unacceptable 1, irreconcilable 1
+**How the team's negotiations ended:** consensus 40, unacceptable 4, insufficient evidence 2, majority 1, irreconcilable 1
 
 **Lunch rush: four donations, a full shelter and a no-show**
 
@@ -61,9 +70,9 @@ Rules mode, deterministic. Regenerate with `python scenarios.py` (the tables at 
 |---|---:|---:|---:|---:|---:|
 | Meals delivered safely | 102 | 142 | 142 | 142 | 142 |
 | Servings lost | 40 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 8.06 | 21.29 | 11.23 | 10.93 | 10.93 |
-| Shelters fed | 2 | 3 | 3 | 4 | 4 |
-| Avg minutes to spare (perishable food) | 74 | 71 | 68 | 71 | 68 |
+| Money spent ($) | 8.06 | 21.29 | 11.23 | 14.69 | 12.97 |
+| Shelters fed | 3 | 3 | 3 | 4 | 4 |
+| Avg minutes to spare (perishable food) | 71 | 71 | 68 | 72 | 67 |
 | Asked a human | 0 | 0 | 0 | 0 | 0 |
 
 Team outcomes: consensus 5
@@ -81,6 +90,32 @@ Team outcomes: consensus 5
 
 Team outcomes: consensus 4
 
+**Standoff: every safe option is expensive, so the agents ask a coordinator**
+
+| Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
+|---|---:|---:|---:|---:|---:|
+| Meals delivered safely | 120 | 120 | 120 | 120 | 120 |
+| Servings lost | 0 | 0 | 0 | 0 | 0 |
+| Money spent ($) | 32.55 | 32.55 | 17.55 | 15.04 | 72.4 |
+| Shelters fed | 1 | 1 | 1 | 1 | 2 |
+| Avg minutes to spare (perishable food) | 0 | 0 | 0 | 0 | 0 |
+| Asked a human | 0 | 0 | 0 | 0 | 2 |
+
+Team outcomes: unacceptable 2
+
+**City mode: 18 donations across Santa Clara in 45 minutes**
+
+| Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
+|---|---:|---:|---:|---:|---:|
+| Meals delivered safely | 367 | 433 | 433 | 433 | 433 |
+| Servings lost | 66 | 0 | 0 | 0 | 0 |
+| Money spent ($) | 96.02 | 111.51 | 46.12 | 103.48 | 96.48 |
+| Shelters fed | 8 | 8 | 8 | 7 | 7 |
+| Avg minutes to spare (perishable food) | 78 | 79 | 76 | 71 | 76 |
+| Asked a human | 0 | 1 | 1 | 1 | 2 |
+
+Team outcomes: consensus 22, majority 1, unacceptable 1
+
 **New information: a pantry joins the directory mid-run**
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
@@ -89,7 +124,7 @@ Team outcomes: consensus 4
 | Servings lost | 0 | 0 | 0 | 0 | 0 |
 | Money spent ($) | 0.0 | 20.91 | 0.0 | 0.0 | 0.0 |
 | Shelters fed | 1 | 1 | 1 | 2 | 2 |
-| Avg minutes to spare (perishable food) | 62 | 60 | 58 | 55 | 57 |
+| Avg minutes to spare (perishable food) | 62 | 60 | 58 | 55 | 56 |
 | Asked a human | 0 | 0 | 0 | 0 | 0 |
 
 Team outcomes: consensus 5
@@ -100,12 +135,12 @@ Team outcomes: consensus 5
 |---|---:|---:|---:|---:|---:|
 | Meals delivered safely | 25 | 25 | 25 | 25 | 25 |
 | Servings lost | 0 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 14.93 | 14.93 | 0.0 | 0.0 | 15.23 |
+| Money spent ($) | 14.93 | 14.93 | 14.93 | 15.23 | 15.23 |
 | Shelters fed | 1 | 1 | 1 | 1 | 1 |
-| Avg minutes to spare (perishable food) | 48 | 48 | 35 | 36 | 48 |
+| Avg minutes to spare (perishable food) | 48 | 48 | 48 | 48 | 48 |
 | Asked a human | 0 | 0 | 0 | 0 | 0 |
 
-Team outcomes: majority 1
+Team outcomes: consensus 1
 
 **Unacceptable compromise: the majority's plan crosses an agent's red line**
 
@@ -139,8 +174,8 @@ Team outcomes: irreconcilable 1
 |---|---:|---:|---:|---:|---:|
 | Meals delivered safely | 50 | 50 | 50 | 50 | 50 |
 | Servings lost | 0 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 0.0 | 20.91 | 0.0 | 0.0 | 0.0 |
-| Shelters fed | 1 | 1 | 2 | 2 | 2 |
+| Money spent ($) | 0.0 | 21.21 | 0.0 | 0.0 | 0.0 |
+| Shelters fed | 1 | 2 | 2 | 2 | 2 |
 | Avg minutes to spare (perishable food) | 98 | 94 | 94 | 94 | 76 |
 | Asked a human | 0 | 0 | 0 | 0 | 0 |
 

@@ -19,6 +19,9 @@ select{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 button{font:600 17px system-ui;padding:14px;border-radius:12px;border:none;cursor:pointer;color:#fff}
 .yes{background:var(--ok)}.no{background:var(--bad)}
+.part{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:var(--muted)}
+.part input{width:70px;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px}
+.part .some{flex:1;background:var(--warn);font-size:15px;padding:10px}
 .meta{color:var(--muted);font-size:14px}
 .bar{height:6px;background:#eee;border-radius:3px;margin-top:10px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--warn)}
@@ -46,8 +49,8 @@ let lastAsks = "";
 
 $("pick").onchange = e => { id = e.target.value; history.replaceState(null, "", "?id=" + id); lastAsks = ""; poll(); };
 
-async function respond(donation, accept){
-  await fetch("/api/shelter/respond", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({donation, accept})});
+async function respond(donation, accept, servings){
+  await fetch("/api/shelter/respond", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({donation, accept, servings})});
   lastAsks = ""; poll();
 }
 
@@ -61,6 +64,7 @@ async function poll(){
   if(!r.ok) return;
   const n = s.nonprofit;
   $("title").innerHTML = `${esc(n.name)} <span class="status ${n.full?"full":""}">${n.full?"full":"open until "+n.open_until}</span>`;
+  const askKey = s.asks.map(a => a.donation).join(",");
   const html = s.asks.map(a => `
     <div class="card ask">
       <h2>New donation request</h2>
@@ -69,12 +73,14 @@ async function poll(){
       <div class="meta">From ${esc(a.business)} · ${esc(a.driver)} arriving ${a.arrive} · safe for ${a.minutes_left} more min</div>
       <div class="bar"><i style="width:${Math.max(0, 100 - 100*a.waiting/a.timeout)}%"></i></div>
       <div class="meta">The agents try elsewhere if you don't answer in ${Math.max(0, a.timeout - a.waiting)} min.</div>
-      <div class="row"><button class="yes" onclick="respond('${a.donation}', true)">Accept</button>
+      <div class="row"><button class="yes" onclick="respond('${a.donation}', true)">Accept all ${a.food.servings}</button>
       <button class="no" onclick="respond('${a.donation}', false)">We're full</button></div>
+      <div class="part"><span>Or take only</span><input type="number" id="n-${a.donation}" min="1" max="${a.food.servings - 1}" value="${Math.max(1, Math.floor(a.food.servings/2))}">
+      <button class="some" onclick="respond('${a.donation}', true, +document.getElementById('n-${a.donation}').value)">Take part</button></div>
     </div>`).join("");
-  if(html !== lastAsks){
-    if(html && !lastAsks && navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    $("asks").innerHTML = html; lastAsks = html;
+  if(askKey !== lastAsks){
+    if(askKey && !lastAsks && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    $("asks").innerHTML = html; lastAsks = askKey;
   }
   $("coming").innerHTML = s.coming.map(c => `<div><b>${c.servings}</b> · ${esc(c.items)}<br><span class="meta">${esc(c.driver)}, ETA ${c.eta}</span></div>`).join("") || `<p class="empty">Nothing on the way.</p>`;
   $("got").innerHTML = s.received.map(g => `<div><b>${g.servings}</b> · ${esc(g.items)} from ${esc(g.donor)} at ${g.delivered}</div>`).join("") || `<p class="empty">Nothing yet.</p>`;

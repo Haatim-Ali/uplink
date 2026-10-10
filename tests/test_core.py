@@ -46,8 +46,9 @@ def test_capacity_counts_food_already_on_the_way():
     big = dict(PIZZA, servings=45)
     d1 = w.add_donation(dict(big), "campus-cafe")
     w.assign(d1, next(p for p in w.safe_plans(d1) if p["np"] == "northside-youth"))
-    d2 = w.add_donation(dict(PIZZA), "campus-cafe")  # 12 more servings; Northside holds 50
-    assert all(p["np"] != "northside-youth" for p in w.safe_plans(d2))
+    d2 = w.add_donation(dict(PIZZA), "campus-cafe")  # 12 more servings; Northside holds 50, so 5 left
+    north = [p for p in w.safe_plans(d2) if p["np"] == "northside-youth"]
+    assert north and all(p["partial"] and p["servings"] == 5 for p in north)  # its agent counter-offers
 
 
 # ---------- negotiation ----------
@@ -152,8 +153,9 @@ def test_pending_requests_hold_shelter_capacity():
     w.plan(d1)
     np_id = d1["ask"]["plan"]["np"]
     room = w.nonprofits[np_id]["capacity_servings"] - 45
-    d2 = w.add_donation(dict(PIZZA, servings=room + 1), "campus-cafe")
-    assert all(p["np"] != np_id for p in w.safe_plans(d2, log=False))
+    d2 = w.add_donation(dict(PIZZA, servings=room + 10), "campus-cafe")
+    # the pending 45 count against that shelter's room: it can only counter-offer what's left
+    assert all(p["servings"] <= room for p in w.safe_plans(d2, log=False) if p["np"] == np_id)
 
 
 def test_agents_never_lose_more_food_than_baseline_on_random_runs():
@@ -179,6 +181,62 @@ def test_combined_trip_respects_safety_and_vehicle_room():
             assert w.nonprofits[p["np"]]["has_fridge"]
     huge = w.add_donation(dict(PIZZA, servings=200), "campus-cafe")
     assert not any(p.get("join") for p in w.safe_plans(huge, log=False))
+
+
+# ---------- agent network ----------
+
+def test_shelter_agents_accept_counter_and_decline():
+    import network
+    w = fresh()
+    d = w.add_donation(dict(PIZZA, servings=30), "campus-cafe")
+    n = w.nonprofits["northside-youth"]
+    assert network.shelter_offer(w, n, d)["kind"] == "accept"
+    n["received"] = 40   # 10 servings of room left
+    o = network.shelter_offer(w, n, d)
+    assert o["kind"] == "counter" and o["servings"] == 10
+    n["received"] = 48
+    assert network.shelter_offer(w, n, d)["kind"] == "decline"
+
+
+def test_category_limit_shapes_the_offer():
+    import network
+    w = fresh()
+    d = w.add_donation(dict(PIZZA, servings=50), "campus-cafe")   # Harbor House serves at most 40 hot meals a day
+    o = network.shelter_offer(w, w.nonprofits["harbor-house"], d)
+    assert o["kind"] == "counter" and o["servings"] == 40
+
+
+def test_driver_refuses_trips_beyond_its_range():
+    w = fresh()
+    d = w.add_donation(dict(scenarios.PRODUCE), "north-market")    # far from Sam, who drives at most 6 km
+    assert not any(p["driver"] == "sam" and p["km"] > 6 for p in w.safe_plans(d))
+
+
+def test_counter_offer_splits_the_donation_and_nothing_is_lost():
+    w = fresh()
+    w.nonprofits["northside-youth"]["received"] = 40
+    d = w.add_donation(dict(PIZZA, servings=30), "campus-cafe")
+    partial = next(p for p in w.safe_plans(d) if p["np"] == "northside-youth")
+    w.dispatch(d, partial)
+    rest = w.get(d["id"] + "-2")
+    assert d["food"]["servings"] == 10 and rest and rest["food"]["servings"] == 20
+    assert "northside-youth" in rest["skip"]
+
+
+def test_network_messages_are_logged():
+    w = fresh()
+    d = w.add_donation(dict(PIZZA), "campus-cafe")
+    w.plan(d)
+    kinds = {m["kind"] for m in w.network if m["donation"] == d["id"]}
+    assert {"announce", "bid", "award"} <= kinds and kinds & {"accept", "counter"}
+
+
+def test_camera_counts_become_safe_separate_donations():
+    import camera
+    assert camera.stable_counts([{"pizza": 2}, {"pizza": 2, "sandwich": 1}, {"pizza": 2}])["pizza"] == 2
+    foods = {f["category"]: f for f in camera.donations_from_counts({"pizza": 2, "sandwich": 3, "apple": 0})}
+    assert set(foods) == {"hot prepared", "cold prepared"}          # different safety rules, separate donations
+    assert foods["cold prepared"]["needs_cold"] and foods["hot prepared"]["servings"] == 8
 
 
 if __name__ == "__main__":

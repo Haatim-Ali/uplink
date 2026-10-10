@@ -17,7 +17,9 @@ from world import World
 
 app = Flask(__name__, static_folder="static")
 lock = threading.Lock()
-state = {"world": World(live=True), "speed": 1.0, "paused": False}
+state = {"world": World(live=True), "speed": 1.0, "paused": False,
+         "closing": {"seq": 0, "business": None},   # bumped by the dashboard's "Closing time" button
+         "cameras": {}}                               # business id -> {"counts": {...}, "seen": time}
 
 
 def W():
@@ -103,7 +105,7 @@ def api_shelter(np_id):
 def api_shelter_respond():
     body = request.get_json(silent=True) or {}
     with lock:
-        ok = W().respond(body.get("donation"), bool(body.get("accept")))
+        ok = W().respond(body.get("donation"), bool(body.get("accept")), body.get("servings"))
     return jsonify(ok=ok)
 
 
@@ -122,6 +124,7 @@ def api_state():
     s["paused"] = state["paused"]
     s["mode"] = {"agents": "llm" if agents.use_llm() else "rules", "vision": llm.provider() or "demo"}
     s["scenarios"] = [{"name": k, "title": v["title"]} for k, v in scenarios.SCENARIOS.items()]
+    s["cameras"] = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
     return jsonify(s)
 
 
@@ -208,6 +211,28 @@ def api_confirm():
 
 
 _compare_cache = {}
+
+
+# ---------------- camera at the business ----------------
+
+@app.post("/api/closing")
+def api_closing():
+    """Dashboard button: tell the camera(s) it's closing time, so they donate what they see."""
+    body = request.get_json(silent=True) or {}
+    state["closing"] = {"seq": state["closing"]["seq"] + 1, "business": body.get("business")}
+    return jsonify(state["closing"])
+
+
+@app.get("/api/closing")
+def api_closing_poll():
+    return jsonify(state["closing"])
+
+
+@app.post("/api/camera/status")
+def api_camera_status():
+    body = request.get_json(silent=True) or {}
+    state["cameras"][body.get("business", "?")] = {"counts": body.get("counts", {}), "seen": time.time()}
+    return jsonify(ok=True)
 
 
 @app.get("/api/compare")
