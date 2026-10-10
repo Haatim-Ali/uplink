@@ -23,7 +23,7 @@ if [ "$(status)" != "RUNNING" ]; then
 fi
 
 echo "2/4 Launching the model server..."
-quiet brev exec "$INSTANCE" "pgrep -f 'vllm serve' >/dev/null && echo 'already running' || \
+quiet brev exec "$INSTANCE" "tmux has-session -t vllm 2>/dev/null && echo 'already running' || \
   tmux new -d -s vllm 'HF_HOME=\$HOME/hf-models \$HOME/vllm-env/bin/vllm serve $MODEL --port $PORT --max-model-len 8192 > \$HOME/vllm.log 2>&1'"
 
 echo "3/4 Waiting for the model to load (usually 1-3 minutes)..."
