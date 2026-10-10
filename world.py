@@ -9,8 +9,9 @@ import math
 import os
 
 import agents
-from config import (COST_LIMIT, HANDOFF_MIN, HUMAN_TIMEOUT, PHONE_ONLINE_SECONDS, RELIABILITY_PENALTY,
-                    SAFETY_MARGIN, SHELTER_TIMEOUT, SPEED_KMH, START, WEIGHT_BONUS)
+from config import (COST_LIMIT, HANDOFF_MIN, HUMAN_TIMEOUT, JOIN_EXTRA_MIN, PHONE_ONLINE_SECONDS,
+                    RELIABILITY_PENALTY, SAFETY_MARGIN, SHELTER_TIMEOUT, SPEED_KMH, START, VEHICLE_SERVINGS,
+                    WEIGHT_BONUS)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
@@ -145,6 +146,36 @@ class World:
             "reliability": round(dr["reliability"], 2), "km": round(dist, 1),
         }
 
+    def join_plans(self, d, ok_nonprofits):
+        """Combined trips: a driver already on the way to this same pickup can carry this food too,
+        if it's going to a shelter that passes the safety rules and the vehicle has room."""
+        if d.get("picked") or d.get("locked_driver"):
+            return []
+        ok_ids = {n["id"] for n in ok_nonprofits}
+        plans = []
+        for e in self.donations:
+            if e is d or e["status"] != "en_route" or e.get("picked") or self.now >= e["t_pick"]:
+                continue
+            if e["business"] != d["business"] or e["plan"]["np"] not in ok_ids:
+                continue
+            load = sum(x["food"]["servings"] for x in self.donations
+                       if x["status"] == "en_route" and x["plan"]["driver"] == e["plan"]["driver"])
+            if load + d["food"]["servings"] > VEHICLE_SERVINGS:
+                continue
+            n, dr = self.nonprofits[e["plan"]["np"]], self.drivers[e["plan"]["driver"]]
+            dur = e["t_arr"] - self.now + JOIN_EXTRA_MIN
+            arrive = self.now + dur
+            if arrive > d["safe_until"] - SAFETY_MARGIN or arrive > n["open_min"]:
+                continue
+            plans.append({
+                "id": f"{n['id']}|{dr['id']}|join-{e['id']}", "np": n["id"], "np_name": n["name"],
+                "driver": dr["id"], "driver_name": dr["name"] + " (combined trip)", "driver_type": dr["type"],
+                "pick": round(e["t_pick"] - self.now), "dur": round(dur), "arrive": arrive, "arrive_hhmm": hhmm(arrive),
+                "slack": round(d["safe_until"] - arrive), "cost": 0.0, "reliability": round(dr["reliability"], 2),
+                "km": 0.0, "join": e["id"],
+            })
+        return plans
+
     def usable_drivers(self, d, n):
         out = []
         for dr in self.drivers.values():
@@ -172,6 +203,7 @@ class World:
                     late += 1
                     continue
                 plans.append(p)
+        plans += self.join_plans(d, ok)
         if log:
             for n, why in removed:
                 self.decide(d, "blocked", f"{n['name']}: {why}")
@@ -309,7 +341,7 @@ class World:
         if not plan:
             return False
         dr = self.drivers[plan["driver"]]
-        if dr["status"] != "free" and d.get("locked_driver") != dr["id"]:
+        if dr["status"] != "free" and d.get("locked_driver") != dr["id"] and not plan.get("join"):
             d["status"] = "new"  # option no longer valid: renegotiate
             return False
         who = "Auto-approved" if auto else "Coordinator approved"
@@ -323,7 +355,7 @@ class World:
 
     def dispatch(self, d, plan):
         """Ask the shelter first if someone is answering its phone; otherwise go straight away."""
-        if not self.phone_online(plan["np"]):
+        if plan.get("join") or not self.phone_online(plan["np"]):
             self.assign(d, plan)
             return
         dr = self.drivers[plan["driver"]]
@@ -376,6 +408,18 @@ class World:
 
     def assign(self, d, plan):
         dr = self.drivers[plan["driver"]]
+        if plan.get("join"):
+            e = self.get(plan["join"])
+            if not e or e["status"] != "en_route" or self.now >= e["t_pick"]:
+                d["status"] = "new"   # that trip already left the pickup; renegotiate
+                return
+            extra = JOIN_EXTRA_MIN
+            e["t_arr"] += extra       # the shared trip takes a little longer to load
+            d.update(plan=plan, status="en_route", t_assign=e["t_assign"], t_pick=e["t_pick"],
+                     t_arr=e["t_arr"], dest=e["dest"], origin=dict(e["origin"]))
+            self.decide(d, "allowed", f"{d['id']} joins {e['id']}'s trip with {dr['name']} to {plan['np_name']}")
+            self.say("Result", f"{d['id']} rides along with {e['id']}: one trip, two donations.", "result", d["id"])
+            return
         dr["status"] = "busy"
         dr["leg_start"] = dict(dr.get("pos", pos(dr)))
         d["plan"] = plan
@@ -406,6 +450,11 @@ class World:
             self.cancel_driver(e["driver"])
         elif t == "new_pantry":
             self.add_pantry()
+        elif t == "driver_joins":
+            dr = dict(e["driver"])
+            if dr["id"] not in self.drivers:
+                self.drivers[dr["id"]] = dict(dr, status="free", home=pos(dr), pos=pos(dr))
+                self.say("Directory", f"{dr['name']} started a shift ({dr['type']}, {dr['reliability']:.0%} reliable).", "event")
 
     def decline(self, np_id):
         n = self.nonprofits.get(np_id)
@@ -500,6 +549,8 @@ class World:
                     self.plan(d)
 
     def _move(self, d):
+        if d["plan"].get("join"):
+            return  # the trip it joined moves the driver
         dr = self.drivers[d["plan"]["driver"]]
         if self.now < d["t_pick"]:
             span = max(1, d["t_pick"] - d["t_assign"])
@@ -524,7 +575,9 @@ class World:
             d.setdefault("skip", []).append(n["id"])
             self.say("World", f"{d['id']} arrived at {n['name']} but it's {why}. Turned away.", "event", d["id"])
             return
-        dr["status"] = "free"
+        if not any(x is not d and x["status"] == "en_route" and x["plan"]["driver"] == dr["id"] for x in self.donations) \
+                and not any(x.get("locked_driver") == dr["id"] for x in self.donations):
+            dr["status"] = "free"
         if d["plan"]["cost"]:
             self.impact["cost"] += d["plan"]["cost"]
         safe = self.now <= d["safe_until"] and (not f["needs_cold"] or n["has_fridge"])

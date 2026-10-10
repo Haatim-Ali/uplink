@@ -1,4 +1,6 @@
-# Food Rescue Agents
+# Uplink
+
+**AI agents that negotiate where leftover food goes.**
 
 One photo of leftover food becomes a completed donation. Three AI agents with competing goals (Speed, Cost, Need) negotiate where the food goes and who drives it, with no boss. Safety rules in code remove unsafe plans before anyone argues. When something breaks, they renegotiate on their own, and when they truly can't agree, they ask a human.
 
@@ -37,8 +39,9 @@ Optional: `ANTHROPIC_MODEL`, `OPENAI_MODEL`, and `AGENT_MODEL` (a faster model f
 3. When the agents pick the teammate's shelter, their phone shows the request. They tap **We're full**: the agents renegotiate live. Next time they tap **Accept**.
 4. Press **Driver cancels** and **New pantry joins** to show adaptation. Pop-ups call out each event.
 5. Run **Standoff** to show the agents asking a coordinator to approve an over-budget plan.
-6. Send a real photo from the Business view on a phone.
-7. Click **Evidence** for the 50-run comparison chart.
+6. Run **City mode** (set speed to 4×): 18 donations from 8 businesses, volunteers starting shifts, a no-show, a full shelter and a new pantry. Point out a combined trip, and the food hall moment where Cost wanted to combine trips but Need objected that Grace Kitchen was already getting food, so they compromised.
+7. Send a real photo from the Business view on a phone.
+8. Click **Evidence** for the 50-run comparison chart.
 
 Click any past negotiation (D1, D2...) and **Replay debate** to walk judges through one decision.
 
@@ -65,6 +68,8 @@ Click any past negotiation (D1, D2...) and **Replay debate** to walk judges thro
 
 **Discovery.** Agents search the directory by capability. A new pantry can register mid-run; waiting and not-yet-picked-up donations are reconsidered.
 
+**Combined trips (city mode).** If a driver is already heading to the same pickup, the agents can add the new donation to that trip, as long as the shelter passes the safety rules for the new food and the vehicle has room (150 servings). Cost values this because it keeps another driver free; Need can still object if that shelter is already well supplied.
+
 **Contacting shelters.** If someone has a shelter's phone page open, the agents ask before dispatching and hold that driver and that shelter's room while waiting. "We're full" marks the shelter full and triggers a renegotiation; no answer within 8 minutes means they try elsewhere.
 
 ## Tests
@@ -83,12 +88,12 @@ python3 tests/test_core.py      # or: python3 -m pytest
 
 | Metric | Baseline | Negotiating agents | Change |
 | --- | --- | --- | --- |
-| Meals delivered safely | 13,827 | 16,223 | +17% |
-| Servings lost | 3,627 | 1,231 | −66% |
-| Money spent on paid drivers | $2,045 | $913 | −55% |
+| Meals delivered safely | 13,827 | 16,229 | +17% |
+| Servings lost | 3,627 | 1,225 | −66% |
+| Money spent on paid drivers | $2,045 | $920 | −55% |
 | Runs where agents lost more food | | 0 of 100 | |
 
-The dashboard's **Evidence** button shows the same comparison on 50 runs (seeds 1–50): −55% food lost, +15% meals, −47% cost, never worse.
+The dashboard's **Evidence** button shows the same comparison on 50 runs (seeds 1–50): −55% food lost, +15% meals, −50% cost, never worse.
 
 **Lessons learned (for Devpost).** Testing on random runs surfaced two failures we fixed. (1) A baseline that retried the same closed shelter forever made us look better than we were; we made the baseline fair. (2) The agents trusted an 80%-reliable volunteer with sandwiches that had 10 minutes of margin; he cancelled and the food spoiled. Speed now objects to anything below 90% reliable when the margin is under 20 minutes. A third bug: a nonprofit's van couldn't deliver elsewhere after its own shelter filled up.
 
@@ -102,4 +107,4 @@ Each person owns different files, so merges stay clean.
 
 ## Next ideas
 
-City mode (15–20 donations at once with combined trips); ElevenLabs voices for each agent and an AI voice call to the shelter phone; agent memory across donations; AGNTCY integration.
+ElevenLabs voices for each agent and an AI voice call to the shelter phone; agent memory across donations; AGNTCY integration.

@@ -131,3 +131,4 @@ dialog table{margin-top:8px}
 /* shelter contact */
 .who.Contact{color:var(--human)}
 .st.awaiting_shelter{background:#fbf0d9;color:var(--human)}
+.tagline{font-weight:400;font-size:13px;color:#bbb;margin-left:4px}

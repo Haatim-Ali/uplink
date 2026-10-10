@@ -21,3 +21,8 @@ WEIGHT_BONUS = 0.25      # extra vote weight for an agent whose warning proved r
 SHELTER_TIMEOUT = 8      # sim minutes to wait for a shelter's reply on its phone before trying elsewhere
 PHONE_ONLINE_SECONDS = 6 # a shelter phone counts as connected if its page checked in this recently
 TIGHT_SLACK = 20         # with less margin than this (min), Speed also objects to drivers below 90% reliability
+
+# --- city mode: combined trips ---
+VEHICLE_SERVINGS = 150   # most servings one driver can carry at once
+JOIN_EXTRA_MIN = 3       # extra minutes to load a second donation at the same pickup
+JOIN_BONUS = 0.25        # how much Cost values a combined trip (it keeps another driver free for the next donation)

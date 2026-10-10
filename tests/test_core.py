@@ -162,6 +162,25 @@ def test_agents_never_lose_more_food_than_baseline_on_random_runs():
     assert r["totals"]["agents"]["servings_lost"] < r["totals"]["baseline"]["servings_lost"]
 
 
+def test_city_mode_combines_trips_and_beats_baseline():
+    a, b = scenarios.run("city_rush", "agents"), scenarios.run("city_rush", "baseline")
+    assert len(a.donations) == 18 and a.done()
+    assert any("rides along" in f["text"] for f in a.feed)
+    assert a.metrics()["servings_lost"] <= b.metrics()["servings_lost"]
+
+
+def test_combined_trip_respects_safety_and_vehicle_room():
+    w = fresh()
+    d1 = w.add_donation(dict(PIZZA), "campus-cafe")
+    w.assign(d1, next(p for p in w.safe_plans(d1) if p["driver_type"] == "paid"))
+    d2 = w.add_donation(dict(SANDWICHES), "campus-cafe")   # cold food: only joins if that shelter has a fridge
+    for p in w.safe_plans(d2, log=False):
+        if p.get("join"):
+            assert w.nonprofits[p["np"]]["has_fridge"]
+    huge = w.add_donation(dict(PIZZA, servings=200), "campus-cafe")
+    assert not any(p.get("join") for p in w.safe_plans(huge, log=False))
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:
