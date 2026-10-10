@@ -57,7 +57,7 @@ def test_negotiation_reaches_a_safe_decision_with_three_agents():
     d = w.add_donation(dict(PIZZA), "campus-cafe")
     plans = w.safe_plans(d)
     result = agents.negotiate(w, d, plans)
-    assert result["outcome"] in ("consensus", "majority", "urgent", "escalate")
+    assert result["outcome"] in ("consensus", "majority", "urgent", "unacceptable", "irreconcilable")
     assert set(result["rounds"][0]["proposals"]) == {"Speed", "Cost", "Need"}
     ids = {p["id"] for p in plans}
     if result["plan"]:

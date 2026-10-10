@@ -514,7 +514,9 @@ class World:
         dr = self.drivers.get(driver_id)
         if not dr or dr["status"] == "off":
             return
-        carrying = any(d["status"] == "en_route" and d["plan"]["driver"] == driver_id and self.now >= d["t_pick"]
+        carrying = any((d["status"] == "en_route" and d["plan"]["driver"] == driver_id and self.now >= d["t_pick"])
+                       or (d.get("picked") and d.get("locked_driver") == driver_id
+                           and d["status"] not in ("delivered", "spoiled", "expired"))  # turned away, food still on board
                        for d in self.donations)
         if carrying:
             return  # already has the food on board; finishes the trip
