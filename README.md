@@ -50,12 +50,17 @@ Optional: `ANTHROPIC_MODEL`, `OPENAI_MODEL`, and `AGENT_MODEL` (a faster model f
 ## Camera at the business
 
 ```bash
-pip3 install ultralytics opencv-python requests   # one time; the detector downloads on first run
+pip3 install ultralytics opencv-python requests   # one time; models download on first run
 python3 camera.py --business campus-cafe          # with the server already running
 python3 camera.py --business campus-cafe --image test.jpg   # test with a photo
 ```
 
-A ready-made detector (YOLO) counts pizza, sandwiches, hot dogs, donuts, cake and fruit/veg on every frame, smoothed over ~15 frames so a passing hand doesn't count. The dashboard shows what it sees. At closing time (press **C** in the camera window or click **Closing time (camera)** on the dashboard) it donates what's left, one donation per kind of food since the safety rules differ. If the server has an AI key, the vision model describes the snapshot in detail. Video never leaves the laptop. Tune servings per item in `camera.py`'s `FOOD` table with real food.
+Two models, each doing what it's good at:
+
+- **Watch (all day, on the laptop):** a fast detector counts food live, smoothed over ~15 frames so a passing hand doesn't count. By default it's **YOLO-World**, which is told by name to look for 25 foods (pizza, sandwiches, salads, popcorn bags, chips, cookies, bread, fruit...). If it can't load, it falls back to the standard detector, which only knows 10 foods. Labels that are often false alarms need more confidence (the standard model calls snack bags "cake").
+- **Identify (once, at closing time):** the snapshot goes to the vision AI model, which names the food, splits it into one donation per food type (safety rules differ) and lists likely allergens. The detector's guess is passed along only as a hint. Without an AI key, the detector's counts are used and allergens are marked unconfirmed, so the agents ask before ruling shelters in or out.
+
+Trigger closing time with **C** in the camera window or **Closing time (camera)** on the dashboard. Video never leaves the laptop. Tune servings per item in the `FOOD` table in `camera.py`.
 
 ## Demo script
 
@@ -130,7 +135,7 @@ Plans over $25 also go to a human.
 python3 tests/test_core.py      # or: python3 -m pytest
 ```
 
-24 checks: cold food never goes somewhere without a fridge, allergens and capacity are respected, every plan arrives in time, the three agents genuinely disagree, short time forces a decision, cancellations lower reliability and trigger a replan, a new pantry is discoverable, the standoff escalates, the shelter phone flow works, pending requests hold capacity, scenarios are repeatable, the agents never lose more food than the baseline, shelter agents accept, counter-offer and decline correctly, counter-offers split without losing food, drivers refuse trips beyond their range, network messages are logged, and camera counts become separate donations by food type. Run them before every push.
+27 checks: cold food never goes somewhere without a fridge, allergens and capacity are respected, every plan arrives in time, the three agents genuinely disagree, short time forces a decision, cancellations lower reliability and trigger a replan, a new pantry is discoverable, the standoff escalates, the shelter phone flow works, pending requests hold capacity, scenarios are repeatable, the agents never lose more food than the baseline, shelter agents accept, counter-offer and decline correctly, counter-offers split without losing food, drivers refuse trips beyond their range, network messages are logged, camera counts become separate donations by food type, the camera ignores low-confidence false alarms, and the vision model's answer wins over the detector's guess. Run them before every push.
 
 ## Results
 

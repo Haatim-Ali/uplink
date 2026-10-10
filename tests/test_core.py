@@ -239,6 +239,69 @@ def test_camera_counts_become_safe_separate_donations():
     assert foods["cold prepared"]["needs_cold"] and foods["hot prepared"]["servings"] == 8
 
 
+class _Box:
+    def __init__(self, cls, conf):
+        self.cls, self.conf, self.xyxy = cls, conf, [[0, 0, 10, 10]]
+
+
+class _FakeModel:
+    """Stands in for the detector: 'cake' at 45% (a snack bag false alarm) and a pizza at 80%."""
+    def predict(self, frame, conf, verbose):
+        class R:
+            names = {0: "cake", 1: "pizza", 2: "person"}
+            boxes = [_Box(0, 0.45), _Box(1, 0.8), _Box(2, 0.9)]
+        return [R()]
+
+
+def test_camera_ignores_low_confidence_false_alarms_and_non_food():
+    import camera
+    counts, boxes = camera.detect(_FakeModel(), None, 0.3)
+    assert dict(counts) == {"pizza": 1}          # cake needs 60%; people aren't food
+
+
+def test_camera_prefers_the_vision_model_and_falls_back_to_counts():
+    import camera
+    up = camera.Uplink.__new__(camera.Uplink)
+    up.server, up.business = "http://x", "campus-cafe"
+    sent = []
+
+    class Resp:
+        def __init__(self, data): self.data = data
+        def json(self): return self.data
+
+    def fake_post(url, **kw):
+        if url.endswith("/api/vision"):
+            assert kw["data"]["hint"] == "cake x1"
+            return Resp({"source": "openai", "foods": [{"items": ["popcorn (2 bags)"], "servings": 8, "category": "packaged"}]})
+        sent.append(kw["json"]["food"])
+        return Resp({"id": "D1"})
+
+    real = camera.requests.post
+    camera.requests.post = fake_post
+    try:
+        up.donate({"cake": 1}, b"jpg")
+        assert sent[0]["items"] == ["popcorn (2 bags)"]        # the model's answer wins over the detector's guess
+        sent.clear()
+        camera.requests.post = lambda url, **kw: Resp({"source": "demo"}) if url.endswith("/api/vision") else (sent.append(kw["json"]["food"]) or Resp({"id": "D2"}))
+        up.donate({"pizza": 2}, b"jpg")
+        assert sent[0]["items"] == ["pizza x2"] and sent[0]["allergens_unverified"]   # no model: counts, allergens unconfirmed
+    finally:
+        camera.requests.post = real
+
+
+def test_vision_multi_uses_neutral_defaults():
+    import llm
+    import vision
+    saved = (llm.available, llm.provider, llm.chat_json)
+    llm.available, llm.provider = (lambda: True), (lambda: "openai")
+    llm.chat_json = lambda s, u, **k: {"donations": [{"items": ["apples"], "servings": 3, "category": "produce"}]}
+    try:
+        foods, src = vision.analyze_many(b"x", hint="apple x3")
+        assert src == "openai" and foods[0]["allergens"] == [] and foods[0]["safe_minutes"] == 720
+    finally:
+        llm.available, llm.provider, llm.chat_json = saved
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

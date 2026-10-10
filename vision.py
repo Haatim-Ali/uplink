@@ -80,9 +80,18 @@ BLANK = {"items": [], "servings": 1, "weight_lbs": [1, 2], "allergens": [], "cat
          "needs_cold": False, "safe_minutes": 120}
 
 
-def normalize(food):
-    """Make sure the shape matches what the rest of the app expects."""
-    f = dict(BLANK)
+SAFE_BY_CATEGORY = SAFE_MINUTES  # name used by camera-side code and tests
+NEUTRAL = {"items": ["food"], "servings": 1, "weight_lbs": [1, 2], "allergens": [], "category": "packaged",
+           "needs_cold": False, "notes": ""}
+
+
+def normalize(food, base=None):
+    """Make sure the shape matches what the rest of the app expects. Missing fields come from `base`
+    (neutral values by default; never the demo pizza, so it can't leak into a real donation).
+    A missing safe time comes from the food's category."""
+    f = dict(BLANK if base is None else base)
+    if "safe_minutes" not in food:
+        f["safe_minutes"] = SAFE_BY_CATEGORY.get(food.get("category"), 120)
     f.update({k: v for k, v in food.items() if v is not None})
     f["items"] = [str(i) for i in (f.get("items") or ["food"])]
     f["servings"] = max(1, int(float(f.get("servings", 1))))
@@ -157,6 +166,44 @@ def prepare(image_bytes, media_type):
     out = io.BytesIO()
     img.save(out, "JPEG", quality=90)
     return out.getvalue(), "image/jpeg"
+
+
+MULTI_PROMPT = """This photo shows food left over at a business at closing time, to be donated.
+A simple on-device detector glanced at it first and thought it saw: {hint}.
+That detector only knows a few foods and is often wrong (it calls snack bags "cake"), so trust your own eyes.
+
+Group what you see into donations, ONE PER FOOD CATEGORY (different categories have different safety rules).
+Ignore anything that isn't food (cups, napkins, utensils, empty containers).
+Return ONLY a JSON object:
+{{"donations": [
+  {{"items": ["short names, e.g. 'popcorn (2 bags)'"], "servings": integer estimate,
+    "weight_lbs": [low, high],
+    "allergens": ["dairy","gluten","eggs","nuts","peanuts","soy","fish","shellfish" - only likely ones; read labels if visible],
+    "category": "hot prepared" | "cold prepared" | "packaged" | "produce",
+    "needs_cold": true/false,
+    "allergens_uncertain": true/false (true if you can't rule out allergens you can't see),
+    "safe_minutes": minutes it stays safe (hot ~120, cold ~90 if it must stay cold, sealed packaged ~1440, produce ~720),
+    "notes": "one short sentence about anything uncertain"}}
+]}}
+If there is no food at all, return {{"donations": []}}. Be conservative with servings and safety."""
+
+
+def analyze_many(image_bytes, media_type="image/jpeg", hint="nothing"):
+    """Closing-time snapshot -> a list of donations, one per food category. Returns (foods, source).
+    source is "demo"/"fallback" when no model answered, so the caller can use its own detector instead."""
+    if not llm.available():
+        return [], "demo"
+    image_bytes, media_type = prepare(image_bytes, media_type)
+    try:
+        b64 = base64.b64encode(image_bytes).decode()
+        data = llm.chat_json("You are a careful food-donation intake assistant.", MULTI_PROMPT.format(hint=hint or "nothing"),
+                             image_b64=b64, media_type=media_type, max_tokens=4000)
+        foods = [normalize(f, base=NEUTRAL) for f in (data.get("donations") or []) if f]
+        for f in foods:
+            f["notes"] = (f.get("notes") or "").strip() or "Identified by the vision model from the closing-time snapshot."
+        return foods, llm.provider()
+    except Exception:  # noqa: BLE001
+        return [], "fallback"
 
 
 def analyze(image_bytes, media_type="image/jpeg"):
