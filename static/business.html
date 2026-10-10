@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Donate food</title>
+<style>
+:root{--ink:#1d1d1b;--muted:#6b6a64;--line:#e3e1da;--bg:#f5f4f0;--ok:#2f8f4e}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.4 system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:440px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 2px}
+p.sub{color:var(--muted);margin:0 0 16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,select{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{width:100%;font:600 16px system-ui;padding:12px;border-radius:10px;border:none;background:var(--ink);color:#fff;margin-top:12px;cursor:pointer}
+button:disabled{opacity:.5}
+.photo{display:block;border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--muted);cursor:pointer}
+img{max-width:100%;border-radius:10px;margin-top:10px;display:none}
+.note{font-size:13px;color:var(--muted);margin-top:8px}
+.done{background:#e3f3e8;color:#1f6b39;border-color:#bfe2cb;font-weight:600}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Donate surplus food</h1>
+  <p class="sub">Take one photo. Our agents handle the rest.</p>
+
+  <div class="card">
+    <label for="biz">Your business</label>
+    <select id="biz"></select>
+    <label class="photo" for="file">Tap to take or choose a photo</label>
+    <input id="file" type="file" accept="image/*" capture="environment" class="hidden">
+    <img id="preview" alt="Food photo preview">
+    <button id="analyze" disabled>Identify the food</button>
+    <button id="skip" style="background:#fff;color:var(--ink);border:1px solid var(--line)">No photo? Enter details by hand</button>
+  </div>
+
+  <div class="card hidden" id="details">
+    <b>Check the details</b>
+    <div class="note" id="note"></div>
+    <label>Items</label><input id="items">
+    <div class="row">
+      <div><label>Servings</label><input id="servings" type="number" min="1"></div>
+      <div><label>Safe for (minutes)</label><input id="safe" type="number" min="10"></div>
+    </div>
+    <div class="row">
+      <div><label>Weight low (lbs)</label><input id="wlo" type="number" step="0.5"></div>
+      <div><label>Weight high (lbs)</label><input id="whi" type="number" step="0.5"></div>
+    </div>
+    <label>Category</label>
+    <select id="category"><option>hot prepared</option><option>cold prepared</option><option>packaged</option><option>produce</option></select>
+    <label>Allergens (comma separated)</label><input id="allergens">
+    <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="cold" type="checkbox" style="width:auto"> Must stay refrigerated</label>
+    <button id="confirm">Confirm donation</button>
+  </div>
+
+  <div class="card done hidden" id="ok">Donation sent. Watch the agents work it out on the dashboard.</div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+let photo = null;
+fetch("/api/state").then(r=>r.json()).then(s=>{
+  $("biz").innerHTML = s.businesses.map(b=>`<option value="${b.id}">${b.name}</option>`).join("");
+});
+$("file").onchange = e => {
+  photo = e.target.files[0];
+  if(!photo) return;
+  $("preview").src = URL.createObjectURL(photo); $("preview").style.display = "block";
+  $("analyze").disabled = false;
+};
+function fill(f, note){
+  $("items").value = f.items.join(", "); $("servings").value = f.servings; $("safe").value = f.safe_minutes;
+  $("wlo").value = f.weight_lbs[0]; $("whi").value = f.weight_lbs[1]; $("category").value = f.category;
+  $("allergens").value = f.allergens.join(", "); $("cold").checked = f.needs_cold;
+  $("note").textContent = note || f.notes || "";
+  $("details").classList.remove("hidden"); $("ok").classList.add("hidden");
+  $("details").scrollIntoView({behavior:"smooth"});
+}
+$("analyze").onclick = async () => {
+  $("analyze").disabled = true; $("analyze").textContent = "Looking at your photo…";
+  const fd = new FormData(); fd.append("photo", photo);
+  const r = await (await fetch("/api/vision",{method:"POST",body:fd})).json();
+  $("analyze").textContent = "Identify the food"; $("analyze").disabled = false;
+  fill(r.food, r.food.notes);
+};
+$("skip").onclick = () => fill({items:["food"],servings:10,safe_minutes:120,weight_lbs:[2,4],category:"hot prepared",allergens:[],needs_cold:false}, "Enter what you have.");
+$("confirm").onclick = async () => {
+  const food = {
+    items: $("items").value.split(",").map(s=>s.trim()).filter(Boolean),
+    servings: +$("servings").value, safe_minutes: +$("safe").value,
+    weight_lbs: [+$("wlo").value, +$("whi").value], category: $("category").value,
+    allergens: $("allergens").value.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean),
+    needs_cold: $("cold").checked,
+  };
+  await fetch("/api/donate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({food,business:$("biz").value})});
+  $("details").classList.add("hidden"); $("ok").classList.remove("hidden");
+};
+</script>
+</body>
+</html>

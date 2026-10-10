@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Donation records (SB 1383)</title>
+<style>
+body{margin:0;font:14px/1.4 system-ui,sans-serif;background:#f5f4f0;color:#1d1d1b}
+.wrap{max-width:1100px;margin:0 auto;padding:20px}
+h1{font-size:20px;margin:0 0 4px}
+p{color:#6b6a64;margin:0 0 14px}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e3e1da;border-radius:10px;overflow:hidden}
+th,td{padding:8px 10px;border-bottom:1px solid #e3e1da;text-align:left}
+th{background:#faf9f6;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#6b6a64}
+button{font:inherit;padding:6px 12px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Edible food recovery records</h1>
+  <p>Created automatically for each delivered donation: the record California SB 1383 asks donors to keep.</p>
+  <button onclick="csv()">Download CSV</button>
+  <table><thead><tr><th>Donation</th><th>Date</th><th>Donor</th><th>Recipient</th><th>Items</th><th>Category</th><th>Servings</th><th>Weight (lbs)</th><th>Picked up</th><th>Delivered</th><th>Transport</th></tr></thead>
+  <tbody id="rows"><tr><td colspan="11">No deliveries yet.</td></tr></tbody></table>
+</div>
+<script>
+const KEYS = ["donation","date","donor","recipient","items","category","servings","weight_lbs","picked_up","delivered","transport"];
+let recs = [];
+const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+async function load(){
+  recs = (await (await fetch("/api/state")).json()).records;
+  if(recs.length) document.getElementById("rows").innerHTML = recs.map(r=>"<tr>"+KEYS.map(k=>`<td>${esc(r[k])}</td>`).join("")+"</tr>").join("");
+}
+function csv(){
+  const lines = [KEYS.join(",")].concat(recs.map(r=>KEYS.map(k=>`"${String(r[k]).replace(/"/g,'""')}"`).join(",")));
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/csv"}));
+  a.download = "donation_records.csv"; a.click();
+}
+load(); setInterval(load, 3000);
+</script>
+</body>
+</html>

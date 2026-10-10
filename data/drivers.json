@@ -1,0 +1,8 @@
+[
+  {"id": "maria", "name": "Maria (volunteer)", "type": "volunteer", "reliability": 0.7, "lat": 37.3779, "lng": -121.9741, "base_usd": 0, "per_km_usd": 0},
+  {"id": "jordan", "name": "Jordan (volunteer)", "type": "volunteer", "reliability": 0.8, "lat": 37.3652, "lng": -121.9501, "base_usd": 0, "per_km_usd": 0},
+  {"id": "sam", "name": "Sam (volunteer)", "type": "volunteer", "reliability": 0.6, "lat": 37.4001, "lng": -121.9852, "base_usd": 0, "per_km_usd": 0},
+  {"id": "courier-a", "name": "Rapid Courier A (paid)", "type": "paid", "reliability": 0.95, "lat": 37.3902, "lng": -121.9601, "base_usd": 6, "per_km_usd": 1.4},
+  {"id": "courier-b", "name": "Rapid Courier B (paid)", "type": "paid", "reliability": 0.95, "lat": 37.3601, "lng": -121.9902, "base_usd": 6, "per_km_usd": 1.4},
+  {"id": "grace-van", "name": "Grace Kitchen van", "type": "nonprofit van", "reliability": 0.9, "lat": 37.3552, "lng": -121.9548, "base_usd": 0, "per_km_usd": 0, "owner": "grace-kitchen"}
+]
