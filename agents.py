@@ -19,6 +19,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 import llm
+from config import CONCESSION, THRESHOLDS, URGENT_MINUTES
 
 AGENTS = ["Speed", "Cost", "Need"]
 GOALS = {
@@ -26,9 +27,6 @@ GOALS = {
     "Cost": "spend as little money as possible (volunteers and nonprofit vans are free; paid couriers cost money)",
     "Need": "send food where it helps most: shelters that have waited longest for a donation and have room",
 }
-THRESHOLDS = [0.9, 0.78, 0.65]  # accept if a plan scores at least this share of the agent's best
-CONCESSION = [0.0, 0.45, 0.75]  # how much an agent weighs the least-happy other agent when revising
-URGENT_MINUTES = 30
 
 
 def clamp(x):

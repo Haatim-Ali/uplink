@@ -8,15 +8,11 @@ import math
 import os
 
 import agents
+from config import (COST_LIMIT, HANDOFF_MIN, HUMAN_TIMEOUT, RELIABILITY_PENALTY, SAFETY_MARGIN, SPEED_KMH,
+                    START, WEIGHT_BONUS)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
-SPEED_KMH = 28.0
-HANDOFF_MIN = 2
-SAFETY_MARGIN = 5          # food must arrive at least this many minutes before it's unsafe
-COST_LIMIT = 25            # plans costing more than this need a human
-HUMAN_TIMEOUT = 15         # if no human answers and food has this little time left, act anyway
-START = 12 * 60            # sim clock starts at 12:00
 
 
 def load(name):
@@ -363,13 +359,13 @@ class World:
         if carrying:
             return  # already has the food on board; finishes the trip
         old = dr["reliability"]
-        dr["reliability"] = round(max(0.1, old - 0.3), 2)
+        dr["reliability"] = round(max(0.1, old - RELIABILITY_PENALTY), 2)
         dr["status"] = "off"
         self.say("World", f"{dr['name']} cancelled. Reliability {old:.0%} → {dr['reliability']:.0%}; every agent now sees that.", "event")
         for d in self.donations:
             if d["status"] == "en_route" and d["plan"]["driver"] == driver_id:
                 for agent in sorted({x["agent"] for x in d.get("objections", []) if x["driver"] == driver_id}):
-                    self.weights[agent] = round(self.weights[agent] + 0.25, 2)
+                    self.weights[agent] = round(self.weights[agent] + WEIGHT_BONUS, 2)
                     self.say("Adapt", f"{agent} warned that {dr['name']} might not show, and was right. "
                              f"{agent}'s vote now weighs {self.weights[agent]}.", "adapt", d["id"])
                 d["status"] = "new"

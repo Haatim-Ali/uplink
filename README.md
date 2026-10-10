@@ -8,12 +8,14 @@ Built for the Cisco Cloud AI track, "When AI Agents Disagree" (Level 3).
 
 ```bash
 pip install flask requests
-python app.py
+PORT=5050 python app.py
 ```
 
-- Dashboard: http://localhost:5000
-- Business view (open on a phone on the same Wi-Fi): http://YOUR-LAPTOP-IP:5000/business
-- Donation records (SB 1383): http://localhost:5000/records
+On a Mac, use `PORT=5050` because macOS reserves port 5000 for AirPlay.
+
+- Dashboard: http://localhost:5050
+- Business view (open on a phone on the same Wi-Fi): http://YOUR-LAPTOP-IP:5050/business
+- Donation records (SB 1383): http://localhost:5050/records
 
 It runs with **no API key**: vision returns a demo pizza result and the agents use rules-based reasoning. The map needs internet for its tiles.
 
@@ -43,8 +45,11 @@ Optional: `ANTHROPIC_MODEL`, `OPENAI_MODEL`, and `AGENT_MODEL` (a faster model f
 | `agents.py` | Speed, Cost, Need agents and the **negotiation protocol** (rules or LLM) |
 | `scenarios.py` | Repeatable scripted scenarios and the baseline comparison (`python scenarios.py`) |
 | `vision.py` / `llm.py` | Photo → food details; thin model wrapper (Anthropic, OpenAI, or OpenAI-compatible) |
+| `config.py` | Every tuning knob in one place: speeds, safety margin, cost limit, negotiation thresholds |
 | `app.py` | Flask server, live clock, planner thread, API |
-| `static/` | Dashboard, phone business page, records page |
+| `static/dashboard.{html,css,js}` | Dashboard layout, styles and behavior, in separate files |
+| `static/business.html`, `records.html` | Phone business page; SB 1383 records page |
+| `tests/test_core.py` | Safety rules, negotiation, adaptation and baseline checks |
 | `data/` | Fictional nonprofits, drivers, businesses near the venue |
 
 **Negotiation (no central decision-maker).** Each round every agent proposes a plan, then votes accept/object on every plan on the table, with reasons. Round 1 is each agent's favourite; later rounds concede toward plans the others can live with. A plan everyone accepts wins. If food has under 30 minutes left, they act on the best-supported plan. After 3 rounds a weighted majority wins and the dissent is recorded; otherwise a human decides. Any plan over $25 also goes to a human.
@@ -54,6 +59,14 @@ Optional: `ANTHROPIC_MODEL`, `OPENAI_MODEL`, and `AGENT_MODEL` (a faster model f
 **Adaptation.** A driver who cancels loses 30 points of reliability, which every agent sees. An agent that warned about that driver gains vote weight (+0.25).
 
 **Discovery.** Agents search the directory by capability. A new pantry can register mid-run; waiting and not-yet-picked-up donations are reconsidered.
+
+## Tests
+
+```bash
+python3 tests/test_core.py      # or: python3 -m pytest
+```
+
+12 checks: cold food never goes somewhere without a fridge, allergens and capacity are respected, every plan arrives in time, the three agents genuinely disagree, short time forces a decision, cancellations lower reliability and trigger a replan, a new pantry is discoverable, scenarios are repeatable, and the agents beat the baseline. Run them before every push.
 
 ## Results (rules mode, `python scenarios.py`)
 
@@ -68,9 +81,11 @@ Re-run after changing data or rules; quote whatever it prints.
 
 ## Team split
 
-- **Agents and backend:** `agents.py`, `world.py` (tune scores, thresholds, LLM prompts)
-- **Data and scenarios:** `data/`, `scenarios.py` (make goals clash more; add scenarios)
-- **Frontend and pitch:** `static/`, demo script, backup video, Devpost
+- **Agents and backend:** `agents.py`, `world.py`, `config.py` (tune scores, thresholds, LLM prompts)
+- **Data and scenarios:** `data/`, `scenarios.py`, `tests/` (make goals clash more; add scenarios)
+- **Frontend and pitch:** `static/` (mostly `dashboard.js` and `dashboard.css`), demo script, backup video, Devpost
+
+Each person owns different files, so merges stay clean.
 
 ## Next ideas
 
