@@ -19,7 +19,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 import llm
-from config import CONCESSION, THRESHOLDS, URGENT_MINUTES
+from config import CONCESSION, THRESHOLDS, TIGHT_SLACK, URGENT_MINUTES
 
 AGENTS = ["Speed", "Cost", "Need"]
 GOALS = {
@@ -69,8 +69,9 @@ def propose_reason(agent, p, world):
 def object_reason(agent, p, best, world):
     """Return (text, kind). kind is used later to check whether the objection proved right."""
     if agent == "Speed":
-        if p["reliability"] < 0.75:
-            return f"Object: {p['driver_name']} is only {p['reliability']:.0%} reliable; a no-show could spoil this food.", "reliability"
+        if p["reliability"] < 0.75 or (p["slack"] < TIGHT_SLACK and p["reliability"] < 0.9):
+            return (f"Object: {p['driver_name']} is only {p['reliability']:.0%} reliable and there's just {p['slack']} min "
+                    "of margin; a no-show would spoil this food."), "reliability"
         return f"Object: only {p['slack']} min margin; {short(best)} leaves {best['slack']}.", "time"
     if agent == "Cost":
         return f"Object: ${p['cost']:.2f} when {short(best)} costs ${best['cost']:.2f} and is also safe.", "cost"
@@ -91,7 +92,9 @@ def _rules_round(world, d, plans, S, best, r):
     return proposals
 
 
-def _rules_vote(agent, pid, S, best_score, r):
+def _rules_vote(agent, pid, S, best_score, r, plan=None):
+    if agent == "Speed" and plan and plan["slack"] < TIGHT_SLACK and plan["reliability"] < 0.9:
+        return False  # tight margin + unreliable driver: Speed won't sign off
     return S[pid][agent] >= THRESHOLDS[r] * best_score[agent]
 
 
@@ -194,7 +197,7 @@ def negotiate(world, d, plans):
                     kind = object_reason(a, p, best_plan[a], world)[1]
                     why = ("Accept: " if acc else "Object: ") + why if why else ("Accept." if acc else "Object.")
                 else:
-                    acc = _rules_vote(a, pid, S, best_score, r)
+                    acc = _rules_vote(a, pid, S, best_score, r, p)
                     if acc:
                         why, kind = "Accept: good enough for my goal.", None
                     else:

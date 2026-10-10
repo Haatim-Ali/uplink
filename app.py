@@ -82,6 +82,30 @@ def business():
     return send_from_directory("static", "business.html")
 
 
+@app.get("/shelter")
+def shelter_page():
+    return send_from_directory("static", "shelter.html")
+
+
+@app.get("/api/shelter/<np_id>")
+def api_shelter(np_id):
+    with lock:
+        v = W().shelter_view(np_id)
+        options = [{"id": n["id"], "name": n["name"]} for n in W().nonprofits.values()]
+    if v is None:
+        return jsonify(error="unknown shelter", options=options), 404
+    v["options"] = options
+    return jsonify(v)
+
+
+@app.post("/api/shelter/respond")
+def api_shelter_respond():
+    body = request.get_json(silent=True) or {}
+    with lock:
+        ok = W().respond(body.get("donation"), bool(body.get("accept")))
+    return jsonify(ok=ok)
+
+
 @app.get("/records")
 def records_page():
     return send_from_directory("static", "records.html")
@@ -173,9 +197,18 @@ def api_approve():
     return jsonify(ok=ok)
 
 
+_compare_cache = {}
+
+
 @app.get("/api/compare")
 def api_compare():
-    return jsonify(scenarios.compare())
+    """Scripted scenarios plus N seeded random runs. Deterministic, so cached after the first call."""
+    n = max(5, min(200, int(request.args.get("n", 50))))
+    if n not in _compare_cache:
+        rnd = scenarios.compare_random(n)
+        rnd.pop("runs")
+        _compare_cache[n] = {"scripted": scenarios.compare(), "random": rnd}
+    return jsonify(_compare_cache[n])
 
 
 if __name__ == "__main__":

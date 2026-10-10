@@ -120,6 +120,48 @@ def test_every_scenario_finishes():
         assert scenarios.run(name, "agents").done(), name
 
 
+# ---------- new features ----------
+
+def test_standoff_asks_a_human_with_two_options():
+    w = scenarios.run("standoff", "agents")
+    assert w.impact["escalations"] >= 1
+    assert any("asking a coordinator" in f["text"] and " or " in f["text"] for f in w.feed)
+
+
+def test_shelter_phone_flow_ask_decline_then_accept():
+    import time
+    w = World(live=True)
+    w.phones = {n: time.time() for n in w.nonprofits}
+    d = w.add_donation(dict(PIZZA), "campus-cafe")
+    w.plan(d)
+    assert d["status"] == "awaiting_shelter"
+    first = d["ask"]["plan"]["np"]
+    assert w.respond(d["id"], False)
+    assert w.nonprofits[first]["full"]
+    w.plan(d)
+    assert d["status"] == "awaiting_shelter" and d["ask"]["plan"]["np"] != first
+    assert w.respond(d["id"], True)
+    assert d["status"] == "en_route"
+
+
+def test_pending_requests_hold_shelter_capacity():
+    import time
+    w = World(live=True)
+    w.phones = {n: time.time() for n in w.nonprofits}
+    d1 = w.add_donation(dict(PIZZA, servings=45), "campus-cafe")
+    w.plan(d1)
+    np_id = d1["ask"]["plan"]["np"]
+    room = w.nonprofits[np_id]["capacity_servings"] - 45
+    d2 = w.add_donation(dict(PIZZA, servings=room + 1), "campus-cafe")
+    assert all(p["np"] != np_id for p in w.safe_plans(d2, log=False))
+
+
+def test_agents_never_lose_more_food_than_baseline_on_random_runs():
+    r = scenarios.compare_random(30, first_seed=500)
+    assert r["wins"]["more_food_lost"] == 0
+    assert r["totals"]["agents"]["servings_lost"] < r["totals"]["baseline"]["servings_lost"]
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

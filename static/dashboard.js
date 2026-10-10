@@ -2,12 +2,42 @@ const AGENTS = ["Speed","Cost","Need"];
 const GOALS = {Speed:"Fast, reliable, big safety margin", Cost:"Spend as little as possible", Need:"Feed whoever needs it most"};
 const COLORS = {Speed:"var(--speed)",Cost:"var(--cost)",Need:"var(--need)"};
 let S = null, roundSel = null, lastNegKey = null, pinned = null;
+// Debate playback: a new negotiation is revealed one message at a time, then the outcome lands.
+const PLAY_MS = 900;
+let play = {seq: null, shown: 0, total: 0};
+setInterval(()=>{ if(play.seq !== null && play.shown < play.total){ play.shown++; if(S) drawNegotiation(); } }, PLAY_MS);
+function replay(){ const n = pinned ? (S.negotiations||[]).find(h=>h.seq===pinned) : S.negotiation; if(!n) return;
+  play = {seq: n.seq, shown: 0, total: n.rounds.reduce((k,r)=>k+r.messages.length,0)}; drawNegotiation(); }
 const $ = id => document.getElementById(id);
 // Write HTML only when it changed: no flicker, hover and scroll survive the 1-second refresh.
 function setHTML(el, html){ if(typeof el==="string") el=$(el); if(el._html!==html){ el._html=html; el.innerHTML=html; } }
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-function toast(msg){ const t=$("toast"); t.textContent=msg; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display="none",2600); }
+function toast(msg, kind="info"){
+  const el = document.createElement("div");
+  el.className = "toast " + kind; el.textContent = msg;
+  $("toasts").appendChild(el);
+  while($("toasts").children.length > 4) $("toasts").firstChild.remove();
+  setTimeout(()=>{ el.classList.add("out"); setTimeout(()=>el.remove(), 400); }, 4500);
+}
+// Pop up the moments the audience should notice.
+let lastSeq = null;
+function toastNewEvents(){
+  const seqs = S.feed.map(f=>f.seq||0); const max = seqs.length ? Math.max(...seqs) : 0;
+  if(lastSeq === null || max < lastSeq){ lastSeq = max; return; }   // first load or reset
+  S.feed.filter(f => f.seq > lastSeq).forEach(f => {
+    const t = f.text;
+    if(f.agent==="World" && /full tonight/.test(t)) toast("🚫 " + t.replace(/"/g,""), "bad");
+    else if(f.agent==="World" && /cancelled/.test(t)) toast("⚠ " + t.split(".")[0], "bad");
+    else if(f.agent==="World" && /delivered to/.test(t) && !/unsafe/.test(t)) toast("✓ " + t.split(".")[0], "good");
+    else if(f.agent==="World" && /(unsafe|lost|Turned away)/.test(t)) toast("✗ " + t.split(".")[0], "bad");
+    else if(f.agent==="Directory") toast("＋ " + t.split("(")[0], "info");
+    else if(f.agent==="Adapt") toast("↑ " + t, "info");
+    else if(f.agent==="Human" && /asking a coordinator|no safe plan/.test(t)) toast("👤 Coordinator needed for " + (f.donation||""), "warn");
+    else if(f.agent==="Contact" && /(accepted|declined|No answer)/.test(t)) toast("📱 " + t.split(".")[0], /accepted/.test(t) ? "good" : "warn");
+  });
+  lastSeq = max;
+}
 async function post(url, body){ const r = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}); const j = await r.json().catch(()=>({})); if(!r.ok) toast(j.error||"Request failed"); return j; }
 
 // ---------- map ----------
@@ -60,15 +90,21 @@ function drawMap(){
 function pin(seq){ pinned = (pinned===seq ? null : seq); lastNegKey=null; drawNegotiation(); }
 function drawNegotiation(){
   const hist = S.negotiations || [];
-  const shown = pinned || (S.negotiation && S.negotiation.seq);
+  const shownSeq = pinned || (S.negotiation && S.negotiation.seq);
   setHTML("history", hist.length > 1 ? `<span class="hist-label">Past negotiations:</span>` +
-    hist.map(h=>`<button class="hb ${shown===h.seq?"on":""}" onclick="pin(${h.seq})">${h.time} ${h.donation}</button>`).join("") +
+    hist.map(h=>`<button class="hb ${shownSeq===h.seq?"on":""}" onclick="pin(${h.seq})">${h.time} ${h.donation}</button>`).join("") +
     (pinned?`<button class="follow" onclick="pin(null)">follow live</button>`:"") : "");
   const n = pinned ? hist.find(h=>h.seq===pinned) : S.negotiation;
   if(S.busy && !pinned){ setHTML("rounds", ""); setHTML("neg", `<p><b>Agents are deliberating…</b> The clock is paused until they finish.</p>`); return; }
   if(!n){ return; }
+  const msgs = n.rounds.flatMap(r => r.messages.map(m => ({...m, round: r.round})));
+  if(!pinned && n.seq !== play.seq && play.seq !== null && n.seq > play.seq){ play = {seq: n.seq, shown: 0, total: msgs.length}; }
+  if(play.seq === null){ play = {seq: n.seq, shown: msgs.length, total: msgs.length}; }   // first load: no replay of old news
+  const shown = play.seq === n.seq ? play.shown : msgs.length;
+  const playing = shown < msgs.length;
   const key = n.seq + "|" + n.donation + "|" + n.rounds.length + "|" + n.outcome + "|" + (n.plan?n.plan.id:"");
-  if(key!==lastNegKey){ roundSel = n.rounds.length-1; lastNegKey = key; }
+  if(playing){ roundSel = Math.max(0, (shown ? msgs[shown-1].round : 1) - 1); lastNegKey = null; }
+  else if(key!==lastNegKey){ roundSel = n.rounds.length-1; lastNegKey = key; }
   setHTML("rounds", n.rounds.map((r,i)=>`<button class="${i===roundSel?"on":""}" onclick="roundSel=${i};drawNegotiation()">R${r.round}</button>`).join(" "));
   const r = n.rounds[roundSel];
   const planIds = Object.keys(r.votes);
@@ -89,11 +125,17 @@ function drawNegotiation(){
   const label = {consensus:"Agreed 3 of 3", majority:"Majority decision, dissent kept on record", urgent:"Time is short: acting on the best-supported plan", escalate:"No agreement: asking a human"}[n.outcome];
   const chosen = n.plan ? ` → ${nm(n.plan.id)}` : "";
   const dissent = (n.dissent||[]).map(x=>`<div class="dissent">${x.agent}: ${esc(x.reason)}</div>`).join("");
+  const bubbles = msgs.slice(0, shown).map((m,i) => `<div class="bubble ${m.agent} ${m.type}${i===shown-1 && playing ? " new" : ""}${i===shown-1 && playing && m.type==="objection" ? " shake" : ""}">
+      <span class="b-who">${m.agent}</span><span class="b-r">R${m.round}</span>${esc(m.text)}</div>`).join("");
+  const done = !playing;
   setHTML("neg", `
+    <div class="debate" id="debate">${bubbles || '<span class="muted">The agents are about to speak…</span>'}</div>
     <div class="neg-title"><b>${esc(n.donation)}</b> · ${esc(n.food)} <span class="badge light">${n.mode==="llm"?"AI reasoning":"rules reasoning"}</span></div>
     <div class="agents">${cards}</div>
     <table class="matrix"><thead><tr><th>Plans on the table (round ${r.round})</th>${AGENTS.map(a=>`<th style="color:${COLORS[a]}">${a}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>
-    ${roundSel===n.rounds.length-1?`<div class="outcome ${n.outcome}">${label}${chosen}${dissent}</div>`:""}`);
+    ${done && roundSel===n.rounds.length-1?`<div class="outcome ${n.outcome} pop">${label}${chosen}${dissent}</div>`:""}
+    ${done?`<button class="replay" onclick="replay()">↻ Replay debate</button>`:""}`);
+  const deb = $("debate"); if(deb) deb.scrollTop = deb.scrollHeight;
 }
 
 function drawHuman(){
@@ -133,27 +175,52 @@ async function refresh(){
       $("scenario").innerHTML = S.scenarios.map(s=>`<option value="${s.name}">${esc(s.title)}</option>`).join("");
     }
     $("speed").value = String(S.speed);
-    drawKpis(); drawMap(); drawNegotiation(); drawHuman(); drawLists();
+    drawKpis(); drawMap(); drawNegotiation(); drawHuman(); drawLists(); toastNewEvents();
   }catch(e){ console.error(e); }
 }
 
-$("start").onclick = async()=>{ await post("/api/reset",{scenario:$("scenario").value}); lastNegKey=null; pinned=null; refresh(); };
-$("blank").onclick = async()=>{ await post("/api/reset",{}); lastNegKey=null; pinned=null; refresh(); };
+$("start").onclick = async()=>{ await post("/api/reset",{scenario:$("scenario").value}); lastNegKey=null; pinned=null; play={seq:0,shown:0,total:0}; lastSeq=0; refresh(); };
+$("blank").onclick = async()=>{ await post("/api/reset",{}); lastNegKey=null; pinned=null; play={seq:0,shown:0,total:0}; lastSeq=0; refresh(); };
 $("speed").onchange = e=>post("/api/control",{speed:+e.target.value});
 $("pause").onclick = ()=>post("/api/control",{paused:!S.paused}).then(refresh);
 document.querySelectorAll("[data-ev]").forEach(b=>b.onclick=async()=>{ await post("/api/event/"+b.dataset.ev); refresh(); });
 
 const dlg = $("dlg");
 $("compare").onclick = async()=>{
-  dlg.showModal(); $("cmp").textContent = "Running all scenarios…";
-  const r = await (await fetch("/api/compare")).json();
+  dlg.showModal(); setHTML("cmp", "Running 50 random scenarios…");
+  const r = await (await fetch("/api/compare?n=50")).json();
+  const b = r.random.totals.baseline, a = r.random.totals.agents, w = r.random.wins;
+  const pct = (x,y)=> Math.round(100*Math.abs(1-x/y));
+  // three metrics, three scales: small multiples, never one shared axis
+  const metric = (label, key, fmt, better) => {
+    const max = Math.max(b[key], a[key]) || 1;
+    const bar = (who, v, cls) => `<div class="cbar-row"><span class="cbar-who">${who}</span>
+      <div class="cbar-track"><i class="${cls}" style="width:${Math.max(2, 100*v/max)}%" title="${who}: ${fmt(v)}"></i></div>
+      <span class="cbar-val">${fmt(v)}</span></div>`;
+    return `<div class="cbar"><div class="cbar-label">${label} <span class="muted">(${better})</span></div>
+      ${bar("Baseline", b[key], "base")}${bar("Agents", a[key], "agt")}</div>`;
+  };
+  const num = v => v.toLocaleString(), usd = v => "$" + Math.round(v).toLocaleString();
   const M = [["meals_delivered_safely","Meals delivered safely",1],["servings_lost","Servings lost",-1],["money_spent","Money spent ($)",-1],["shelters_fed","Shelters fed",1],["human_escalations","Asked a human",0]];
-  const block = (title,b,a)=>`<tr><th colspan="3" style="text-align:left;padding-top:14px">${esc(title)}</th></tr>` + M.map(([k,l,dir])=>{
-    const better = dir && (dir>0 ? a[k]>b[k] : a[k]<b[k]);
-    return `<tr><td>${l}</td><td>${b[k]}</td><td class="${better?"better":""}">${a[k]}</td></tr>`;}).join("");
-  $("cmp").innerHTML = `<table><thead><tr><th></th><th>Baseline</th><th>Agents</th></tr></thead><tbody>
-    ${block("All scenarios",r.totals.baseline,r.totals.agents)}
-    ${r.rows.map(x=>block(x.title,x.baseline,x.agents)).join("")}</tbody></table>`;
+  const sb = r.scripted.totals.baseline, sa = r.scripted.totals.agents;
+  setHTML("cmp", `
+    <div class="hero-row">
+      <div class="hero"><b>${pct(a.servings_lost, b.servings_lost)}%</b><span>less food lost</span></div>
+      <div class="hero"><b>${pct(a.meals_delivered_safely, b.meals_delivered_safely)}%</b><span>more meals delivered</span></div>
+      <div class="hero"><b>${pct(a.money_spent, b.money_spent)}%</b><span>lower driver cost</span></div>
+      <div class="hero"><b>${w.more_food_lost} of ${r.random.n}</b><span>runs where agents lost more food</span></div>
+    </div>
+    <p class="muted small">Across ${r.random.n} seeded random lunch rushes (3–6 donations, driver no-shows, full shelters, new pantries). Agents lost less food in ${w.less_food_lost}, the same in ${w.same_food_lost}.</p>
+    <div class="cbars">
+      ${metric("Meals delivered safely","meals_delivered_safely",num,"higher is better")}
+      ${metric("Servings lost","servings_lost",num,"lower is better")}
+      ${metric("Money spent on paid drivers","money_spent",usd,"lower is better")}
+    </div>
+    <details><summary>The ${r.scripted.rows.length} scripted demo scenarios</summary>
+      <table><thead><tr><th></th><th>Baseline</th><th>Agents</th></tr></thead><tbody>
+      ${M.map(([k,l,dir])=>{ const better = dir && (dir>0 ? sa[k]>sb[k] : sa[k]<sb[k]);
+        return `<tr><td>${l}</td><td>${sb[k]}</td><td class="${better?"better":""}">${sa[k]}</td></tr>`; }).join("")}
+      </tbody></table></details>`);
 };
 
 refresh(); setInterval(refresh, 1000);

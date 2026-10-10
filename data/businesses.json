@@ -1,6 +1,32 @@
 [
-  {"id": "campus-cafe", "name": "Bowers Ave Café", "lat": 37.3788, "lng": -121.9764},
-  {"id": "tech-cafeteria", "name": "Mission Tech Cafeteria", "lat": 37.3881, "lng": -121.9701},
-  {"id": "corner-bakery", "name": "Scott Blvd Bakery", "lat": 37.3702, "lng": -121.9601},
-  {"id": "lakeside-hotel", "name": "Lakeside Hotel Kitchen", "lat": 37.3951, "lng": -121.9802}
+ {
+  "id": "campus-cafe",
+  "name": "Bowers Ave Caf\u00e9",
+  "lat": 37.3788,
+  "lng": -121.9764
+ },
+ {
+  "id": "tech-cafeteria",
+  "name": "Mission Tech Cafeteria",
+  "lat": 37.3881,
+  "lng": -121.9701
+ },
+ {
+  "id": "corner-bakery",
+  "name": "Scott Blvd Bakery",
+  "lat": 37.3702,
+  "lng": -121.9601
+ },
+ {
+  "id": "lakeside-hotel",
+  "name": "Lakeside Hotel Kitchen",
+  "lat": 37.3951,
+  "lng": -121.9802
+ },
+ {
+  "id": "north-market",
+  "name": "North Valley Farmers Market",
+  "lat": 37.4302,
+  "lng": -121.8801
+ }
 ]

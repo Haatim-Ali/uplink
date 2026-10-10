@@ -16,9 +16,10 @@
   <button id="blank">Empty world</button>
   <select id="speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select>
   <button id="pause">Pause</button>
-  <a class="btn" href="/business" target="_blank">Business view ↗</a>
-  <a class="btn" href="/records" target="_blank">Donation records ↗</a>
-  <button id="compare">Agents vs baseline</button>
+  <a class="btn" href="/business" target="_blank">Business ↗</a>
+  <a class="btn" href="/shelter" target="_blank">Shelter ↗</a>
+  <a class="btn" href="/records" target="_blank">Records ↗</a>
+  <button id="compare">Evidence</button>
   <span class="badge" id="mode"></span>
   <span class="clock" id="clock">12:00</span>
 </header>
@@ -58,12 +59,12 @@
 </main>
 
 <dialog id="dlg">
-  <h2 style="margin-top:0">Negotiating agents vs nearest-shelter baseline</h2>
-  <p style="color:var(--muted);margin-top:-6px">Same scripted scenarios and events for both. The baseline always sends food to the nearest shelter that takes it, with the nearest free driver, and skips the safety checks.</p>
+  <h2 class="dlg-title">Negotiating agents vs a simple baseline</h2>
+  <p class="dlg-sub">Same scenarios, same events. The baseline sends food to the nearest open shelter with room and the nearest free driver. It skips fridge, allergen and timing checks, driver reliability, cost and fairness, and never negotiates.</p>
   <div id="cmp">Running…</div>
-  <p><button onclick="dlg.close()">Close</button></p>
+  <p><button class="dlg-close" onclick="dlg.close()">Close</button></p>
 </dialog>
-<div class="toast" id="toast"></div>
+<div id="toasts"></div>
 
 <script src="/static/dashboard.js"></script>
 </body>
