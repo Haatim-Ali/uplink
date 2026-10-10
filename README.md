@@ -29,6 +29,16 @@ It runs with **no API key**: vision returns a demo pizza result and the agents u
 
 ### Turn on the AI model
 
+**Our setup (no API key needed):** photos are read by an open vision model (Qwen2.5-VL-7B) on an NVIDIA Brev GPU. See [docs/BREV_SETUP.md](docs/BREV_SETUP.md).
+
+```bash
+scripts/start_vision.sh                                   # GPU on, model up, tunnel open
+source scripts/vision_env.sh && PORT=5050 python app.py
+scripts/stop_vision.sh                                    # when done: stops billing
+```
+
+**With an API key instead:**
+
 ```bash
 export ANTHROPIC_API_KEY=...      # or OPENAI_API_KEY=... (OPENAI_BASE_URL works for NVIDIA NIM)
 python app.py                      # vision now uses the model

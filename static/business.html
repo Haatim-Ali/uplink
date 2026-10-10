@@ -22,6 +22,9 @@ img{max-width:100%;border-radius:10px;margin-top:10px;display:none}
 .note{font-size:13px;color:var(--muted);margin-top:8px}
 .done{background:#e3f3e8;color:#1f6b39;border-color:#bfe2cb;font-weight:600}
 .hidden{display:none}
+.banner{font-size:14px;border-radius:8px;padding:8px 10px;margin-top:8px;font-weight:600}
+.banner.ok{background:#e3f3e8;color:#1f6b39}.banner.warn{background:#fbf0d9;color:#7a5410}.banner.bad{background:#fbe5e5;color:#8a2323}
+input.check{border:2px solid #d99a1b;background:#fffaf0}
 </style>
 </head>
 <body>
@@ -41,6 +44,7 @@ img{max-width:100%;border-radius:10px;margin-top:10px;display:none}
 
   <div class="card hidden" id="details">
     <b>Check the details</b>
+    <div class="banner hidden" id="banner"></div>
     <div class="note" id="note"></div>
     <label>Items</label><input id="items">
     <div class="row">
@@ -73,6 +77,31 @@ $("file").onchange = e => {
   $("preview").src = URL.createObjectURL(photo); $("preview").style.display = "block";
   $("analyze").disabled = false;
 };
+// Shrink the photo in the browser before upload: faster, and keeps it within the model's limits.
+// If the browser can't decode it (e.g. HEIC in Chrome), send the original; the server converts it.
+function shrink(file, maxEdge = 1568){
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, maxEdge / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => resolve(b || file), "image/jpeg", 0.9);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+function showSource(r){
+  const b = $("banner"), f = r.food || {};
+  $("servings").classList.remove("check"); $("items").classList.remove("check");
+  if(r.source === "demo"){ b.className = "banner warn"; b.textContent = "Demo mode: no AI model is connected. This is a sample, not your photo."; }
+  else if(r.source === "fallback"){ b.className = "banner bad"; b.textContent = "We couldn't read this photo. Please fill in the details."; $("items").classList.add("check"); }
+  else if(f.confidence === "high"){ b.className = "banner ok"; b.textContent = "Read by AI. Please check the count before confirming."; }
+  else { b.className = "banner warn"; b.textContent = `AI isn't sure (${f.confidence || "low"} confidence). Please check the count.`; $("servings").classList.add("check"); }
+}
 function fill(f, note){
   $("items").value = f.items.join(", "); $("servings").value = f.servings; $("safe").value = f.safe_minutes;
   $("wlo").value = f.weight_lbs[0]; $("whi").value = f.weight_lbs[1]; $("category").value = f.category;
@@ -83,12 +112,14 @@ function fill(f, note){
 }
 $("analyze").onclick = async () => {
   $("analyze").disabled = true; $("analyze").textContent = "Looking at your photo…";
-  const fd = new FormData(); fd.append("photo", photo);
-  const r = await (await fetch("/api/vision",{method:"POST",body:fd})).json();
+  const fd = new FormData(); fd.append("photo", await shrink(photo), "photo.jpg");
+  let r;
+  try { r = await (await fetch("/api/vision",{method:"POST",body:fd})).json(); }
+  catch(e){ r = {source:"fallback", food:{items:[],servings:1,safe_minutes:120,weight_lbs:[1,2],category:"hot prepared",allergens:[],needs_cold:false,notes:"Couldn't reach the server."}}; }
   $("analyze").textContent = "Identify the food"; $("analyze").disabled = false;
-  fill(r.food, r.food.notes);
+  fill(r.food, r.food.notes); showSource(r);
 };
-$("skip").onclick = () => fill({items:["food"],servings:10,safe_minutes:120,weight_lbs:[2,4],category:"hot prepared",allergens:[],needs_cold:false}, "Enter what you have.");
+$("skip").onclick = () => { fill({items:["food"],servings:10,safe_minutes:120,weight_lbs:[2,4],category:"hot prepared",allergens:[],needs_cold:false}, "Enter what you have."); $("banner").className = "banner hidden"; };
 $("confirm").onclick = async () => {
   const food = {
     items: $("items").value.split(",").map(s=>s.trim()).filter(Boolean),

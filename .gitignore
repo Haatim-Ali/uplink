@@ -2,4 +2,6 @@ __pycache__/
 *.pyc
 .env
 .venv/
+scripts/.tunnel.pid
+scripts/.tunnel.log
 *.pt
