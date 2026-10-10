@@ -2,3 +2,4 @@ flask>=3
 requests>=2
 pillow>=10
 pillow-heif>=0.16  # lets iPhone HEIC photos work
+anthropic>=1.13

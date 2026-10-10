@@ -197,7 +197,7 @@ def analyze_many(image_bytes, media_type="image/jpeg", hint="nothing"):
     try:
         b64 = base64.b64encode(image_bytes).decode()
         data = llm.chat_json("You are a careful food-donation intake assistant.", MULTI_PROMPT.format(hint=hint or "nothing"),
-                             image_b64=b64, media_type=media_type, max_tokens=4000)
+                             image_b64=b64, media_type=media_type, max_tokens=4000, effort="high")
         foods = [normalize(f, base=NEUTRAL) for f in (data.get("donations") or []) if f]
         for f in foods:
             f["notes"] = (f.get("notes") or "").strip() or "Identified by the vision model from the closing-time snapshot."
@@ -215,7 +215,7 @@ def analyze(image_bytes, media_type="image/jpeg"):
     try:
         b64 = base64.b64encode(image_bytes).decode()
         data = llm.chat_json("You are a careful food-donation intake assistant. You count, you don't guess.",
-                             PROMPT, image_b64=b64, media_type=media_type, max_tokens=4000)
+                             PROMPT, image_b64=b64, media_type=media_type, max_tokens=4000, effort="high")
     except Exception as e:  # noqa: BLE001 - any failure becomes a clear message, never fake food
         return failed(f"the vision model call failed: {type(e).__name__}")
     if data.get("is_food") is False:
