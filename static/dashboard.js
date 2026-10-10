@@ -78,6 +78,12 @@ function drawMap(){
     });
   });
   for(const id in markers){ if(!live.has(id)){ markers[id].remove(); delete markers[id]; } }   // e.g. after a reset
+  // zoom to fit every shelter and business whenever that set changes (e.g. city mode)
+  const fitKey = S.nonprofits.length + "|" + S.businesses.length;
+  if(map._fitKey !== fitKey){
+    map._fitKey = fitKey;
+    map.fitBounds(L.latLngBounds([...S.nonprofits, ...S.businesses].map(p=>[p.lat,p.lng])), {padding:[24,24]});
+  }
   layers.route.clearLayers();   // routes change shape every tick, so these are redrawn
   S.donations.filter(d=>d.status==="en_route" && d.plan).forEach(d=>{
     const dr = S.drivers.find(x=>x.id===d.plan.driver);
@@ -108,7 +114,7 @@ function drawNegotiation(){
   setHTML("rounds", n.rounds.map((r,i)=>`<button class="${i===roundSel?"on":""}" onclick="roundSel=${i};drawNegotiation()">R${r.round}</button>`).join(" "));
   const r = n.rounds[roundSel];
   const planIds = Object.keys(r.votes);
-  const nm = id => { const [np,dr] = id.split("|"); const N = S.nonprofits.find(x=>x.id===np); const D = S.drivers.find(x=>x.id===dr); return `${N?N.name:np} <span class="muted">via ${D?D.name:dr}</span>`; };
+  const nm = id => { const [np,dr,join] = id.split("|"); if(join) return `${(S.nonprofits.find(x=>x.id===np)||{}).name||np} <span class="muted">· combined trip with ${join.replace("join-","")}</span>`; const N = S.nonprofits.find(x=>x.id===np); const D = S.drivers.find(x=>x.id===dr); return `${N?N.name:np} <span class="muted">via ${D?D.name:dr}</span>`; };
   const cards = AGENTS.map(a=>{
     const pid = r.proposals[a];
     return `<div class="agent ${a}"><span class="w">vote ×${(n.weights||{})[a]??1}</span><h3>${a}</h3><div class="goal">${GOALS[a]}</div><div>Wants: <b>${nm(pid)}</b></div></div>`;

@@ -63,7 +63,8 @@ def planner_loop():
                 continue  # reset happened mid-negotiation
             w.busy = False
             plan = result.get("plan")
-            if plan and w.drivers[plan["driver"]]["status"] != "free" and d.get("locked_driver") != plan["driver"] \
+            if plan and not plan.get("join") and w.drivers[plan["driver"]]["status"] != "free" \
+                    and d.get("locked_driver") != plan["driver"] \
                     and not (d["status"] == "en_route" and d["plan"]["driver"] == plan["driver"]):
                 d["status"] = "new"  # driver was taken meanwhile; renegotiate
                 continue
@@ -224,6 +225,7 @@ if __name__ == "__main__":
     threading.Thread(target=clock_loop, daemon=True).start()
     threading.Thread(target=planner_loop, daemon=True).start()
     port = int(os.getenv("PORT", "5000"))
+    print("Uplink · food rescue agents")
     print(f"Dashboard: http://localhost:{port}   Business page: http://localhost:{port}/business")
     print(f"Agents: {'LLM' if agents.use_llm() else 'rules'} · Vision: {llm.provider() or 'demo (no API key)'}")
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

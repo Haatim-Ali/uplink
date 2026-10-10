@@ -28,6 +28,29 @@ PAD_THAI = {"items": ["pad thai"], "servings": 20, "weight_lbs": [8, 10], "aller
 PRODUCE = {"items": ["mixed produce crates"], "servings": 120, "weight_lbs": [60, 80], "allergens": [],
            "category": "produce", "needs_cold": False, "safe_minutes": 720}
 
+RICE_BOWLS = {"items": ["teriyaki rice bowls"], "servings": 18, "weight_lbs": [8, 11], "allergens": ["soy", "gluten"],
+              "category": "hot prepared", "needs_cold": False, "safe_minutes": 100}
+TACOS = {"items": ["chicken tacos"], "servings": 22, "weight_lbs": [7, 9], "allergens": ["dairy"],
+         "category": "hot prepared", "needs_cold": False, "safe_minutes": 90}
+DUMPLINGS = {"items": ["vegetable dumplings"], "servings": 15, "weight_lbs": [4, 6], "allergens": ["gluten", "soy"],
+             "category": "hot prepared", "needs_cold": False, "safe_minutes": 90}
+BREAD = {"items": ["day-old bread"], "servings": 40, "weight_lbs": [10, 14], "allergens": ["gluten"],
+         "category": "packaged", "needs_cold": False, "safe_minutes": 2880}
+MILK = {"items": ["milk cartons"], "servings": 36, "weight_lbs": [20, 24], "allergens": ["dairy"],
+        "category": "cold prepared", "needs_cold": True, "safe_minutes": 150}
+
+CITY_DRIVERS = [
+    {"id": "priya", "name": "Priya (volunteer)", "type": "volunteer", "reliability": 0.9, "lat": 37.3601, "lng": -121.9452, "base_usd": 0, "per_km_usd": 0},
+    {"id": "luis", "name": "Luis (volunteer)", "type": "volunteer", "reliability": 0.75, "lat": 37.3452, "lng": -121.9702, "base_usd": 0, "per_km_usd": 0},
+    {"id": "kim", "name": "Kim (volunteer)", "type": "volunteer", "reliability": 0.85, "lat": 37.3952, "lng": -121.9402, "base_usd": 0, "per_km_usd": 0},
+    {"id": "courier-c", "name": "Rapid Courier C (paid)", "type": "paid", "reliability": 0.95, "lat": 37.3402, "lng": -121.9602, "base_usd": 6, "per_km_usd": 1.4},
+]
+
+
+def _d(at, business, food, **change):
+    return {"at": at, "type": "donation", "business": business, "food": dict(food, **change)}
+
+
 SCENARIOS = {
     "lunch_rush": {
         "name": "lunch_rush", "title": "Lunch rush: four donations, a full shelter and a no-show",
@@ -57,6 +80,33 @@ SCENARIOS = {
             {"at": 0, "type": "cancel", "driver": "jordan"},
             {"at": 0, "type": "cancel", "driver": "sam"},
             {"at": 1, "type": "donation", "business": "north-market", "food": PRODUCE},
+        ],
+    },
+    "city_rush": {
+        "name": "city_rush", "title": "City mode: 18 donations across Santa Clara in 45 minutes",
+        "events": [{"at": 0, "type": "driver_joins", "driver": d} for d in CITY_DRIVERS] + [
+            _d(1, "campus-cafe", PIZZA),
+            _d(2, "food-hall", RICE_BOWLS),
+            _d(3, "food-hall", TACOS),
+            _d(4, "food-hall", DUMPLINGS),
+            _d(5, "tech-cafeteria", SANDWICHES, servings=30),
+            _d(6, "grocer", BREAD),
+            _d(8, "campus-dining", PASTA, servings=20),
+            _d(9, "campus-dining", SALADS, servings=16),
+            {"at": 10, "type": "cancel", "driver": "maria"},
+            _d(11, "lakeside-hotel", CURRY, servings=20, safe_minutes=60),
+            _d(13, "caterer", SOUP),
+            _d(14, "grocer", MILK),
+            {"at": 15, "type": "decline", "nonprofit": "harbor-house"},
+            _d(17, "corner-bakery", GRANOLA, servings=40),
+            _d(19, "food-hall", PIZZA, items=["margherita pizza"]),
+            _d(21, "caterer", YOGURT, servings=20),
+            {"at": 22, "type": "new_pantry"},
+            _d(24, "campus-cafe", PB, servings=18),
+            _d(28, "north-market", PRODUCE, servings=60),
+            {"at": 30, "type": "cancel", "driver": "luis"},
+            _d(33, "tech-cafeteria", SALADS, servings=14),
+            _d(40, "lakeside-hotel", RICE_BOWLS, servings=20),
         ],
     },
     "new_pantry": {

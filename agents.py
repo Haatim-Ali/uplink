@@ -28,7 +28,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 import llm
-from config import CONCESSION, THRESHOLDS, TIGHT_SLACK, URGENT_MINUTES
+from config import CONCESSION, JOIN_BONUS, THRESHOLDS, TIGHT_SLACK, URGENT_MINUTES
 
 AGENTS = ["Speed", "Cost", "Need"]
 GOALS = {
@@ -58,7 +58,8 @@ def score(agent, world, d, p):
     if agent == "Speed":
         return clamp(p["slack"] / remaining) * (0.6 + 0.4 * p["reliability"])
     if agent == "Cost":
-        return (1 - min(p["cost"], 30) / 30) * (0.55 + 0.45 * p["reliability"])
+        base = (1 - min(p["cost"], 30) / 30) * (0.55 + 0.45 * p["reliability"])
+        return clamp(base + (JOIN_BONUS if p.get("join") else 0))  # a combined trip also saves a driver
     n = world.nonprofits[p["np"]]
     incoming = world.committed(n["id"])
     room = 1 - (n["received"] + incoming) / max(1, n["capacity_servings"])
@@ -152,7 +153,9 @@ def propose_reason(agent, p, world, compromise=False):
     if agent == "Speed":
         return f"Arrives in {p['dur']} min with {p['slack']} min to spare ({p['reliability']:.0%} reliable)."
     if agent == "Cost":
-        return "Costs nothing." if p["cost"] == 0 else f"Costs ${p['cost']:.2f}."
+        if p.get("join"):
+            return f"Ride along with {p['join']}: no extra trip, and another driver stays free for the next donation."
+        return "Costs nothing." if p["cost"] == 0 else f"${p['cost']:.2f} is the lowest cost I can find."
     n = world.nonprofits[p["np"]]
     room = n["capacity_servings"] - n["received"] - world.committed(n["id"])
     if world.committed(n["id"]):

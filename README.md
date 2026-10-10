@@ -1,4 +1,6 @@
-# Food Rescue Agents
+# Uplink
+
+**AI agents that negotiate where leftover food goes.**
 
 One photo of leftover food becomes a completed donation. Three AI agents with competing goals (Speed, Cost, Need) negotiate where the food goes and who drives it, with no boss. Safety rules in code remove unsafe plans before anyone argues. When something breaks, they renegotiate on their own. When they truly can't agree, a plan crosses one agent's red line, or the decision hinges on a fact nobody has confirmed, they stop and ask a person instead of forcing a consensus.
 
@@ -45,8 +47,9 @@ Optional: `ANTHROPIC_MODEL`, `OPENAI_MODEL`, and `AGENT_MODEL` (a faster model f
    - **Irreconcilable goals**: no plan wins a majority after 3 rounds. A human picks from the agents' top two.
    - **Insufficient evidence**: the agents ask the business "is this free of peanuts?" before committing. Answer with the buttons, or wait and watch them act on what they know.
 6. Run **Standoff** to show the agents asking a coordinator to approve an over-budget plan.
-7. Send a real photo from the Business view on a phone (tick "Not sure about allergens" to trigger the question).
-8. Click **Evidence** for the 50-run comparison chart, and open the scripted table for team vs each agent alone.
+7. Run **City mode** (set speed to 4×): 18 donations from 8 businesses, volunteers starting shifts, a no-show, a full shelter and a new pantry. Point out a combined trip, and the food hall moment where Cost wanted to combine trips but Need objected that Grace Kitchen was already getting food, so they compromised.
+8. Send a real photo from the Business view on a phone (tick "Not sure about allergens" to trigger the question).
+9. Click **Evidence** for the 50-run comparison chart, and open the scripted table for team vs each agent alone.
 
 Click any past negotiation (D1, D2...) and **Replay debate** to walk judges through one decision, including vetoes.
 
@@ -88,6 +91,8 @@ Plans over $25 also go to a human.
 
 **Discovery.** Agents search the directory by capability. A new pantry can register mid-run; waiting and not-yet-picked-up donations are reconsidered.
 
+**Combined trips (city mode).** If a driver is already heading to the same pickup, the agents can add the new donation to that trip, as long as the shelter passes the safety rules for the new food and the vehicle has room (150 servings). Cost values this because it keeps another driver free; Need can still object if that shelter is already well supplied.
+
 **Contacting shelters.** If someone has a shelter's phone page open, the agents ask before dispatching and hold that driver and that shelter's room while waiting. "We're full" marks the shelter full and triggers a renegotiation; no answer within 8 minutes means they try elsewhere.
 
 **Fallback rules (disclosed, not decision-makers).** In scripted runs nobody is at the keyboard, so a simulated coordinator picks the agents' top-ranked option when asked. In the live demo, if no human answers an escalation before the food has 15 minutes left, the agents' top-ranked option goes. Both are labeled as such in the feed.
@@ -104,29 +109,29 @@ python3 tests/test_core.py      # or: python3 -m pytest
 
 **The baseline** is what a busy coordinator with a phone list would do: nearest shelter that takes this food type, is open, isn't full and has room, with the nearest free driver, never retrying a shelter that turned the food away. It skips fridge, allergen and timing checks, driver reliability, cost and fairness, and doesn't negotiate.
 
-**All 8 scripted scenarios, team vs each agent alone** (`python scenarios.py`). Full per-scenario tables: [docs/RESULTS.md](docs/RESULTS.md).
+**All 9 scripted scenarios, team vs each agent alone** (`python scenarios.py`). Full per-scenario tables: [docs/RESULTS.md](docs/RESULTS.md).
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
 |---|---:|---:|---:|---:|---:|
-| Meals delivered safely | 396 | 501 | 501 | 501 | 501 |
-| Servings lost | 105 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 90.45 | 148.18 | 53.33 | 95.28 | 90.22 |
-| Shelters fed | 9 | 11 | 12 | 15 | 15 |
-| Avg minutes to spare (perishable food) | 73 | 65 | 61 | 61 | 59 |
-| Asked a human | 0 | 0 | 0 | 0 | 3 |
+| Meals delivered safely | 763 | 934 | 914 | 934 | 934 |
+| Servings lost | 171 | 0 | 20 | 0 | 0 |
+| Money spent ($) | 172.76 | 263.93 | 149.73 | 191.21 | 139.18 |
+| Shelters fed | 17 | 19 | 19 | 22 | 22 |
+| Avg minutes to spare (perishable food) | 76 | 73 | 68 | 67 | 67 |
+| Asked a human | 0 | 1 | 3 | 1 | 7 |
 
-How the team's negotiations ended: consensus 17, unacceptable 2, insufficient evidence 2, majority 1, irreconcilable 1
+How the team's negotiations ended: consensus 38, majority 4, unacceptable 2, insufficient evidence 2, irreconcilable 1
 
 **100 random lunch rushes the rules were never tuned on** (`python3 -c "import scenarios; print(scenarios.compare_random(100, 1001)['totals'])"`):
 
 | Metric | Baseline | Negotiating agents | Change |
 | --- | --- | --- | --- |
-| Meals delivered safely | 13,827 | 16,223 | +17% |
-| Servings lost | 3,627 | 1,231 | −66% |
-| Money spent on paid drivers | $2,045 | $888 | −57% |
-| Runs where agents lost more food | | 0 of 100 | |
+| Meals delivered safely | 13,827 | 16,203 | +17% |
+| Servings lost | 3,627 | 1,251 | −66% |
+| Money spent on paid drivers | $2,045 | $894 | −56% |
+| Runs where agents lost more food | | 1 of 100 | |
 
-The dashboard's **Evidence** button shows the same comparison on 50 runs (seeds 1–50): −55% food lost, +15% meals, −49% cost, never worse.
+The dashboard's **Evidence** button shows the same comparison on 50 runs (seeds 1–50): −55% food lost, +15% meals, −52% cost, never worse.
 
 **Lessons learned (for Devpost).** Testing on random runs surfaced two failures we fixed. (1) A baseline that retried the same closed shelter forever made us look better than we were; we made the baseline fair. (2) The agents trusted an 80%-reliable volunteer with sandwiches that had 10 minutes of margin; he cancelled and the food spoiled. Speed now objects to anything below 90% reliable when the margin is under 20 minutes. A third bug: a nonprofit's van couldn't deliver elsewhere after its own shelter filled up.
 
@@ -140,4 +145,4 @@ Each person owns different files, so merges stay clean.
 
 ## Next ideas
 
-Give each agent private information it has to share as evidence; LLM agents as the demo default with saved responses as a fallback; city mode (15–20 donations at once with combined trips); ElevenLabs voices for each agent and an AI voice call to the shelter phone; agent memory across donations; AGNTCY integration.
+Give each agent private information it has to share as evidence; LLM agents as the demo default with saved responses as a fallback; ElevenLabs voices for each agent and an AI voice call to the shelter phone; agent memory across donations; AGNTCY integration.

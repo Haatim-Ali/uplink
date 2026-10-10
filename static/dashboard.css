@@ -135,3 +135,4 @@ dialog table{margin-top:8px}
 .vote.veto{color:#fff;background:var(--bad);border-radius:4px;padding:0 4px}
 .tally{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:12px}
 .tally span{background:#f0efea;border-radius:99px;padding:2px 8px}
+.tagline{font-weight:400;font-size:13px;color:#bbb;margin-left:4px}

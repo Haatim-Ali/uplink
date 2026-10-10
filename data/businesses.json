@@ -28,5 +28,29 @@
   "name": "North Valley Farmers Market",
   "lat": 37.4302,
   "lng": -121.8801
+ },
+ {
+  "id": "food-hall",
+  "name": "Santa Clara Food Hall",
+  "lat": 37.3542,
+  "lng": -121.9552
+ },
+ {
+  "id": "campus-dining",
+  "name": "University Dining Commons",
+  "lat": 37.3496,
+  "lng": -121.9389
+ },
+ {
+  "id": "grocer",
+  "name": "Homestead Grocery",
+  "lat": 37.3366,
+  "lng": -121.9845
+ },
+ {
+  "id": "caterer",
+  "name": "Lafayette Catering",
+  "lat": 37.3905,
+  "lng": -121.9512
  }
 ]
