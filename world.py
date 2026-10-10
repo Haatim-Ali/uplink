@@ -418,6 +418,12 @@ class World:
                  f"{label}. {plan['servings']} servings to {plan['np_name']} with {plan['driver_name']}, arriving {plan['arrive_hhmm']}.")
         self.dispatch(d, plan)
 
+    def last_call(self, d):
+        """When the fallback must act if no human answers: the last minute the agents' options can still
+        arrive safely (with a 2-minute buffer), and never later than HUMAN_TIMEOUT before the food is unsafe."""
+        latest = max((d["safe_until"] - SAFETY_MARGIN - o["dur"] for o in d["options"]), default=d["safe_until"])
+        return min(latest - 2, d["safe_until"] - HUMAN_TIMEOUT)
+
     def approve(self, did, plan_id, auto=False):
         d = self.get(did)
         if not d or d["status"] != "awaiting_human":
@@ -428,6 +434,14 @@ class World:
         dr = self.drivers[plan["driver"]]
         if dr["status"] != "free" and d.get("locked_driver") != dr["id"] and not plan.get("join"):
             d["status"] = "new"  # option no longer valid: renegotiate
+            return False
+        # The option was priced when the agents asked. If time has passed, it may no longer arrive safely.
+        arrive = self.now + plan["dur"]
+        if not plan.get("join") and (arrive > d["safe_until"] - SAFETY_MARGIN
+                                     or arrive > self.nonprofits[plan["np"]]["open_min"]):
+            self.say("Safety", f"{did}: {short_plan(plan)} would now arrive at {hhmm(arrive)}, too late to be safe. "
+                     "Not approved; the agents will find a plan that still works.", "safety", did)
+            d["status"] = "new"
             return False
         who = {
             False: "Coordinator approved",
@@ -714,9 +728,12 @@ class World:
                     d.setdefault("skip", []).append(plan["np"])
                     d["status"] = "new"
                     self.say("Contact", f"No answer from {plan['np_name']} after {SHELTER_TIMEOUT} min. Trying elsewhere.", "contact", d["id"])
-                elif d["status"] == "awaiting_human" and d["safe_until"] - self.now <= HUMAN_TIMEOUT and d["options"]:
+                elif d["status"] == "awaiting_human" and d["options"] and self.now >= self.last_call(d):
+                    # Nobody answered and waiting longer would make every option too late: act now,
+                    # on the agents' best-ranked option that can still arrive safely.
                     self.outcomes["human_timeout"] = self.outcomes.get("human_timeout", 0) + 1
-                    if not self.approve(d["id"], d["options"][0]["id"], auto="timeout"):
+                    ok = [o for o in d["options"] if self.now + o["dur"] <= d["safe_until"] - SAFETY_MARGIN]
+                    if not ok or not self.approve(d["id"], ok[0]["id"], auto="timeout"):
                         d["status"] = "new"
                 elif d["status"] == "awaiting_info" and self.now >= d["answer_by"]:
                     self.say("System", f"{d['id']}: no answer from {d['business_name']} in time. "
@@ -821,6 +838,8 @@ class World:
                                        "picked", "why", "asked_about")}
             x["safe_until"] = hhmm(d["safe_until"])
             x["minutes_left"] = d["safe_until"] - self.now
+            if d["status"] == "awaiting_human" and d.get("options"):
+                x["decide_by"] = hhmm(self.last_call(d))   # after this the fallback rule acts
             dons.append(x)
         return {
             "now": hhmm(self.now), "scenario": self.scenario_name, "busy": self.busy,

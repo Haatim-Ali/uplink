@@ -3,33 +3,124 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Uplink · Donation records (SB 1383)</title>
+<title>Uplink · Edible food recovery records (SB 1383)</title>
+<link rel="stylesheet" href="/static/uplink.css">
 <style>
-body{margin:0;font:14px/1.4 system-ui,sans-serif;background:#f5f4f0;color:#1d1d1b}
-.wrap{max-width:1100px;margin:0 auto;padding:20px}
-h1{font-size:20px;margin:0 0 4px}
-p{color:#6b6a64;margin:0 0 14px}
-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e3e1da;border-radius:10px;overflow:hidden}
-th,td{padding:8px 10px;border-bottom:1px solid #e3e1da;text-align:left}
-th{background:#faf9f6;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#6b6a64}
-button{font:inherit;padding:6px 12px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;margin-bottom:12px}
+.rnav{background:#fff;border-bottom:1px solid var(--line)}
+.rnav-in{max-width:76rem;margin:0 auto;padding:.5rem var(--s4);display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap}
+.rnav .brand{color:var(--ink);font-size:1.3rem}
+.rnav nav{display:flex;gap:.15rem;flex-wrap:wrap}
+.rnav nav a{font-weight:600;color:var(--ink-2);text-decoration:none;padding:.6rem .8rem;border-radius:8px}
+.rnav nav a:hover{background:var(--bg)}
+.rnav nav a.active{color:var(--brand-ink);background:var(--brand-soft)}
+.page{max-width:76rem;margin:0 auto;padding:var(--s5) var(--s4) var(--s6)}
+.doc-head{display:flex;justify-content:space-between;gap:var(--s4);flex-wrap:wrap;align-items:flex-end;padding-bottom:var(--s4);border-bottom:3px solid var(--ink);margin-bottom:var(--s4)}
+.doc-head .brand{font-size:var(--t-lg);margin-bottom:var(--s3);color:var(--ink)}
+.doc-head h1{font-size:var(--t-2xl);line-height:1.15;letter-spacing:-.02em}
+.doc-head p{color:var(--muted);max-width:44rem;margin-top:var(--s2)}
+.doc-meta{font-size:var(--t-sm);color:var(--ink-2);text-align:right;line-height:1.6}
+.sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s3);margin-bottom:var(--s4)}
+.sum div{background:#fff;border:1px solid var(--line);border-top:3px solid var(--brand);border-radius:var(--r2);padding:var(--s3) var(--s4)}
+.sum b{display:block;font-size:var(--t-2xl);font-variant-numeric:tabular-nums;line-height:1.1}
+.sum span{font-size:var(--t-sm);color:var(--muted)}
+.actions{display:flex;gap:var(--s2);flex-wrap:wrap;margin-bottom:var(--s3)}
+.table-wrap{max-height:none}
+table.data td.tag-t,table.data td.nowrap{white-space:nowrap}
+.empty-rec{text-align:center;padding:var(--s6) var(--s4)!important;color:var(--muted)}
+.empty-rec b{display:block;color:var(--ink);font-size:var(--t-lg);margin-bottom:var(--s1)}
+.sign{display:none}
+.print-only{display:none;font-size:var(--t-sm);margin-bottom:var(--s2)}
+.foot-note{font-size:var(--t-xs);color:var(--muted);margin-top:var(--s3);line-height:1.5}
+@media (max-width:760px){.sum{grid-template-columns:repeat(2,minmax(0,1fr))}.doc-meta{text-align:left}}
+
+@media print{
+  @page{size:landscape;margin:12mm}
+  body{background:#fff;color:#000;font-size:10pt}
+  .page{max-width:none;padding:0}
+  .actions,.no-print{display:none!important}
+  .doc-head{border-bottom:2px solid #000}
+  .doc-head .brand{color:#000}
+  .sum div{border:1px solid #000;border-top:3px solid #000;break-inside:avoid}
+  .table-wrap{border:1px solid #000;overflow:visible}
+  table.data{font-size:8.5pt}
+  table.data th,table.data td{border-bottom:1px solid #999;padding:3pt 5pt}
+  table.data thead{display:table-header-group}
+  table.data thead th{position:static;background:#eee!important;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  table.data tbody tr:nth-child(even) td{background:#f6f6f6!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  table.data tr{break-inside:avoid}
+  .print-only{display:block}
+  .sign{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24pt;margin-top:36pt}
+  .sign div{border-top:1px solid #000;padding-top:4pt;font-size:8.5pt}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Edible food recovery records</h1>
-  <p>Created automatically for each delivered donation: the record California SB 1383 asks donors to keep.</p>
-  <button onclick="csv()">Download CSV</button>
-  <table><thead><tr><th>Donation</th><th>Date</th><th>Donor</th><th>Recipient</th><th>Items</th><th>Category</th><th>Servings</th><th>Weight (lbs)</th><th>Picked up</th><th>Delivered</th><th>Transport</th></tr></thead>
-  <tbody id="rows"><tr><td colspan="11">No deliveries yet.</td></tr></tbody></table>
+<header class="rnav no-print"><div class="rnav-in">
+  <a class="brand" href="/#/live"><span class="brand-mark" aria-hidden="true">↑</span>Uplink</a>
+  <nav aria-label="Main"><a href="/#/live">Live</a><a href="/#/decisions">Decisions</a><a href="/#/activity/feed">Activity</a><a href="/#/evidence">Evidence</a><a href="/records" class="active" aria-current="page">Records</a><a href="/#/how">How it works</a></nav>
+</div></header>
+<div class="page">
+  <header class="doc-head">
+    <div>
+      <div class="print-only"><b>Uplink</b> · food rescue</div>
+      <h1>Edible food recovery records</h1>
+      <p>Created automatically for each delivered donation: the record California SB 1383 asks commercial food donors to keep (donor, recipient, quantity, pickup and delivery times, and how it was transported).</p>
+    </div>
+    <div class="doc-meta">
+      <div>Document: <b>Food recovery log</b></div>
+      <div>Generated: <b id="gen">--</b></div>
+      <div>Records: <b id="count-meta">0</b></div>
+    </div>
+  </header>
+
+  <section class="sum" aria-label="Summary">
+    <div><b id="s-count">0</b><span>donations recorded</span></div>
+    <div><b id="s-serv">0</b><span>servings recovered</span></div>
+    <div><b id="s-lbs">0</b><span>pounds recovered (est.)</span></div>
+    <div><b id="s-orgs">0</b><span>recipient organizations</span></div>
+  </section>
+
+  <div class="actions">
+    <button class="btn primary" onclick="csv()" id="csvBtn">⬇ Download CSV</button>
+    <button class="btn" onclick="window.print()">🖨 Print record</button>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data" aria-describedby="live-note">
+      <caption class="sr-only">Delivered donations</caption>
+      <thead><tr><th scope="col">Donation</th><th scope="col">Date</th><th scope="col">Donor</th><th scope="col">Recipient</th><th scope="col">Items</th><th scope="col">Category</th><th scope="col" class="n">Servings</th><th scope="col" class="n">Weight (lbs)</th><th scope="col">Picked up</th><th scope="col">Delivered</th><th scope="col">Transport</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="11" class="empty-rec"><b>No deliveries yet</b>A record appears here automatically when a donation is delivered. Run a scenario on the dashboard to see one.</td></tr></tbody>
+    </table>
+  </div>
+  <p class="foot-note" id="live-note">This page updates by itself every few seconds. Weights are estimated ranges from the photo. All locations, drivers and times in this demo are simulated.</p>
+
+  <div class="sign" aria-hidden="true"><div>Donor representative</div><div>Recipient representative</div><div>Date</div></div>
 </div>
 <script>
 const KEYS = ["donation","date","donor","recipient","items","category","servings","weight_lbs","picked_up","delivered","transport"];
+const NUM = new Set(["servings","weight_lbs"]);
 let recs = [];
-const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cell = (r,k) => {
+  const v = r[k];
+  if(k === "transport") return `<td class="tag-t"><span class="pill outline">${esc(v)}</span></td>`;
+  if(k === "donation") return `<td><b>${esc(v)}</b></td>`;
+  if(["date","weight_lbs","picked_up","delivered"].includes(k)) return `<td class="nowrap${NUM.has(k)?" n":""}">${esc(Array.isArray(v) ? v.join("–") : v)}</td>`;
+  return `<td class="${NUM.has(k)?"n":""}">${esc(Array.isArray(v) ? v.join("–") : v)}</td>`;
+};
+function summary(){
+  const wt = r => { const w = r.weight_lbs; const a = Array.isArray(w) ? w : String(w).split(/[^0-9.]+/).filter(Boolean).map(Number); return a.length ? a.reduce((x,y)=>x+(+y||0),0)/a.length : 0; };
+  document.getElementById("s-count").textContent = recs.length;
+  document.getElementById("count-meta").textContent = recs.length;
+  document.getElementById("s-serv").textContent = recs.reduce((t,r)=>t+(+r.servings||0),0).toLocaleString();
+  document.getElementById("s-lbs").textContent = Math.round(recs.reduce((t,r)=>t+wt(r),0)).toLocaleString();
+  document.getElementById("s-orgs").textContent = new Set(recs.map(r=>r.recipient)).size;
+  document.getElementById("gen").textContent = new Date().toLocaleString();
+}
 async function load(){
-  recs = (await (await fetch("/api/state")).json()).records;
-  if(recs.length) document.getElementById("rows").innerHTML = recs.map(r=>"<tr>"+KEYS.map(k=>`<td>${esc(r[k])}</td>`).join("")+"</tr>").join("");
+  try{ recs = (await (await fetch("/api/state")).json()).records; }catch(e){ return; }
+  if(recs.length) document.getElementById("rows").innerHTML = recs.map(r=>"<tr>"+KEYS.map(k=>cell(r,k)).join("")+"</tr>").join("");
+  summary();
 }
 function csv(){
   const lines = [KEYS.join(",")].concat(recs.map(r=>KEYS.map(k=>`"${String(r[k]).replace(/"/g,'""')}"`).join(",")));

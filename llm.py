@@ -26,6 +26,9 @@ def _load_env_file(path=os.path.join(HERE, ".env")):
             line = line.strip()
             if line.startswith("export "):
                 line = line[7:]
+            if line.startswith("sk-ant-") and "=" not in line:   # a bare Anthropic key pasted on its own
+                os.environ.setdefault("ANTHROPIC_API_KEY", line)
+                continue
             if not line or line.startswith("#") or "=" not in line:
                 continue
             key, value = line.split("=", 1)
