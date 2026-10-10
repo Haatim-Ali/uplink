@@ -123,12 +123,14 @@ function drawNegotiation(){
     const win = n.plan && n.plan.id===pid && roundSel===n.rounds.length-1;
     const cells = AGENTS.map(a=>{
       const v = r.votes[pid][a], sc = (n.scores[pid]||{})[a] ?? 0;
-      return `<td title="${esc(v.reason)}"><span class="vote ${v.accept?"yes":"no"}">${v.accept?"✓ accept":"✗ object"}</span>
+      const veto = !v.accept && v.reason.startsWith("Veto");
+      return `<td title="${esc(v.reason)}"><span class="vote ${v.accept?"yes":veto?"veto":"no"}">${v.accept?"✓ accept":veto?"⛔ veto":"✗ object"}</span>
         <div class="bar"><i style="width:${Math.round(sc*100)}%;background:${COLORS[a]}"></i></div></td>`;
     }).join("");
     return `<tr class="${win?"winner":""}"><td>${nm(pid)}</td>${cells}</tr>`;
   }).join("");
-  const label = {consensus:"Agreed 3 of 3", majority:"Majority decision, dissent kept on record", urgent:"Time is short: acting on the best-supported plan", escalate:"No agreement: asking a human"}[n.outcome];
+  const label = {consensus:"Agreed 3 of 3", majority:"Majority decision, dissent kept on record", urgent:"Time is short: acting on the best-supported plan",
+    irreconcilable:"Irreconcilable: no plan has a majority, asking a human", unacceptable:"Unacceptable compromise: the majority's plan crosses a red line, asking a human"}[n.outcome];
   const chosen = n.plan ? ` → ${nm(n.plan.id)}` : "";
   const dissent = (n.dissent||[]).map(x=>`<div class="dissent">${x.agent}: ${esc(x.reason)}</div>`).join("");
   const bubbles = msgs.slice(0, shown).map((m,i) => `<div class="bubble ${m.agent} ${m.type}${i===shown-1 && playing ? " new" : ""}${i===shown-1 && playing && m.type==="objection" ? " shake" : ""}">
@@ -140,17 +142,33 @@ function drawNegotiation(){
     <div class="agents">${cards}</div>
     <table class="matrix"><thead><tr><th>Plans on the table (round ${r.round})</th>${AGENTS.map(a=>`<th style="color:${COLORS[a]}">${a}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>
     ${done && roundSel===n.rounds.length-1?`<div class="outcome ${n.outcome} pop">${label}${chosen}${dissent}</div>`:""}
-    ${done?`<button class="replay" onclick="replay()">↻ Replay debate</button>`:""}`);
+    ${done?`<button class="replay" onclick="replay()">↻ Replay debate</button>`:""}
+    ${tally()}`);
   const deb = $("debate"); if(deb) deb.scrollTop = deb.scrollHeight;
+}
+
+function tally(){
+  const o = S.outcomes || {}, names = {consensus:"agreed", majority:"majority", urgent:"time short", unacceptable:"unacceptable compromise",
+    irreconcilable:"irreconcilable", insufficient_evidence:"asked for evidence", over_budget:"over budget", human_timeout:"fallback rule used"};
+  const parts = Object.entries(o).map(([k,v])=>`<span>${names[k]||k}: <b>${v}</b></span>`).join("");
+  return parts ? `<div class="tally"><span class="muted" style="background:none;padding-left:0">How negotiations ended so far:</span>${parts}</div>` : "";
 }
 
 function drawHuman(){
   const waiting = S.donations.filter(d=>d.status==="awaiting_human");
+  const asking = S.donations.filter(d=>d.status==="awaiting_info");
   setHTML("human", waiting.map(d=>`
-    <div class="human"><b>Coordinator needed for ${d.id}</b> (${esc(d.food.items.join(", "))}, ${d.minutes_left} min until unsafe). The agents could not agree or the cost is over the limit.
-      <div>${d.options.map(o=>`<button onclick="approve('${d.id}','${o.id}')">Approve ${esc(o.np_name)} via ${esc(o.driver_name)} · ${o.dur} min · $${o.cost.toFixed(2)}</button>`).join("")}</div></div>`).join(""));
+    <div class="human"><b>Coordinator needed for ${d.id}</b> (${esc(d.food.items.join(", "))}, ${d.minutes_left} min until unsafe).
+      <div style="margin-top:4px">Why: ${esc(d.why||"the agents could not agree")}.</div>
+      <div>${d.options.map(o=>`<button onclick="approve('${d.id}','${o.id}')">Approve ${esc(o.np_name)} via ${esc(o.driver_name)} · ${o.dur} min · $${o.cost.toFixed(2)}</button>`).join("")}</div></div>`).join("")
+  + asking.map(d=>`
+    <div class="human" style="border-color:var(--need)"><b>Agents are asking ${esc(d.business_name)} about ${d.id}</b> (${esc(d.food.items.join(", "))}):
+      "Is this free of ${esc(d.asked_about)}?" Not enough evidence to decide yet; they act on what they know if there's no answer.
+      <div><button onclick="confirmInfo('${d.id}',true)">Business: listed allergens only (${esc(d.food.allergens.join(", ")||"none")})</button>
+      <button onclick="confirmInfo('${d.id}',false)">Business: can't say for sure</button></div></div>`).join(""));
 }
 async function approve(d,p){ await post("/api/approve",{donation:d,plan:p}); refresh(); }
+async function confirmInfo(id, sure){ const d = S.donations.find(x=>x.id===id); await post("/api/confirm",{donation:id, allergens: sure ? d.food.allergens : null}); refresh(); }
 
 // ---------- lists ----------
 function drawLists(){
@@ -158,8 +176,9 @@ function drawLists(){
   setHTML("log", S.decisions.slice().reverse().map(x=>`<div><span class="v ${x.verdict}">${x.verdict==="allowed"?"ALLOWED":"BLOCKED"}</span>${esc(x.donation)} · ${esc(x.text)}</div>`).join("") || "<p class='empty'>No decisions yet.</p>");
   setHTML("dons", S.donations.slice().reverse().map(d=>{
     const live = !["delivered","spoiled","expired"].includes(d.status);
+    const statusText = {awaiting_info:"asking business", awaiting_human:"asking human", awaiting_shelter:"asking shelter"}[d.status] || d.status.replace("_"," ");
     const where = d.plan ? `${esc(d.plan.np_name)} via ${esc(d.plan.driver_name)}` : "planning…";
-    return `<div class="don"><span class="st ${d.status}">${d.status.replace("_"," ")}</span><b>${d.id}</b> ${esc(d.food.items.join(", "))} · ${d.food.servings} servings<br>
+    return `<div class="don"><span class="st ${d.status}">${statusText}</span><b>${d.id}</b> ${esc(d.food.items.join(", "))} · ${d.food.servings} servings<br>
       <span class="muted">${esc(d.business_name)} → ${where}</span>
       ${live?`<br><span class="timer ${d.minutes_left<30?"low":""}">${d.minutes_left} min until unsafe (${d.safe_until})</span>`:""}</div>`;
   }).join("") || "<p class='empty'>No donations yet.</p>");
@@ -207,8 +226,14 @@ $("compare").onclick = async()=>{
       ${bar("Baseline", b[key], "base")}${bar("Agents", a[key], "agt")}</div>`;
   };
   const num = v => v.toLocaleString(), usd = v => "$" + Math.round(v).toLocaleString();
-  const M = [["meals_delivered_safely","Meals delivered safely",1],["servings_lost","Servings lost",-1],["money_spent","Money spent ($)",-1],["shelters_fed","Shelters fed",1],["human_escalations","Asked a human",0]];
-  const sb = r.scripted.totals.baseline, sa = r.scripted.totals.agents;
+  const sc = r.scripted, P = sc.order;  // the server sorts JSON keys, so the column order comes separately
+  const M = [["meals_delivered_safely","Meals delivered safely",1],["servings_lost","Servings lost",-1],["money_spent","Money spent ($)",-1],
+             ["shelters_fed","Shelters fed",1],["avg_spare_minutes","Avg minutes to spare (perishable)",1],["human_escalations","Asked a human",0]];
+  const outcomeLine = o => Object.entries(o||{}).map(([k,v])=>`${k.replace(/_/g," ")} ${v}`).join(", ") || "none";
+  const block = (title,res)=>`<tr><th colspan="${P.length+1}" style="text-align:left;padding-top:14px">${esc(title)}</th></tr>` + M.map(([k,l,dir])=>{
+    const vals = P.map(p=>res[p][k]); const best = dir>0 ? Math.max(...vals) : Math.min(...vals);
+    return `<tr><td>${l}</td>${P.map(p=>`<td class="${dir&&res[p][k]===best?"better":""}">${res[p][k]}</td>`).join("")}</tr>`;}).join("")
+    + `<tr><td colspan="${P.length+1}" style="text-align:left" class="muted small">Team outcomes: ${outcomeLine(res.agents.outcomes)}</td></tr>`;
   setHTML("cmp", `
     <div class="hero-row">
       <div class="hero"><b>${pct(a.servings_lost, b.servings_lost)}%</b><span>less food lost</span></div>
@@ -222,11 +247,11 @@ $("compare").onclick = async()=>{
       ${metric("Servings lost","servings_lost",num,"lower is better")}
       ${metric("Money spent on paid drivers","money_spent",usd,"lower is better")}
     </div>
-    <details><summary>The ${r.scripted.rows.length} scripted demo scenarios</summary>
-      <table><thead><tr><th></th><th>Baseline</th><th>Agents</th></tr></thead><tbody>
-      ${M.map(([k,l,dir])=>{ const better = dir && (dir>0 ? sa[k]>sb[k] : sa[k]<sb[k]);
-        return `<tr><td>${l}</td><td>${sb[k]}</td><td class="${better?"better":""}">${sa[k]}</td></tr>`; }).join("")}
-      </tbody></table></details>`);
+    <details><summary>The ${sc.rows.length} scripted demo scenarios: team vs nearest shelter vs each agent alone</summary>
+      <p class="muted small"><b>Speed / Cost / Need alone</b> use the same safety rules as the team, but one agent decides by itself with no negotiation. <b>Green</b> = best in the row.</p>
+      <table><thead><tr><th></th>${P.map(p=>`<th>${esc(sc.policies[p])}</th>`).join("")}</tr></thead><tbody>
+      ${block("All scenarios",sc.totals)}
+      ${sc.rows.map(x=>block(x.title,x.results)).join("")}</tbody></table></details>`);
 };
 
 refresh(); setInterval(refresh, 1000);

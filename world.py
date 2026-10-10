@@ -15,6 +15,8 @@ from config import (COST_LIMIT, HANDOFF_MIN, HUMAN_TIMEOUT, JOIN_EXTRA_MIN, PHON
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
+EVIDENCE_WAIT = 15         # wait at most this long for the business to answer a question...
+EVIDENCE_DEADLINE = 30     # ...and never past this many minutes before the food is unsafe
 
 
 def load(name):
@@ -59,7 +61,7 @@ class World:
     def __init__(self, scenario=None, policy="agents", live=False):
         self.policy = policy          # "agents" or "baseline"
         self.live = live              # live: humans answer escalations; headless: auto-approve
-        self.now = START
+        self.now = self.start = START
         self.nonprofits = {}
         for n in load("nonprofits.json"):
             self._register(n, announce=False)
@@ -72,6 +74,7 @@ class World:
         self.feed, self.decisions, self.records = [], [], []
         self.weights = {a: 1.0 for a in agents.AGENTS}
         self.impact = {"meals": 0, "lbs": 0.0, "cost": 0.0, "spoiled": 0, "escalations": 0, "orgs": set()}
+        self.outcomes = {}         # how each negotiation ended (consensus, majority, urgent, ...)
         self.negotiation = None
         self.negotiations = []
         self.phones = {}              # nonprofit id -> last time its phone page checked in (real seconds)
@@ -108,6 +111,8 @@ class World:
         bad = [a for a in food["allergens"] if a in n.get("avoid_allergens", [])]
         if bad:
             return f"can't take {', '.join(bad)}"
+        if food.get("allergens_unverified") and n.get("avoid_allergens"):
+            return f"must avoid {', '.join(n['avoid_allergens'])} and the allergens aren't confirmed"
         if n["full"]:
             return "reported full"
         if n["open_min"] <= self.now:
@@ -189,9 +194,9 @@ class World:
             out.append(dr)
         return out
 
-    def safe_plans(self, d, log=True):
+    def safe_plans(self, d, log=True, food=None):
         """Every (nonprofit, driver) plan that passes the safety rules."""
-        ok, removed = self.search_directory(d["food"])
+        ok, removed = self.search_directory(food or d["food"])
         skip = d.get("skip", [])
         removed += [(n, "didn't answer this request") for n in ok if n["id"] in skip]
         ok = [n for n in ok if n["id"] not in skip]
@@ -258,6 +263,12 @@ class World:
         if self.policy == "baseline":
             return []
         plans = self.safe_plans(d)
+        if self.policy == "agents" and d["food"].get("allergens_unverified") and d["status"] == "new":
+            relaxed = self.safe_plans(d, log=False, food=dict(d["food"], allergens_unverified=False))
+            gap = agents.evidence_gap(self, d, plans, relaxed)
+            if gap:
+                self.ask_business(d, gap)
+                return None
         if not plans:
             d["reconsider"] = False
             if d["status"] == "new":
@@ -273,6 +284,9 @@ class World:
     def decide_plan(self, d, plans):
         if self.policy == "baseline":
             return baseline_plan(self, d)
+        if self.policy.startswith("solo:"):
+            agent = self.policy[5:]
+            return max(plans, key=lambda p: agents.score(agent, self, d, p))
         return agents.negotiate(self, d, plans)
 
     def finish(self, d, plans, result):
@@ -283,9 +297,21 @@ class World:
             self.say("Baseline", f"{d['id']}: nearest shelter {result['np_name']}, nearest driver {result['driver_name']}.", "result", d["id"])
             self.assign(d, result)
             return
+        if self.policy.startswith("solo:"):
+            d["reconsider"] = False
+            if d["status"] == "en_route":
+                d.pop("locked_driver", None)
+                if result["np"] != d["plan"]["np"]:
+                    self.drivers[d["plan"]["driver"]]["status"] = "free"
+                    self.assign(d, result)
+                return
+            self.say(f"{self.policy[5:]} alone", f"{d['id']}: {short_plan(result)}.", "result", d["id"])
+            self.assign(d, result)
+            return
 
         reconsidering = d.get("reconsider") and d["status"] == "en_route"
         d["reconsider"] = False
+        self.outcomes[result["outcome"]] = self.outcomes.get(result["outcome"], 0) + 1
         self.negotiation = dict(result, donation=d["id"], food=", ".join(d["food"]["items"]),
                                 time=hhmm(self.now), seq=next(self._neg_ids))
         self.negotiations.append(self.negotiation)
@@ -294,13 +320,22 @@ class World:
             for m in rnd["messages"]:
                 self.say(m["agent"], f"R{rnd['round']} · {m['text']}", m["type"], d["id"])
         plan = result["plan"]
-        if result["outcome"] == "escalate" or (plan and plan["cost"] > COST_LIMIT):
-            why = "no agreement after 3 rounds" if result["outcome"] == "escalate" else f"cost ${plan['cost']:.2f} is over the ${COST_LIMIT} limit"
+        # remember every reliability objection raised in any round, to check later who was right
+        d["objections"] = [{"agent": a, "driver": pid.split("|")[1]}
+                           for rnd in result["rounds"] for pid, vs in rnd["votes"].items()
+                           for a, v in vs.items() if v["kind"] == "reliability"]
+        if result["outcome"] in ("irreconcilable", "unacceptable") or (plan and plan["cost"] > COST_LIMIT):
+            if plan is None:
+                why = result["why"]
+            else:
+                why = f"cost ${plan['cost']:.2f} is over the ${COST_LIMIT} limit"
+                self.outcomes["over_budget"] = self.outcomes.get("over_budget", 0) + 1
             d["options"] = list(result["options"])
             if len(d["options"]) < 2:  # give the coordinator a real choice: add the best different plan
                 rest = [p for p in plans if p["id"] not in {o["id"] for o in d["options"]}]
                 if rest:
                     d["options"].append(min(rest, key=lambda p: (p["cost"], p["dur"])))
+            d["why"] = why
             if reconsidering:
                 self.say("Result", f"{d['id']}: no agreement on a better plan; keeping the current one.", "result", d["id"])
                 d.pop("locked_driver", None)
@@ -310,14 +345,10 @@ class World:
             opts = " or ".join(short_plan(o) for o in d["options"])
             self.say("Human", f"{d['id']}: asking a coordinator ({why}). Options: {opts}.", "human", d["id"])
             if not self.live:
-                self.approve(d["id"], d["options"][0]["id"], auto=True)
+                self.approve(d["id"], d["options"][0]["id"], auto="scripted")
             return
         label = {"consensus": "Agreed 3 of 3", "majority": "Majority", "urgent": "Time is short, acting on best-supported plan"}[result["outcome"]]
         d["dissent"] = result["dissent"]
-        # remember every reliability objection raised in any round, to check later who was right
-        d["objections"] = [{"agent": a, "driver": pid.split("|")[1]}
-                           for rnd in result["rounds"] for pid, vs in rnd["votes"].items()
-                           for a, v in vs.items() if v["kind"] == "reliability"]
         if result["dissent"]:
             label += " · dissent kept on record: " + ", ".join(x["agent"] for x in result["dissent"])
         if reconsidering:
@@ -344,7 +375,11 @@ class World:
         if dr["status"] != "free" and d.get("locked_driver") != dr["id"] and not plan.get("join"):
             d["status"] = "new"  # option no longer valid: renegotiate
             return False
-        who = "Auto-approved" if auto else "Coordinator approved"
+        who = {
+            False: "Coordinator approved",
+            "scripted": "Simulated coordinator (scripted run) picked the agents' top-ranked option",
+            "timeout": "Fallback rule, not a decision-maker: no human answered in time, so the agents' top-ranked option goes",
+        }[auto]
         self.say("Human", f"{who}: {short_plan(plan)} for {did}.", "human", did)
         self.dispatch(d, plan)
         return True
@@ -438,6 +473,20 @@ class World:
     def load_scenario(self, sc):
         self.scenario_name = sc["name"]
         self.events = sorted(sc["events"], key=lambda e: e["at"])
+        setup = sc.get("setup", {})
+        if "start" in setup:
+            self.now = self.start = to_min(setup["start"])
+        for np_id, fields in setup.get("nonprofits", {}).items():
+            self.nonprofits[np_id].update(fields)
+            if "open_until" in fields:
+                self.nonprofits[np_id]["open_min"] = to_min(fields["open_until"])
+        for dr_id, fields in setup.get("drivers", {}).items():
+            self.drivers[dr_id].update(fields)
+            self.drivers[dr_id]["pos"] = self.drivers[dr_id]["home"] = pos(self.drivers[dr_id])
+        for dr_id in setup.get("drivers_off", []):
+            self.drivers[dr_id]["status"] = "off"
+        if setup.get("note"):
+            self.say("System", setup["note"], "event")
         self.say("System", f"Scenario loaded: {sc['title']}.", "event")
 
     def run_event(self, e):
@@ -455,6 +504,38 @@ class World:
             if dr["id"] not in self.drivers:
                 self.drivers[dr["id"]] = dict(dr, status="free", home=pos(dr), pos=pos(dr))
                 self.say("Directory", f"{dr['name']} started a shift ({dr['type']}, {dr['reliability']:.0%} reliable).", "event")
+        elif t == "confirm":
+            d = next((x for x in self.donations if x["business"] == e["business"] and x["status"] == "awaiting_info"), None)
+            if d:
+                self.confirm_allergens(d["id"], e.get("allergens"))
+
+    # ---------------- insufficient evidence: ask the business ----------------
+    def ask_business(self, d, gap):
+        d["status"] = "awaiting_info"
+        d["evidence_asked"] = True
+        d["asked_about"] = gap["allergens"]
+        d["answer_by"] = min(self.now + EVIDENCE_WAIT, d["safe_until"] - EVIDENCE_DEADLINE)
+        self.outcomes["insufficient_evidence"] = self.outcomes.get("insufficient_evidence", 0) + 1
+        for agent, text in gap["messages"]:
+            self.say(agent, text, "propose", d["id"])
+        self.say("Result", f"{d['id']}: not enough evidence to decide. Asking {d['business_name']}: "
+                 f"\"Is this free of {gap['allergens']}?\" Will act on what we know by "
+                 f"{hhmm(d['answer_by'])} if there's no answer.", "result", d["id"])
+
+    def confirm_allergens(self, did, allergens=None):
+        """The business answers. allergens=None means "can't confirm": keep treating them as present."""
+        d = self.get(did)
+        if not d or d["status"] != "awaiting_info":
+            return False
+        if allergens is None:
+            self.say("World", f"{d['business_name']}: \"Sorry, we can't say for sure.\" Acting on what we know.", "event", did)
+        else:
+            d["food"]["allergens"] = list(allergens)
+            d["food"]["allergens_unverified"] = False
+            listed = ", ".join(allergens) or "none of the common ones"
+            self.say("World", f"{d['business_name']} confirms the allergens: {listed}. New information; replanning.", "event", did)
+        d["status"] = "new"
+        return True
 
     def decline(self, np_id):
         n = self.nonprofits.get(np_id)
@@ -482,7 +563,9 @@ class World:
         dr = self.drivers.get(driver_id)
         if not dr or dr["status"] == "off":
             return
-        carrying = any(d["status"] == "en_route" and d["plan"]["driver"] == driver_id and self.now >= d["t_pick"]
+        carrying = any((d["status"] == "en_route" and d["plan"]["driver"] == driver_id and self.now >= d["t_pick"])
+                       or (d.get("picked") and d.get("locked_driver") == driver_id
+                           and d["status"] not in ("delivered", "spoiled", "expired"))  # turned away, food still on board
                        for d in self.donations)
         if carrying:
             return  # already has the food on board; finishes the trip
@@ -520,7 +603,7 @@ class World:
     def tick(self, minutes=1, plan_inline=True):
         for _ in range(minutes):
             self.now += 1
-            while self.events and self.events[0]["at"] + START <= self.now:
+            while self.events and self.events[0]["at"] + self.start <= self.now:
                 self.run_event(self.events.pop(0))
             for d in self.donations:
                 if d["status"] == "en_route":
@@ -528,7 +611,7 @@ class World:
                     if self.now >= d["t_arr"]:
                         self.arrive(d)
             for d in self.donations:
-                if d["status"] in ("new", "stuck", "awaiting_human", "awaiting_shelter") and self.now > d["safe_until"]:
+                if d["status"] in ("new", "stuck", "awaiting_human", "awaiting_info", "awaiting_shelter") and self.now > d["safe_until"]:
                     if d.get("ask"):
                         self._release(d, d.pop("ask")["plan"])
                     self.expire(d)
@@ -539,9 +622,13 @@ class World:
                     d["status"] = "new"
                     self.say("Contact", f"No answer from {plan['np_name']} after {SHELTER_TIMEOUT} min. Trying elsewhere.", "contact", d["id"])
                 elif d["status"] == "awaiting_human" and d["safe_until"] - self.now <= HUMAN_TIMEOUT and d["options"]:
-                    self.say("System", f"{d['id']}: no human answer and food is running out of time. Stop and act.", "human", d["id"])
-                    if not self.approve(d["id"], d["options"][0]["id"], auto=True):
+                    self.outcomes["human_timeout"] = self.outcomes.get("human_timeout", 0) + 1
+                    if not self.approve(d["id"], d["options"][0]["id"], auto="timeout"):
                         d["status"] = "new"
+                elif d["status"] == "awaiting_info" and self.now >= d["answer_by"]:
+                    self.say("System", f"{d['id']}: no answer from {d['business_name']} in time. "
+                             "Acting on what we know: treating the allergens as present.", "human", d["id"])
+                    d["status"] = "new"
                 elif d["status"] == "stuck" and self.now % 5 == 0:
                     d["status"] = "new"  # retry: a driver may have freed up
             if plan_inline:
@@ -594,6 +681,9 @@ class World:
         self.impact["orgs"].add(n["id"])
         d["status"] = "delivered"
         d["t_done"] = self.now
+        if f["safe_minutes"] <= 180:  # perishable food only; packaged food would swamp the average
+            self.impact["spare"] = self.impact.get("spare", 0) + (d["safe_until"] - self.now)
+            self.impact["perishable"] = self.impact.get("perishable", 0) + 1
         self.records.append({
             "donation": d["id"], "date": "2026-10-10", "donor": d["business_name"], "recipient": n["name"],
             "items": ", ".join(f["items"]), "category": f["category"], "servings": f["servings"],
@@ -620,6 +710,9 @@ class World:
             "money_spent": round(self.impact["cost"], 2),
             "shelters_fed": len(self.impact["orgs"]),
             "human_escalations": self.impact["escalations"],
+            "deliveries": self.impact.get("perishable", 0),
+            "spare_minutes": self.impact.get("spare", 0),
+            "outcomes": dict(self.outcomes),
         }
 
     def to_json(self):
@@ -629,7 +722,8 @@ class World:
             drivers.append({k: dr[k] for k in ("id", "name", "type", "status", "reliability")} | p)
         dons = []
         for d in self.donations:
-            x = {k: d.get(k) for k in ("id", "food", "business_name", "status", "plan", "options", "origin", "dest", "picked")}
+            x = {k: d.get(k) for k in ("id", "food", "business_name", "status", "plan", "options", "origin", "dest",
+                                       "picked", "why", "asked_about")}
             x["safe_until"] = hhmm(d["safe_until"])
             x["minutes_left"] = d["safe_until"] - self.now
             dons.append(x)
@@ -642,6 +736,7 @@ class World:
             "drivers": drivers, "donations": dons,
             "feed": self.feed[-120:], "decisions": self.decisions[-60:], "records": self.records,
             "negotiation": self.negotiation, "negotiations": self.negotiations, "weights": self.weights,
+            "outcomes": self.outcomes,
             "impact": {**{k: v for k, v in self.impact.items() if k != "orgs"}, "orgs": len(self.impact["orgs"]),
                        "lbs": round(self.impact["lbs"], 1), "cost": round(self.impact["cost"], 2)},
             "pending": len(self.events),

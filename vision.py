@@ -11,6 +11,7 @@ Return ONLY a JSON object with these keys:
  "weight_lbs": [low, high], "allergens": ["dairy","gluten","eggs","nuts","peanuts","soy","fish","shellfish" - only likely ones],
  "category": one of "hot prepared" | "cold prepared" | "packaged" | "produce",
  "needs_cold": true/false (must it stay refrigerated?),
+ "allergens_uncertain": true/false (true if you can't rule out allergens you can't see, e.g. nuts in baked goods),
  "safe_minutes": minutes it stays safe from now (hot prepared ~120, cold prepared ~90 if needs_cold, packaged ~1440, produce ~720),
  "notes": "one short sentence about anything uncertain"}
 Be conservative: if unsure, give a wider weight range and say so in notes."""
@@ -41,6 +42,7 @@ def normalize(food):
     if f.get("category") not in CATEGORIES:
         f["category"] = "hot prepared"
     f["needs_cold"] = bool(f.get("needs_cold"))
+    f["allergens_unverified"] = bool(f.pop("allergens_uncertain", False) or f.get("allergens_unverified"))
     f["safe_minutes"] = max(10, int(float(f.get("safe_minutes", 120))))
     return f
 

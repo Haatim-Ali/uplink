@@ -198,6 +198,15 @@ def api_approve():
     return jsonify(ok=ok)
 
 
+@app.post("/api/confirm")
+def api_confirm():
+    """The business answers the agents' question. allergens=null means "we can't confirm"."""
+    body = request.get_json(silent=True) or {}
+    with lock:
+        ok = W().confirm_allergens(body.get("donation"), body.get("allergens"))
+    return jsonify(ok=ok)
+
+
 _compare_cache = {}
 
 

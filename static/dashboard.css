@@ -64,7 +64,7 @@ table.matrix{width:100%;border-collapse:collapse;font-size:12px}
 tr.winner td{background:#f0f6fd}
 .outcome{margin-top:10px;padding:8px 10px;border-radius:8px;font-weight:600}
 .outcome.consensus{background:#e3f3e8;color:#1f6b39}.outcome.majority{background:#eef3fb;color:#1f4f87}
-.outcome.urgent{background:#fdf0e3;color:#8a4a12}.outcome.escalate{background:#fbf0d9;color:#7a5410}
+.outcome.urgent{background:#fdf0e3;color:#8a4a12}.outcome.irreconcilable,.outcome.unacceptable{background:#fbf0d9;color:#7a5410}
 .human{margin-top:10px;border:2px solid var(--human);border-radius:10px;padding:10px;background:#fffaf0}
 .human button{font:inherit;margin:4px 6px 0 0;padding:6px 10px;border-radius:6px;border:1px solid var(--human);background:#fff;cursor:pointer}
 .empty{color:var(--muted);font-style:italic}
@@ -131,4 +131,8 @@ dialog table{margin-top:8px}
 /* shelter contact */
 .who.Contact{color:var(--human)}
 .st.awaiting_shelter{background:#fbf0d9;color:var(--human)}
+.st.awaiting_info{background:#efe9fb;color:var(--need)}
+.vote.veto{color:#fff;background:var(--bad);border-radius:4px;padding:0 4px}
+.tally{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:12px}
+.tally span{background:#f0efea;border-radius:99px;padding:2px 8px}
 .tagline{font-weight:400;font-size:13px;color:#bbb;margin-left:4px}
