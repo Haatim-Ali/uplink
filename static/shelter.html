@@ -42,6 +42,13 @@
 .waiting .pulse{display:inline-block;width:.8rem;height:.8rem;border-radius:50%;background:var(--ok);margin-bottom:var(--s2);animation:pulse 1.6s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(21,128,61,.5)}100%{box-shadow:0 0 0 .8rem rgba(21,128,61,0)}}
 .err{color:var(--bad);font-weight:600;font-size:var(--t-sm);text-align:center;padding:var(--s2)}
+.vbar{display:flex;gap:.6rem;align-items:center;margin-top:.6rem;flex-wrap:wrap}
+.vbar .hint{margin:0}
+.ask .mic{width:100%;margin-top:.6rem}
+.ask .mic.rec{background:var(--bad,#b91c1c);color:#fff;border-color:var(--bad,#b91c1c)}
+@media (prefers-reduced-motion:no-preference){.ask .mic.rec{animation:micpulse .8s ease-in-out infinite alternate}}
+@keyframes micpulse{from{opacity:1}to{opacity:.7}}
+.heard{font-size:.9rem;margin-top:.4rem;color:var(--muted,#64748b);min-height:1em}
 </style>
 </head>
 <body>
@@ -51,6 +58,7 @@
     <label for="pick" style="margin-top:0">You are answering for</label>
     <select id="pick"></select>
     <p class="hint">When the agents choose this shelter, the request appears below. You decide, just like a real shelter would.</p>
+    <div class="vbar"><button class="btn sm" id="vt" type="button" aria-pressed="false">🔈 Voice off</button><span class="hint" id="vnote">Turn on to hear requests and answer out loud.</span></div>
   </div>
 
   <div class="who-h"><h1 id="title">Shelter phone</h1><span id="status"></span></div>
@@ -85,6 +93,7 @@ async function poll(){
   }
   $("pick").value = id;
   if(!r.ok) return;
+  hasEleven = !!s.voice;
   const n = s.nonprofit;
   $("now").textContent = s.now || "--:--";
   $("title").textContent = n.name;
@@ -108,12 +117,73 @@ async function poll(){
       <button class="btn danger" onclick="respond('${a.donation}', false)">✕ We're full</button></div>
       <div class="part"><div class="pr"><div><label for="n-${a.donation}">Servings</label><input type="number" inputmode="numeric" id="n-${a.donation}" min="1" max="${a.food.servings - 1}" value="${Math.max(1, Math.floor(a.food.servings/2))}"></div>
       <button class="btn" onclick="respond('${a.donation}', true, +document.getElementById('n-${a.donation}').value)">Take only part (counter-offer)</button></div></div>
+      <button class="btn mic" id="mic-${a.donation}" type="button" onclick="answerByVoice('${a.donation}')">🎤 Answer by voice</button>
+      <div class="heard" id="heard-${a.donation}" aria-live="polite"></div>
     </div>`).join("") || WAITING;
     lastAsks = askKey;
+    s.asks.forEach(a => { if(!announced.has(a.donation)){ announced.add(a.donation); announce(a.donation); } });
   }
   $("coming").innerHTML = s.coming.map(c => `<div><b>${c.servings} servings</b> · ${esc(c.items)}<br><span class="meta">${esc(c.driver)}, ETA ${esc(c.eta)}</span></div>`).join("") || `<p class="empty">Nothing on the way.</p>`;
   $("got").innerHTML = s.received.map(g => `<div><b>${g.servings} servings</b> · ${esc(g.items)}<br><span class="meta">from ${esc(g.donor)} at ${esc(g.delivered)}</span></div>`).join("") || `<p class="empty">Nothing yet today.</p>`;
 }
+// ---- Voice: the dispatcher reads each request aloud (ElevenLabs), the shelter answers out loud ----
+let voiceOn = false, hasEleven = false, rec = null;
+const announced = new Set();
+$("vt").onclick = () => {
+  voiceOn = !voiceOn;
+  $("vt").textContent = voiceOn ? "🔊 Voice on" : "🔈 Voice off"; $("vt").classList.toggle("primary", voiceOn); $("vt").setAttribute("aria-pressed", voiceOn);
+  $("vnote").textContent = voiceOn ? (hasEleven ? "Requests are read aloud. Tap 🎤 and say yes, no, or a number." : "Browser voice (no ElevenLabs key on the server).") : "Turn on to hear requests and answer out loud.";
+  if(voiceOn) document.querySelectorAll(".ask .mic").forEach(b => announce(b.id.slice(4)));
+};
+function sayLocal(text){ if(!window.speechSynthesis) return; const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; speechSynthesis.speak(u); }
+async function announce(donation){
+  if(!voiceOn) return;
+  const r = await fetch(`/api/shelter/${id}/ask_text?donation=${encodeURIComponent(donation)}`);
+  if(!r.ok) return;
+  const {text} = await r.json();
+  if(hasEleven){
+    const a = new Audio(`/api/tts?who=Dispatch&text=${encodeURIComponent(text)}`);
+    a.play().catch(() => sayLocal(text)); a.onerror = () => sayLocal(text);
+  } else sayLocal(text);
+}
+async function sendAnswer(donation, form){
+  form.append("donation", donation);
+  const out = $("heard-" + donation);
+  if(out) out.textContent = "Listening back…";
+  const r = await fetch("/api/shelter/voice", {method:"POST", body:form});
+  const j = await r.json().catch(() => ({}));
+  const heard = j.heard ? `Heard: “${j.heard}”. ` : "";
+  if(out) out.textContent = heard + (r.ok ? (j.accept ? (j.servings ? `Taking ${j.servings}.` : "Accepted.") : "Declined.") : (j.error || "Try again."));
+  if(r.ok) setTimeout(() => { lastAsks = null; poll(); }, 1200);
+}
+async function answerByVoice(donation){
+  const btn = $("mic-" + donation);
+  if(rec && rec.state === "recording"){ rec.stop(); return; }
+  if(!hasEleven){   // no key: use the browser's own speech recognition if it has one
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SR){ $("heard-" + donation).textContent = "Voice answers need an ElevenLabs key or Chrome. Tap a button instead."; return; }
+    const sr = new SR(); sr.lang = "en-US"; btn.classList.add("rec"); btn.textContent = "Listening…";
+    sr.onresult = e => { const f = new FormData(); f.append("text", e.results[0][0].transcript); sendAnswer(donation, f); };
+    sr.onend = () => { btn.classList.remove("rec"); btn.textContent = "🎤 Answer by voice"; };
+    sr.start(); return;
+  }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ $("heard-" + donation).textContent = "Microphone blocked. Allow it in the browser (it only works on localhost or https)."; return; }
+  const chunks = [];
+  rec = new MediaRecorder(stream);
+  rec.ondataavailable = e => chunks.push(e.data);
+  rec.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    btn.classList.remove("rec"); btn.textContent = "🎤 Answer by voice";
+    const type = rec.mimeType || "audio/webm";
+    const f = new FormData(); f.append("audio", new Blob(chunks, {type}), type.includes("mp4") ? "answer.mp4" : "answer.webm");
+    sendAnswer(donation, f);
+  };
+  rec.start(); btn.classList.add("rec"); btn.textContent = "⏹ Tap when done (stops in 6 s)";
+  setTimeout(() => { if(rec && rec.state === "recording") rec.stop(); }, 6000);
+}
+
 poll(); setInterval(poll, 1000);
 </script>
 </body>

@@ -7,13 +7,18 @@ import os
 import threading
 import time
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
 
-import agents
-import llm
-import scenarios
-import vision
-from world import World
+import env
+
+env.load()   # API keys from .env (gitignored) before anything reads them
+
+import agents  # noqa: E402
+import llm  # noqa: E402
+import scenarios  # noqa: E402
+import vision  # noqa: E402
+import voice  # noqa: E402
+from world import World  # noqa: E402
 
 app = Flask(__name__, static_folder="static")
 lock = threading.Lock()
@@ -98,6 +103,7 @@ def api_shelter(np_id):
     if v is None:
         return jsonify(error="unknown shelter", options=options), 404
     v["options"] = options
+    v["voice"] = voice.available()
     return jsonify(v)
 
 
@@ -122,7 +128,8 @@ def api_state():
         s = W().to_json()
     s["speed"] = state["speed"]
     s["paused"] = state["paused"]
-    s["mode"] = {"agents": "llm" if agents.use_llm() else "rules", "vision": llm.provider() or "demo"}
+    s["mode"] = {"agents": "llm" if agents.use_llm() else "rules", "vision": llm.provider() or "demo",
+                 "voice": "elevenlabs" if voice.available() else "browser"}
     s["scenarios"] = [{"name": k, "title": v["title"]} for k, v in scenarios.SCENARIOS.items()]
     s["cameras"] = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
     return jsonify(s)
@@ -216,6 +223,60 @@ def api_confirm():
 _compare_cache = {}
 
 
+# ---------------- voice (ElevenLabs) ----------------
+
+@app.get("/api/tts")
+def api_tts():
+    """?who=Speed|Cost|Need|Dispatch&text=...  ->  mp3. 503 without a key, so the browser uses its own voice."""
+    if not voice.available():
+        return jsonify(error="no ElevenLabs key"), 503
+    try:
+        audio = voice.speak(request.args.get("who", "Dispatch"), request.args.get("text", ""))
+    except Exception as e:  # noqa: BLE001
+        return jsonify(error=f"voice failed: {type(e).__name__}"), 502
+    return Response(audio, mimetype="audio/mpeg", headers={"Cache-Control": "max-age=86400"})
+
+
+@app.get("/api/shelter/<np_id>/ask_text")
+def api_ask_text(np_id):
+    """The sentence the dispatcher says to this shelter for a pending request."""
+    did = request.args.get("donation")
+    with lock:
+        v = W().shelter_view(np_id)
+    ask = next((a for a in (v or {}).get("asks", []) if a["donation"] == did), None)
+    if not ask:
+        return jsonify(error="no such request"), 404
+    return jsonify(text=voice.ask_text(v["nonprofit"]["name"], ask))
+
+
+@app.post("/api/shelter/voice")
+def api_shelter_voice():
+    """A shelter answers out loud: audio -> ElevenLabs speech-to-text -> yes / no / how many -> respond.
+    The browser can instead send text it transcribed itself (form field 'text') when there's no key."""
+    did = request.form.get("donation")
+    text = (request.form.get("text") or "").strip()
+    f = request.files.get("audio")
+    if f and voice.available():
+        try:
+            text = voice.transcribe(f.read(), f.filename or "answer.webm", f.mimetype or "audio/webm")
+        except Exception as e:  # noqa: BLE001
+            return jsonify(error=f"Couldn't transcribe ({type(e).__name__}). Tap a button instead."), 502
+    if not text:
+        return jsonify(error="Didn't catch that. Try again or tap a button.", heard=""), 400
+    with lock:
+        d = W().get(did)
+        if not d or d["status"] != "awaiting_shelter":
+            return jsonify(error="That request is no longer waiting.", heard=text), 409
+        ans = voice.parse_answer(text, d["food"]["servings"])
+        if ans is None:
+            return jsonify(error="Not sure if that was a yes or a no. Try again or tap a button.", heard=text), 422
+        np_name = d["ask"]["plan"]["np_name"]
+        ok = W().respond(did, ans["accept"], ans["servings"])
+        if ok:
+            W().say(np_name, f'(by voice) "{text}"', "event", did)
+    return jsonify(ok=ok, heard=text, **ans)
+
+
 # ---------------- camera at the business ----------------
 
 @app.post("/api/closing")
@@ -255,5 +316,6 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     print("Uplink · food rescue agents")
     print(f"Dashboard: http://localhost:{port}   Business page: http://localhost:{port}/business")
-    print(f"Agents: {'LLM' if agents.use_llm() else 'rules'} · Vision: {llm.provider() or 'demo (no API key)'}")
+    print(f"Agents: {'LLM' if agents.use_llm() else 'rules'} · Vision: {llm.provider() or 'demo (no API key)'}"
+          f" · Voice: {'ElevenLabs' if voice.available() else 'browser (no ElevenLabs key)'}")
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
