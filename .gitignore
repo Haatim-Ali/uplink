@@ -5,3 +5,4 @@ __pycache__/
 scripts/.tunnel.pid
 scripts/.tunnel.log
 *.pt
+.tts_cache/

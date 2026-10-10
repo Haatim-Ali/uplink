@@ -27,7 +27,24 @@ On a Mac, use `PORT=5050` because macOS reserves port 5000 for AirPlay.
 
 It runs with **no API key**: vision returns a demo pizza result and the agents use rules-based reasoning. The map needs internet for its tiles.
 
-### Turn on the AI model
+### Turn on the AI model and voices (keys in `.env`)
+
+```bash
+cp .env.example .env      # then open .env and paste your keys after the = signs
+PORT=5050 python3 app.py  # the first line printed says which of Claude / ElevenLabs are on
+```
+
+`.env` is in `.gitignore`, so keys never go to GitHub. With `ANTHROPIC_API_KEY`, Claude reads the photos
+and (with `LLM_AGENTS=1`) writes the agents' arguments. With `ELEVENLABS_API_KEY`:
+
+- **Dashboard → 🔊 Voices**: Speed, Cost and Need each argue in their own voice; the debate waits for each
+  line to finish, then the outcome is announced.
+- **Shelter phone → 🔊 Voice on**: the dispatcher reads each request aloud. Tap **🎤 Answer by voice** and say
+  "yes", "sorry, we're full" or "we can only take twenty"; ElevenLabs transcribes it and the agents react
+  (a partial answer splits the donation). The microphone works on `localhost` or https, not a plain LAN address.
+
+Without an ElevenLabs key, both fall back to the browser's built-in voice.
+
 
 **Our setup (no API key needed):** photos are read by an open vision model (Qwen2.5-VL-7B) on an NVIDIA Brev GPU. See [docs/BREV_SETUP.md](docs/BREV_SETUP.md).
 

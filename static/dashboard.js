@@ -5,7 +5,36 @@ let S = null, roundSel = null, lastNegKey = null, pinned = null;
 // Debate playback: a new negotiation is revealed one message at a time, then the outcome lands.
 const PLAY_MS = 900;
 let play = {seq: null, shown: 0, total: 0};
-setInterval(()=>{ if(play.seq !== null && play.shown < play.total){ play.shown++; if(S) drawNegotiation(); } }, PLAY_MS);
+setInterval(()=>{ if(voiceOn && speaking) return;   // with voices on, the next line waits for the current one
+  if(play.seq !== null && play.shown < play.total){ play.shown++; if(S) drawNegotiation(); } }, PLAY_MS);
+
+// ---- Voices: each agent speaks in its own ElevenLabs voice (browser voice if there's no key) ----
+let voiceOn = false, speaking = false, lastSpoken = null, speakTimer = null;
+const audioCache = {};
+const PITCH = {Speed:1.25, Cost:0.8, Need:1.05, Dispatch:1};
+const plain = html => { const t = document.createElement("div"); t.innerHTML = html; return t.textContent; };
+function audioFor(who, text){
+  const url = `/api/tts?who=${encodeURIComponent(who)}&text=${encodeURIComponent(text)}`;
+  if(!audioCache[url]){ const a = new Audio(url); a.preload = "auto"; audioCache[url] = a; }
+  return audioCache[url];
+}
+function endSpeak(){ speaking = false; clearTimeout(speakTimer); }
+function browserSpeak(who, text){
+  if(!window.speechSynthesis){ endSpeak(); return; }
+  const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.rate = 1.08;
+  u.onend = u.onerror = endSpeak; speechSynthesis.speak(u);
+}
+function speak(who, text, next){
+  if(!voiceOn || !text) return;
+  who = PITCH[who] !== undefined ? who : "Dispatch";
+  speaking = true; clearTimeout(speakTimer); speakTimer = setTimeout(endSpeak, 20000);  // never stall the debate
+  if(S && S.mode && S.mode.voice === "elevenlabs"){
+    const a = audioFor(who, text); a.currentTime = 0;
+    a.onended = endSpeak; a.onerror = ()=>browserSpeak(who, text);
+    a.play().catch(()=>browserSpeak(who, text));
+    if(next) audioFor(next.agent in PITCH ? next.agent : "Dispatch", next.text);   // fetch the next line while this one plays
+  } else browserSpeak(who, text);
+}
 function replay(){ const n = pinned ? (S.negotiations||[]).find(h=>h.seq===pinned) : S.negotiation; if(!n) return;
   play = {seq: n.seq, shown: 0, total: n.rounds.reduce((k,r)=>k+r.messages.length,0)}; drawNegotiation(); }
 const $ = id => document.getElementById(id);
@@ -145,6 +174,14 @@ function drawNegotiation(){
     ${done?`<button class="replay" onclick="replay()">↻ Replay debate</button>`:""}
     ${tally()}`);
   const deb = $("debate"); if(deb) deb.scrollTop = deb.scrollHeight;
+  if(voiceOn && play.seq === n.seq){
+    const k = n.seq + ":" + (playing ? shown : "end");
+    if(k !== lastSpoken && !(speaking && !playing)){
+      lastSpoken = k;
+      if(playing && shown) speak(msgs[shown-1].agent, msgs[shown-1].text, msgs[shown]);
+      else if(!playing) speak("Dispatch", plain((label||"Decision made") + chosen));
+    }
+  }
 }
 
 function tally(){
@@ -222,7 +259,7 @@ function drawKpis(){
   $("k-meals").textContent = i.meals; $("k-lbs").textContent = i.lbs; $("k-orgs").textContent = i.orgs;
   $("k-lost").textContent = i.spoiled; $("k-cost").textContent = "$"+i.cost.toFixed(2); $("k-esc").textContent = i.escalations;
   $("clock").textContent = S.now + (S.paused?" ⏸":"");
-  $("mode").textContent = `Agents: ${S.mode.agents} · Vision: ${S.mode.vision}`;
+  $("mode").textContent = `Agents: ${S.mode.agents} · Vision: ${S.mode.vision} · Voice: ${S.mode.voice}`;
   $("pause").textContent = S.paused ? "Resume" : "Pause";
 }
 
@@ -248,6 +285,13 @@ $("closing").onclick = async()=>{
 document.querySelectorAll("[data-ev]").forEach(b=>b.onclick=async()=>{ await post("/api/event/"+b.dataset.ev); refresh(); });
 
 const dlg = $("dlg");
+$("voice").onclick = ()=>{
+  voiceOn = !voiceOn;
+  $("voice").textContent = voiceOn ? "🔊 Voices on" : "🔈 Voices off";
+  $("voice").classList.toggle("primary", voiceOn);
+  if(voiceOn){ toast(S && S.mode.voice==="elevenlabs" ? "Voices on (ElevenLabs). Replaying the debate." : "Voices on (browser voice; add an ElevenLabs key for real voices)", "info"); lastSpoken = null; replay(); }
+  else { endSpeak(); if(window.speechSynthesis) speechSynthesis.cancel(); Object.values(audioCache).forEach(a=>a.pause()); }
+};
 $("compare").onclick = async()=>{
   dlg.showModal(); setHTML("cmp", "Running 50 random scenarios…");
   const r = await (await fetch("/api/compare?n=50")).json();

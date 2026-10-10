@@ -302,6 +302,60 @@ def test_vision_multi_uses_neutral_defaults():
         llm.available, llm.provider, llm.chat_json = saved
 
 
+# ---------- voice (ElevenLabs) and .env ----------
+
+def test_voice_understands_yes_no_and_how_many():
+    import voice
+    cases = {"Yes, send it over": (True, None), "sure we'll take it": (True, None), "sorry, we're full tonight": (False, None),
+             "no": (False, None), "we can only take twenty": (True, 20), "just 15 please": (True, 15),
+             "we can take all 40": (True, None), "we can't take more than ten": (True, 10), "maybe half": (True, 20),
+             "twenty-five works": (True, 25), "hmm let me check": None, "": None}
+    for text, want in cases.items():
+        got = voice.parse_answer(text, 40)
+        assert (got and (got["accept"], got["servings"])) == want or (got is None and want is None), (text, got)
+
+
+def test_env_file_loads_keys_without_overriding_the_terminal(tmp_path=None):
+    import tempfile
+
+    import env
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, ".env")
+        with open(path, "w") as f:
+            f.write("# comment\nUPLINK_TEST_A=from-file\nexport UPLINK_TEST_B='quoted'\nUPLINK_TEST_C=\nUPLINK_TEST_D=file\n")
+        os.environ["UPLINK_TEST_D"] = "terminal"
+        try:
+            env.load(path)
+            assert os.environ["UPLINK_TEST_A"] == "from-file" and os.environ["UPLINK_TEST_B"] == "quoted"
+            assert "UPLINK_TEST_C" not in os.environ and os.environ["UPLINK_TEST_D"] == "terminal"
+        finally:
+            for k in "ABCD":
+                os.environ.pop(f"UPLINK_TEST_{k}", None)
+
+
+def test_shelter_can_answer_out_loud():
+    import app
+    import voice
+    saved = voice.available
+    voice.available = lambda: False
+    try:
+        c = app.app.test_client()
+        assert c.get("/api/tts?who=Speed&text=hi").status_code == 503   # browser voice takes over
+        import time
+        w = World(live=True)
+        app.state["world"] = w
+        d = w.add_donation(dict(PIZZA), "campus-cafe")
+        w.phones = {n: time.time() + 3600 for n in w.nonprofits}   # every shelter phone is online
+        w.plan(d)
+        assert d["status"] == "awaiting_shelter"
+        np_id = d["ask"]["plan"]["np"]
+        assert "Can you take it" in c.get(f"/api/shelter/{np_id}/ask_text?donation={d['id']}").get_json()["text"]
+        r = c.post("/api/shelter/voice", data={"donation": d["id"], "text": "we can only take ten"}).get_json()
+        assert r["ok"] and r["servings"] == 10
+    finally:
+        voice.available = saved
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:
