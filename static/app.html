@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uplink · Get your leftover food picked up</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="/static/uplink.css">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar">
+  <div class="bar-in">
+    <a class="logo" href="#/" aria-label="Uplink home"><span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>Uplink</a>
+    <nav aria-label="Main">
+      <a href="#/donations" data-nav="donations">My donations</a>
+      <a href="#/help" data-nav="help">Help</a>
+      <a class="btn primary sm" href="#/schedule" data-nav="schedule">Schedule a pickup</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+
+<!-- Home -->
+<section class="view" data-view="home">
+  <div class="hero">
+    <h1>Leftover food? We'll get it picked up.</h1>
+    <p class="lead">Take a photo. We find a nearby shelter and a driver, and you get your donation record.</p>
+    <a class="btn primary xl" href="#/schedule">Schedule a pickup</a>
+    <div id="home-active"></div>
+  </div>
+  <ol class="how" aria-label="How it works">
+    <li><span class="ico"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span><b>Take a photo</b><span>Of the food you want to give away.</span></li>
+    <li><span class="ico"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg></span><b>We send a driver</b><span>To a shelter that can use it.</span></li>
+    <li><span class="ico"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><path d="M9 12l2 2 4-4"/></svg></span><b>Get your record</b><span>A receipt for your files, ready to print.</span></li>
+  </ol>
+</section>
+
+<!-- Schedule -->
+<section class="view narrow" data-view="schedule" hidden>
+  <ol class="steps" aria-label="Progress">
+    <li id="st1" class="active" aria-current="step"><span class="dot">1</span>Photo</li>
+    <li id="st2"><span class="dot">2</span>Confirm</li>
+    <li id="st3"><span class="dot">3</span>Scheduled</li>
+  </ol>
+
+  <div id="sch-photo">
+    <h1>Add a photo of the food</h1>
+    <p class="lead">Show everything in one shot.</p>
+    <label for="biz">Your business</label>
+    <select id="biz"></select>
+    <label class="drop" for="file" id="dropLabel">
+      <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <span id="dropText">Take or choose a photo</span>
+    </label>
+    <input id="file" type="file" accept="image/*" capture="environment" class="sr-only">
+    <img id="preview" alt="Preview of your food photo">
+    <button class="btn primary xl" id="analyze" type="button" disabled>Continue</button>
+    <button class="linkbtn" id="skip" type="button">No photo? Type it in instead</button>
+  </div>
+
+  <div id="sch-confirm" hidden>
+    <h1>Does this look right?</h1>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <div class="summary" id="summary"></div>
+    <button class="linkbtn" id="edit" type="button" aria-expanded="false" aria-controls="form">Edit details</button>
+    <div id="form" hidden>
+      <label for="items">What is it? (separate with commas)</label><input id="items" autocomplete="off">
+      <div class="grid2">
+        <div><label for="servings">Servings</label><input id="servings" type="number" min="1" inputmode="numeric"></div>
+        <div><label for="safe">Safe for (minutes)</label><input id="safe" type="number" min="10" inputmode="numeric"></div>
+      </div>
+      <div class="grid2">
+        <div><label for="wlo">Weight, low (lbs)</label><input id="wlo" type="number" step="0.5" inputmode="decimal"></div>
+        <div><label for="whi">Weight, high (lbs)</label><input id="whi" type="number" step="0.5" inputmode="decimal"></div>
+      </div>
+      <label for="category">Type of food</label>
+      <select id="category"><option value="hot prepared">Hot, prepared</option><option value="cold prepared">Cold, prepared</option><option value="packaged">Packaged</option><option value="produce">Produce</option></select>
+      <label for="allergens">Allergens (separate with commas)</label><input id="allergens" placeholder="for example: wheat, milk" autocomplete="off">
+      <label class="check"><input id="cold" type="checkbox"><span>Needs to stay refrigerated</span></label>
+    </div>
+    <label class="check big"><input id="unsure" type="checkbox"><span>I'm not sure about the allergens<small>We may ask you one quick question.</small></span></label>
+    <p class="err" id="err" role="alert" hidden></p>
+    <button class="btn primary xl" id="confirm" type="button">Confirm pickup</button>
+    <button class="linkbtn" id="back" type="button">Back</button>
+  </div>
+</section>
+
+<!-- Track -->
+<section class="view narrow" data-view="track" hidden>
+  <div id="track"></div>
+</section>
+
+<!-- My donations -->
+<section class="view" data-view="donations" hidden>
+  <div class="page-head">
+    <h1>My donations</h1>
+    <div class="head-tools">
+      <label class="sr-only" for="bizFilter">Business</label>
+      <select id="bizFilter"></select>
+      <button class="btn sm" id="csv" type="button">Download CSV</button>
+    </div>
+  </div>
+  <div id="donList"></div>
+</section>
+
+<!-- Receipt -->
+<section class="view narrow" data-view="receipt" hidden>
+  <div id="receipt"></div>
+</section>
+
+<!-- Help -->
+<section class="view narrow" data-view="help" hidden>
+  <h1>Help</h1>
+  <div class="faq">
+    <details><summary>What food can I donate?</summary><p>Prepared food, packaged food and produce that is still safe to eat: unsold sandwiches, baked goods, salads, trays from catering. We can't take anything that was served to a customer, or anything past its safe time.</p></details>
+    <details><summary>Is it safe?</summary><p>Yes. Before anything is sent, we check that the shelter is open, has room, can keep the food cold if needed, and can take the allergens in it. The driver has to arrive well before the food stops being safe.</p></details>
+    <details><summary>What if I'm not sure about the allergens?</summary><p>Tick "I'm not sure about the allergens" when you confirm. We'll treat it as the safe side and may ask you one quick question, right on your tracking page.</p></details>
+    <details><summary>How long until someone picks it up?</summary><p>It starts as soon as you confirm. Most pickups are arranged within a few minutes, and your tracking page shows each step and the driver on a map.</p></details>
+    <details><summary>What does it cost?</summary><p>Nothing. Uplink is free for your business.</p></details>
+    <details><summary>What record do I get?</summary><p>Every delivered donation gets a record with the date, the shelter, what was donated, the amount, and pickup and delivery times. It is the kind of record California's SB 1383 food recovery law asks businesses to keep. Print it or download all of them from My donations.</p></details>
+    <details><summary>What if nobody can take it?</summary><p>We'll tell you on your tracking page. You can schedule again with a new photo.</p></details>
+  </div>
+  <a class="btn primary xl" href="#/schedule">Schedule a pickup</a>
+</section>
+</main>
+
+<footer class="foot">
+  <a href="/ops">Behind the scenes (for judges) →</a>
+</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>
