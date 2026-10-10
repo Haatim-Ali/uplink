@@ -153,6 +153,9 @@ def api_vision():
     f = request.files.get("photo")
     if not f:
         return jsonify(error="no photo"), 400
+    if request.form.get("multi"):   # camera at closing time: one donation per food category
+        foods, source = vision.analyze_many(f.read(), f.mimetype or "image/jpeg", request.form.get("hint", ""))
+        return jsonify(foods=foods, source=source)
     food, source = vision.analyze(f.read(), f.mimetype or "image/jpeg")
     return jsonify(food=food, source=source)
 
