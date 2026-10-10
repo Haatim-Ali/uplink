@@ -26,7 +26,7 @@ brew install brevdev/homebrew-brev/brev   # once
 brev login                                # once; opens the browser
 
 scripts/start_vision.sh                   # starts the GPU, launches the model, opens the tunnel (~2-5 min)
-source scripts/vision_env.sh && PORT=5001 python app.py
+source scripts/vision_env.sh && PORT=5050 python app.py
 ...
 scripts/stop_vision.sh                    # closes the tunnel and stops billing for compute
 ```

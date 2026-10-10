@@ -1,7 +1,7 @@
 #!/bin/bash
 # Start the Brev GPU, launch the vision model on it, and connect this Mac to it.
 #   scripts/start_vision.sh
-#   source scripts/vision_env.sh && PORT=5001 python app.py
+#   source scripts/vision_env.sh && PORT=5050 python app.py
 # Billing runs while the instance is on (~$0.90/hr for an L4). Stop with scripts/stop_vision.sh.
 # One-time setup on a new instance first: see docs/BREV_SETUP.md.
 set -euo pipefail
@@ -53,5 +53,5 @@ fi
 
 echo
 echo "Vision model ready at http://localhost:$PORT"
-echo "Run the app:   source scripts/vision_env.sh && PORT=5001 python app.py"
+echo "Run the app:   source scripts/vision_env.sh && PORT=5050 python app.py"
 echo "When done:     scripts/stop_vision.sh   (stops billing)"

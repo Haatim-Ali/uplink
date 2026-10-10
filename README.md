@@ -33,7 +33,7 @@ It runs with **no API key**: vision returns a demo pizza result and the agents u
 
 ```bash
 scripts/start_vision.sh                                   # GPU on, model up, tunnel open
-source scripts/vision_env.sh && PORT=5001 python app.py
+source scripts/vision_env.sh && PORT=5050 python app.py
 scripts/stop_vision.sh                                    # when done: stops billing
 ```
 
