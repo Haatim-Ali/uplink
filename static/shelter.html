@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Uplink · Shelter phone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="/static/uplink.css">
 <style>
 .demo-pick{margin-top:var(--s5);padding:var(--s3) 0;border-top:1px dashed var(--line-2);color:var(--muted);font-size:var(--t-sm)}
@@ -20,23 +22,31 @@
 .cap i{display:block;height:100%;background:var(--brand)}
 .sec{margin-top:var(--s4)}
 .sec h2{margin-bottom:var(--s2)}
-.ask{border:2px solid var(--warn);background:#fffdf7;margin-bottom:var(--s3);animation:ring 1.4s ease-in-out infinite alternate}
-@keyframes ring{from{box-shadow:0 0 0 0 rgba(161,92,7,.3)}to{box-shadow:0 0 0 .5rem rgba(161,92,7,0)}}
-.ask-tag{display:inline-block;font:800 var(--t-xs) var(--font);text-transform:uppercase;letter-spacing:.08em;background:var(--warn);color:#fff;padding:.2rem .6rem;border-radius:99px}
-.ask h3{font-size:var(--t-xl);margin:var(--s2) 0 var(--s1);line-height:1.2}
-.ask dl{display:grid;grid-template-columns:auto 1fr;gap:.25rem var(--s3);margin:var(--s3) 0;font-size:var(--t-md)}
-.ask dt{color:var(--muted);font-weight:600}
-.ask dd{margin:0;font-weight:600}
+body.locked{overflow:hidden}
+.takeover{position:fixed;inset:0;z-index:100;background:rgba(22,25,27,.72);display:flex;align-items:flex-end;justify-content:center;padding:0}
+@media (min-width:600px){.takeover{align-items:center;padding:1.5rem}}
+.takeover .ask{width:100%;max-width:34rem;max-height:100vh;overflow:auto;padding:0;border:none;border-radius:var(--r3) var(--r3) 0 0;animation:slideUp .35s cubic-bezier(.2,.8,.2,1)}
+@media (min-width:600px){.takeover .ask{border-radius:var(--r3)}}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.to-band{display:flex;justify-content:space-between;align-items:center;gap:1rem;background:var(--amber);color:#2b1d00;font-weight:700;padding:.8rem 1.25rem}
+.to-q{font-weight:600;opacity:.8;margin-left:.4rem}
+.to-body{padding:1.25rem 1.25rem 1.5rem}
+.to-body h2{font-size:2.1rem;line-height:1.1;font-stretch:112%;letter-spacing:-.02em}
+.to-from{margin-top:.5rem;font-size:1.05rem;color:var(--ink-2)}
+.btn.accept{position:relative;overflow:hidden;width:100%;min-height:4.5rem;margin-top:1.25rem;font-size:1.35rem;font-weight:700;background:var(--brand);border-color:var(--brand);color:#fff;border-radius:var(--r3)}
+.btn.accept:hover{background:var(--brand-ink)}
+.btn.accept span{position:relative;z-index:1}
+.btn.accept i{position:absolute;left:0;bottom:0;height:5px;background:#9be2b3;transition:width 1s linear}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.6rem}
+.row2 .btn{min-height:3.25rem;font-size:1.05rem}
+.btn.decline{color:var(--bad);border-color:#e3b2ac}
+.adjust{margin-top:.9rem;padding:1rem;border:1px solid var(--line);border-radius:var(--r2);background:var(--panel-2)}
+.adjust label{margin-top:0}
+.stepper{display:grid;grid-template-columns:3.25rem 1fr 3.25rem;gap:.5rem;margin:.5rem 0 .75rem}
+.stepper .btn{min-height:3.25rem;font-size:1.5rem}
+.stepper input{text-align:center;font-size:1.4rem;font-weight:700;min-height:3.25rem}
+.ask{margin-bottom:var(--s3)}
 .tags{display:flex;flex-wrap:wrap;gap:var(--s1);margin-top:var(--s2)}
-.timeleft{margin-top:var(--s3);font-size:var(--t-sm);font-weight:600;color:var(--ink-2)}
-.bar{height:.5rem;background:#eee6d2;border-radius:99px;margin-top:var(--s1);overflow:hidden}
-.bar i{display:block;height:100%;background:var(--warn);transition:width 1s linear}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:var(--s2);margin-top:var(--s3)}
-.row .btn{min-height:3.5rem;font-size:var(--t-lg);border-radius:var(--r3)}
-.part{margin-top:var(--s4);padding-top:var(--s3);border-top:1px dashed var(--line-2)}
-.part .pr{display:grid;grid-template-columns:5.5rem 1fr;gap:var(--s2);align-items:end}
-.part label{margin-top:0}
-.part .btn{min-height:2.9rem}
 .list>div{padding:var(--s3) 0;border-bottom:1px solid var(--line);font-size:var(--t-md)}
 .list>div:last-child{border-bottom:none}
 .list .meta{color:var(--muted);font-size:var(--t-sm)}
@@ -47,10 +57,10 @@
 .err{color:var(--bad);font-weight:600;font-size:var(--t-sm);text-align:center;padding:var(--s2)}
 .vbar{display:flex;gap:.6rem;align-items:center;margin-top:.6rem;flex-wrap:wrap}
 .vbar .hint{margin:0}
-.ask .mic{width:100%;margin-top:.6rem}
-.ask .mic.rec{background:var(--bad,#b91c1c);color:#fff;border-color:var(--bad,#b91c1c)}
 @media (prefers-reduced-motion:no-preference){.ask .mic.rec{animation:micpulse .8s ease-in-out infinite alternate}}
 @keyframes micpulse{from{opacity:1}to{opacity:.7}}
+.ask .mic{width:100%;margin-top:.9rem;min-height:3rem}
+.ask .mic.rec{background:var(--bad);color:#fff;border-color:var(--bad)}
 .heard{font-size:.9rem;margin-top:.4rem;color:var(--muted,#64748b);min-height:1em}
 </style>
 </head>
@@ -79,6 +89,20 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let id = new URLSearchParams(location.search).get("id") || "harbor-house";
 let lastAsks = null;
+const cap = t => t ? t[0].toUpperCase() + t.slice(1) : t;
+const firstName = n => String(n || "").split(/[ (]/)[0];
+function hm12(hhmm){ const [h, m] = String(hhmm).split(":").map(Number); if(isNaN(h)) return hhmm; return `${(h % 12) || 12}:${String(m).padStart(2,"0")} ${h % 24 < 12 ? "AM" : "PM"}`; }
+function toggleAdjust(){ const p = $("adj"), b = $("adj-btn"); p.hidden = !p.hidden; b.setAttribute("aria-expanded", String(!p.hidden)); if(!p.hidden) p.querySelector("input").focus(); }
+function bump(id, k){ const i = $("n-" + id); i.value = Math.min(+i.max, Math.max(1, (+i.value || 0) + k)); }
+// A short two-tone chime, like an order tablet. Browsers allow sound after the first tap on the page.
+let actx = null;
+document.addEventListener("pointerdown", () => { try{ actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); }catch(e){} }, {once:false});
+function chime(){
+  if(!actx || actx.state !== "running") return;
+  [[880, 0], [1320, .18]].forEach(([f, t]) => { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = f; o.type = "sine";
+    g.gain.setValueAtTime(0, actx.currentTime + t); g.gain.linearRampToValueAtTime(.25, actx.currentTime + t + .02); g.gain.exponentialRampToValueAtTime(.001, actx.currentTime + t + .5);
+    o.connect(g).connect(actx.destination); o.start(actx.currentTime + t); o.stop(actx.currentTime + t + .55); });
+}
 const WAITING = `<div class="card waiting"><span class="pulse" aria-hidden="true"></span><div><b>Waiting for a request</b></div><div class="small">New donation requests show up here and your phone vibrates.</div></div>`;
 
 $("pick").onchange = e => { id = e.target.value; history.replaceState(null, "", "?id=" + id); lastAsks = null; poll(); };
@@ -108,24 +132,44 @@ async function poll(){
     (n.full ? `<div class="full-note" style="grid-column:1/-1">You're marked as full, so we won't send you requests for now.</div>` : "");
   const askKey = s.asks.map(a => a.donation).join(",");
   if(askKey !== lastAsks){
-    if(askKey && !lastAsks && navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    $("asks").innerHTML = s.asks.map(a => `
-    <div class="card ask">
-      <span class="ask-tag">New donation request</span>
-      <h3>${a.food.servings} servings of ${esc(a.food.items.join(", "))}</h3>
-      <div class="tags"><span class="pill outline">${esc(a.food.category)}</span>${a.food.needs_cold?'<span class="pill info">❄ Must stay cold</span>':""}${a.food.allergens.length?`<span class="pill warn">⚠ Contains ${esc(a.food.allergens.join(", "))}</span>`:'<span class="pill ok">No listed allergens</span>'}</div>
-      <dl><dt>From</dt><dd>${esc(a.business)}</dd><dt>Driver</dt><dd>${esc(a.driver)}, arriving ${esc(a.arrive)}</dd><dt>Good for</dt><dd>${a.minutes_left} more min</dd></dl>
-      <div class="timeleft" id="tl-${esc(a.donation)}">Please answer within ${Math.max(0, a.timeout - a.waiting)} min.</div>
-      <div class="bar" aria-hidden="true"><i style="width:${Math.max(0, 100 - 100*a.waiting/a.timeout)}%"></i></div>
-      <div class="row"><button class="btn ok" onclick="respond('${a.donation}', true)">✓ Accept all ${a.food.servings}</button>
-      <button class="btn danger" onclick="respond('${a.donation}', false)">✕ We're full</button></div>
-      <div class="part"><div class="pr"><div><label for="n-${a.donation}">Servings</label><input type="number" inputmode="numeric" id="n-${a.donation}" min="1" max="${a.food.servings - 1}" value="${Math.max(1, Math.floor(a.food.servings/2))}"></div>
-      <button class="btn" onclick="respond('${a.donation}', true, +document.getElementById('n-${a.donation}').value)">Take only this many</button></div></div>
-      <button class="btn mic" id="mic-${a.donation}" type="button" onclick="answerByVoice('${a.donation}')">🎤 Answer by voice</button>
-      <div class="heard" id="heard-${a.donation}" aria-live="polite"></div>
-    </div>`).join("") || WAITING;
+    const isNew = s.asks.some(a => !(lastAsks || "").split(",").includes(a.donation));
+    if(isNew){ if(navigator.vibrate) navigator.vibrate([200, 100, 200]); chime(); }
+    const a = s.asks[0];
+    // Like a delivery tablet: a new request takes over the screen until someone answers it
+    $("asks").innerHTML = a ? `
+    <div class="takeover" role="alertdialog" aria-modal="true" aria-labelledby="to-food">
+      <div class="card ask">
+        <div class="to-band"><span>New pickup request${s.asks.length > 1 ? ` <span class="to-q">1 of ${s.asks.length}</span>` : ""}</span><span id="cd-text" class="num"></span></div>
+        <div class="to-body">
+          <h2 id="to-food"><span class="num">${a.food.servings}</span> ${esc(a.food.items.join(", "))}</h2>
+          <p class="to-from">From ${esc(a.business)}. ${esc(firstName(a.driver))} brings it at <b>${esc(hm12(a.arrive))}</b>.</p>
+          <div class="tags">${a.food.needs_cold?'<span class="pill info">Must stay cold</span>':""}${a.food.allergens.length?`<span class="pill warn">Contains ${esc(a.food.allergens.join(", "))}</span>`:'<span class="pill ok">No listed allergens</span>'}<span class="pill outline">${esc(cap(a.food.category))}</span></div>
+          <button class="btn accept" type="button" onclick="respond('${a.donation}', true)"><span>Accept ${a.food.servings} servings</span><i id="cd-bar" aria-hidden="true"></i></button>
+          <div class="row2">
+            <button class="btn" type="button" onclick="toggleAdjust('${a.donation}')" aria-expanded="false" id="adj-btn">Take fewer</button>
+            <button class="btn decline" type="button" onclick="respond('${a.donation}', false)">Decline</button>
+          </div>
+          <div class="adjust" id="adj" hidden>
+            <label for="n-${a.donation}">How many servings can you take?</label>
+            <div class="stepper"><button class="btn" type="button" onclick="bump('${a.donation}',-5)" aria-label="Five fewer">−</button>
+              <input type="number" inputmode="numeric" id="n-${a.donation}" min="1" max="${a.food.servings - 1}" value="${Math.max(1, Math.floor(a.food.servings/2))}">
+              <button class="btn" type="button" onclick="bump('${a.donation}',5)" aria-label="Five more">+</button></div>
+            <button class="btn primary lg" type="button" onclick="respond('${a.donation}', true, +document.getElementById('n-${a.donation}').value)">Send</button>
+          </div>
+          <button class="btn mic" id="mic-${a.donation}" type="button" onclick="answerByVoice('${a.donation}')">🎤 Answer by voice</button>
+          <div class="heard" id="heard-${a.donation}" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>` : WAITING;
+    document.body.classList.toggle("locked", !!a);
     lastAsks = askKey;
     s.asks.forEach(a => { if(!announced.has(a.donation)){ announced.add(a.donation); announce(a.donation); } });
+  }
+  const first = s.asks[0];
+  if(first && $("cd-text")){
+    const left = Math.max(0, first.timeout - first.waiting);
+    $("cd-text").textContent = left ? `Answer within ${left} min` : "Time's up";
+    $("cd-bar").style.width = Math.max(0, 100 - 100 * first.waiting / first.timeout) + "%";
   }
   $("coming").innerHTML = s.coming.map(c => `<div><b>${c.servings} servings</b> · ${esc(c.items)}<br><span class="meta">${esc(c.driver)}, ETA ${esc(c.eta)}</span></div>`).join("") || `<p class="empty">Nothing on the way.</p>`;
   $("got").innerHTML = s.received.map(g => `<div><b>${g.servings} servings</b> · ${esc(g.items)}<br><span class="meta">from ${esc(g.donor)} at ${esc(g.delivered)}</span></div>`).join("") || `<p class="empty">Nothing yet today.</p>`;

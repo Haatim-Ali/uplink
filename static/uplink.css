@@ -1,33 +1,38 @@
-/* Uplink design system: shared by dashboard, business, shelter and records.
-   System font stack only (no network fonts). All sizes in rem so the projector scale-up is one rule. */
+/* Uplink design system: shared by every page.
+   Look: a kitchen ticket on a steel counter. White paper, black ink, one green for "go",
+   amber for "waiting", red for "stop". Square-ish corners, borders instead of shadows.
+   Type: Archivo (one family, width axis for headlines); IBM Plex Mono only on printed-style tickets.
+   Fonts load from Google Fonts; without a network the system stack takes over. */
 :root{
   /* neutrals */
-  --bg:#f1f4f8; --panel:#ffffff; --panel-2:#f8fafc; --ink:#0f172a; --ink-2:#334155; --muted:#475569; --faint:#64748b;
-  --line:#dbe2ec; --line-2:#c3cddb;
+  --bg:#eceeec; --panel:#ffffff; --panel-2:#f6f7f6; --ink:#16191b; --ink-2:#343a3f; --muted:#4f585f; --faint:#6b747b;
+  --line:#d6dad7; --line-2:#b9bfbb;
   /* brand */
-  --brand:#0f766e; --brand-ink:#0b5a54; --brand-soft:#e0f2f0; --nav:#0f172a; --nav-2:#1e293b;
+  --brand:#127a3f; --brand-ink:#0c5c2e; --brand-soft:#e3f1e7; --nav:#16191b; --nav-2:#2a3034;
+  --amber:#e8a317; --amber-ink:#7a5200;
   /* agents (each also has an icon + name wherever it appears) */
-  --speed:#c2410c; --speed-soft:#fff1e8; --cost:#15803d; --cost-soft:#e8f6ec; --need:#6d28d9; --need-soft:#f1eafd;
+  --speed:#c2410c; --speed-soft:#fff1e8; --cost:#1f5fbf; --cost-soft:#e8effb; --need:#6d28d9; --need-soft:#f1eafd;
   /* semantic */
-  --ok:#15803d; --ok-soft:#e5f5ea; --bad:#b91c1c; --bad-soft:#fdeaea; --warn:#a15c07; --warn-soft:#fdf1d9;
-  --info:#0f766e; --info-soft:#e0f2f0;
+  --ok:#127a3f; --ok-soft:#e3f1e7; --bad:#c42b1c; --bad-soft:#fbe9e7; --warn:#946200; --warn-soft:#fdf1d6;
+  --info:#127a3f; --info-soft:#e3f1e7;
   /* legacy aliases used by older rules */
-  --safety:#b91c1c; --result:#1d4ed8; --human:#a15c07; --adapt:#0f766e; --world:#64748b; --intake:#475569;
+  --safety:#b91c1c; --result:#1d4ed8; --human:#a15c07; --adapt:#127a3f; --world:#64748b; --intake:#475569;
   /* spacing scale */
   --s1:.25rem; --s2:.5rem; --s3:.75rem; --s4:1rem; --s5:1.5rem; --s6:2rem;
-  --r1:6px; --r2:10px; --r3:14px;
-  --shadow:0 1px 2px rgba(15,23,42,.06),0 2px 8px rgba(15,23,42,.04);
-  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r1:3px; --r2:5px; --r3:7px;
+  --shadow:none;
+  --font:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   /* type scale */
   --t-xs:.75rem; --t-sm:.8125rem; --t-md:.9375rem; --t-lg:1.125rem; --t-xl:1.375rem; --t-2xl:1.75rem; --t-3xl:2.25rem;
 }
 *{box-sizing:border-box}
 html{font-size:16px;-webkit-text-size-adjust:100%}
-body{margin:0;font:var(--t-md)/1.45 var(--font);background:var(--bg);color:var(--ink)}
+body{margin:0;font:var(--t-md)/1.45 var(--font);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
 h1,h2,h3,p{margin:0}
+h1,h2,h3{font-stretch:108%;letter-spacing:-.015em;font-weight:750}
 a{color:var(--info)}
-:focus-visible{outline:3px solid #2563eb;outline-offset:2px;border-radius:4px}
+:focus-visible{outline:3px solid #1d4ed8;outline-offset:2px;border-radius:4px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .muted{color:var(--muted)}
 .small{font-size:var(--t-sm)}
@@ -35,7 +40,7 @@ a{color:var(--info)}
 .hidden{display:none!important}
 
 /* ---------- buttons ---------- */
-.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);font:600 var(--t-md)/1.2 var(--font);
+.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);font:650 var(--t-md)/1.2 var(--font);
   padding:.55rem .9rem;min-height:2.4rem;border-radius:var(--r2);border:1px solid var(--line-2);background:#fff;color:var(--ink);cursor:pointer;text-decoration:none;
   transition:background .15s,border-color .15s,box-shadow .15s}
 .btn:hover{background:var(--panel-2);border-color:var(--faint)}
@@ -49,8 +54,8 @@ a{color:var(--info)}
 .btn.sm{min-height:2rem;padding:.3rem .65rem;font-size:var(--t-sm)}
 
 /* ---------- badges / pills (always carry text, optionally an icon) ---------- */
-.pill{display:inline-flex;align-items:center;gap:.35em;font:600 var(--t-xs)/1.2 var(--font);padding:.2rem .6rem;border-radius:99px;
-  background:#e8edf3;color:var(--ink-2);white-space:nowrap;border:1px solid transparent}
+.pill{display:inline-flex;align-items:center;gap:.35em;font:600 var(--t-xs)/1.2 var(--font);padding:.22rem .5rem;border-radius:var(--r1);
+  background:#e7eae8;color:var(--ink-2);white-space:nowrap;border:1px solid transparent}
 .pill.ok{background:var(--ok-soft);color:#14612f}.pill.bad{background:var(--bad-soft);color:#991b1b}
 .pill.warn{background:var(--warn-soft);color:#7c4806}.pill.info{background:var(--info-soft);color:#1e40af}
 .pill.need{background:var(--need-soft);color:#5b21b6}.pill.brand{background:var(--brand-soft);color:var(--brand-ink)}
@@ -58,19 +63,19 @@ a{color:var(--info)}
 
 /* ---------- cards ---------- */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--shadow);padding:var(--s4)}
-.card-title{font:700 var(--t-sm)/1.2 var(--font);text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.card-title{font:650 var(--t-sm)/1.2 var(--font);color:var(--muted)}
 
 /* ---------- forms ---------- */
 label,.label{display:block;font:600 var(--t-sm)/1.3 var(--font);color:var(--ink-2);margin:var(--s3) 0 var(--s1)}
 input,select,textarea{width:100%;font:inherit;color:var(--ink);padding:.7rem .8rem;min-height:2.9rem;border:1px solid var(--line-2);border-radius:var(--r2);background:#fff}
-input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #2563eb;outline-offset:1px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #1d4ed8;outline-offset:1px}
 .hint{font-size:var(--t-sm);color:var(--muted);margin-top:var(--s1)}
 
 /* ---------- tables ---------- */
 .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r2);background:#fff}
 table.data{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--t-sm)}
 table.data th,table.data td{padding:.55rem .7rem;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-table.data thead th{position:sticky;top:0;z-index:1;background:#eef2f7;color:var(--ink-2);font:700 var(--t-xs)/1.2 var(--font);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+table.data thead th{position:sticky;top:0;z-index:1;background:var(--panel-2);color:var(--ink-2);font:650 var(--t-xs)/1.2 var(--font);white-space:nowrap}
 table.data tbody tr:nth-child(even) td{background:var(--panel-2)}
 table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nums}
 
@@ -79,8 +84,8 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
 }
 
 /* ---------- shared brand mark ---------- */
-.brand{display:inline-flex;align-items:center;gap:.55rem;color:inherit;text-decoration:none;font:800 var(--t-xl)/1 var(--font);letter-spacing:-.01em}
-.brand-mark{width:1.9rem;height:1.9rem;border-radius:9px;background:linear-gradient(135deg,#14b8a6,#0f766e);display:grid;place-items:center;color:#fff;font-size:1.05rem}
+.brand{display:inline-flex;align-items:center;gap:.55rem;color:inherit;text-decoration:none;font:800 var(--t-xl)/1 var(--font);font-stretch:112%;letter-spacing:-.02em}
+.brand-mark{width:1.9rem;height:1.9rem;border-radius:var(--r2);background:var(--brand);display:grid;place-items:center;color:#fff;font-size:1.05rem}
 
 /* ---------- phone pages ---------- */
 .phone-top{background:var(--nav);color:#fff;padding:var(--s3) var(--s4)}

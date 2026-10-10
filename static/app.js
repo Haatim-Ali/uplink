@@ -108,7 +108,7 @@ function drawHome(){
   const last = store.get("uplink_last"), d = last && donation(last);
   if(d && !DONE.includes(d.status)){
     const st = stage(d);
-    setHTML("home-active", `<a class="active-card" href="#/track/${esc(d.id)}"><span><small>Your latest pickup</small><b>${esc(st.head)}</b></span><span class="go">Track it →</span></a>`);
+    setHTML("home-active", `<a class="active-card" href="#/track/${esc(d.id)}"><span><small>Your latest pickup</small><b>${esc(st.head)}</b></span><span class="go">Track it</span></a>`);
   } else setHTML("home-active", "");
 }
 
@@ -217,6 +217,29 @@ $("confirm").onclick = async () => {
 };
 
 // ---------- track ----------
+// The pickup ticket: printed-receipt style, like an order ticket in the kitchen. It "prints" once.
+const printed = new Set();
+function ticket(d, np, arrive){
+  const f = d.food, done = d.status === "delivered";
+  const keep = f.needs_cold ? "Keep cold." : f.category === "hot prepared" ? "Keep warm." : "";
+  const alg = f.allergens.length ? `Contains ${f.allergens.join(", ")}.` : "";
+  const fresh = !printed.has(d.id); printed.add(d.id);
+  return `<div class="ticket${fresh ? " print-in" : ""}" role="group" aria-label="Pickup ticket">
+    <div class="t-head"><span>Uplink pickup</span><b>${esc(d.id)}</b></div>
+    <div class="t-from">${esc(d.business_name)}</div>
+    <div class="t-rule"></div>
+    <div class="t-food"><b>${f.servings}×</b> ${esc(itemsText(f.items))}</div>
+    ${keep || alg ? `<div class="t-note">${esc([keep, alg].filter(Boolean).join(" "))}</div>` : ""}
+    <div class="t-rule"></div>
+    <dl class="t-lines">
+      ${d.plan ? `<dt>Driver</dt><dd>${esc(firstName(d.plan.driver_name))}</dd>` : ""}
+      <dt>To</dt><dd>${esc(np)}</dd>
+      ${arrive ? `<dt>${done ? "Delivered" : "Arrives"}</dt><dd>${esc(clock(arrive))}</dd>` : ""}
+    </dl>
+    <div class="t-rule"></div>
+    <div class="t-foot">${done ? "Delivered. Your receipt is ready." : "Show this to the driver at pickup."}</div>
+  </div>`;
+}
 let tmap = null, tlayers = null, tFor = null, tTilesFailed = 0;
 function destroyMap(){ if(tmap){ tmap.remove(); tmap = null; } tFor = null; _html.trackTop = _html.trackBottom = undefined; $("track").innerHTML = ""; }
 function addTiles(m){
@@ -245,7 +268,7 @@ function drawTrack(){
   let destBlock = "";
   if(np && !st.fail){
     const arrive = d.status === "delivered" ? ((S.records.find(r => r.donation === d.id) || {}).delivered) : d.plan.arrive_hhmm;
-    destBlock = `<div class="dest"><small>${d.status === "delivered" ? "Delivered to" : "Going to"}</small><div class="big">${esc(np)}</div>${arrive ? `<div class="eta">${d.status === "delivered" ? "Delivered at" : "Arrives about"} <b>${esc(clock(arrive))}</b></div>` : ""}</div>`;
+    destBlock = ticket(d, np, arrive);
   }
   let question = "";
   if(d.status === "awaiting_info"){
@@ -270,7 +293,7 @@ function drawTrack(){
   const after = d.status === "delivered"
     ? `<a class="btn primary xl" href="#/receipt/${esc(d.id)}">View your receipt</a>`
     : st.fail ? `<a class="btn primary xl" href="#/schedule">Schedule another pickup</a>` : "";
-  setIn("trackBottom", `<ol class="timeline" aria-label="Progress">${tl}</ol><div class="mini">${info}</div>${after}`);
+  setIn("trackBottom", `<ol class="timeline" aria-label="Progress">${tl}</ol>${destBlock ? "" : `<div class="mini">${info}</div>`}${after}`);
   drawTrackMap(d);
 }
 async function answer(d, sure){
@@ -301,7 +324,7 @@ function drawTrackMap(d){
   if(tlayers.line){ tlayers.line.remove(); delete tlayers.line; }
   if(d.plan && d.dest){
     const pts = showDrv && d.status === "en_route" ? (d.picked ? [[drv.lat,drv.lng],[d.dest.lat,d.dest.lng]] : [[drv.lat,drv.lng],[d.origin.lat,d.origin.lng],[d.dest.lat,d.dest.lng]]) : [[d.origin.lat,d.origin.lng],[d.dest.lat,d.dest.lng]];
-    tlayers.line = L.polyline(pts, {color:"#0f766e", weight:4, opacity:.8}).addTo(tmap);
+    tlayers.line = L.polyline(pts, {color:"#127a3f", weight:4, opacity:.8}).addTo(tmap);
   }
   const all = ["pickup","dest","drv"].filter(k => tlayers[k]).map(k => tlayers[k].getLatLng());
   const key = all.length + "|" + (showDrv ? 1 : 0);
@@ -350,3 +373,7 @@ function drawReceipt(){
 }
 
 route(); refresh(); setInterval(refresh, 1500);
+
+// "Closing up": straight to the camera, the way a register's end-of-day button goes straight to the count
+const closingBtn = document.getElementById("closing-up");
+if(closingBtn) closingBtn.onclick = () => { location.hash = "#/schedule"; $("file").click(); };

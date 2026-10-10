@@ -6,6 +6,8 @@
 <title>Uplink · Get your leftover food picked up</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="/static/uplink.css">
 <link rel="stylesheet" href="/static/app.css">
 </head>
@@ -27,15 +29,24 @@
 <!-- Home -->
 <section class="view" data-view="home">
   <div class="hero">
-    <h1>Leftover food? We'll get it picked up.</h1>
-    <p class="lead">Take a photo. We find a nearby shelter and a driver, and you get your donation record.</p>
-    <a class="btn primary xl" href="#/schedule">Schedule a pickup</a>
+    <h1>Leftover food at closing? A shelter can use it tonight.</h1>
+    <p class="lead">Snap a photo of what's left. We find a shelter that can take it and send a driver, and you get a donation record for your files.</p>
+    <div class="actions">
+      <button class="tile go" type="button" id="closing-up">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span><b>Closing up</b><small>Photograph the leftovers</small></span>
+      </button>
+      <a class="tile" href="#/schedule" id="type-it">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg>
+        <span><b>Schedule a pickup</b><small>Photo or type it in</small></span>
+      </a>
+    </div>
     <div id="home-active"></div>
   </div>
   <ol class="how" aria-label="How it works">
-    <li><span class="ico"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span><b>Take a photo</b><span>Of the food you want to give away.</span></li>
-    <li><span class="ico"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg></span><b>We send a driver</b><span>To a shelter that can use it.</span></li>
-    <li><span class="ico"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><path d="M9 12l2 2 4-4"/></svg></span><b>Get your record</b><span>A receipt for your files, ready to print.</span></li>
+    <li><b>Take a photo</b><span>We read the food, the amount and the allergens.</span></li>
+    <li><b>We send a driver</b><span>To a shelter that's open and has room for it.</span></li>
+    <li><b>Keep the record</b><span>A printable receipt for your donation files.</span></li>
   </ol>
 </section>
 
