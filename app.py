@@ -100,7 +100,13 @@ def planner_loop():
             with lock:
                 w.busy = False
                 w.live_rounds = None
-                w.say("System", f"Negotiation error: {e}", "event")
+                # back off instead of retrying 5x a second: "stuck" is retried every 5 sim minutes by tick()
+                d["reconsider"] = False
+                if d["status"] == "new":
+                    d["status"] = "stuck"
+                elif d["status"] == "en_route":
+                    d.pop("locked_driver", None)
+                w.say("System", f"Negotiation error on {d['id']}: {e}. Will retry shortly.", "event", d["id"])
             continue
         with lock:
             if W() is not w:
@@ -169,6 +175,7 @@ def records_page():
 def api_state():
     with lock:
         s = W().to_json()
+        cams = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
     s["speed"] = state["speed"]
     s["paused"] = state["paused"]
     prov = llm.provider()
@@ -183,7 +190,7 @@ def api_state():
                  "mesh_transport": MESH.transport if MESH else None}
     s["scenarios"] = [{"name": k, "title": v["title"]} for k, v in scenarios.SCENARIOS.items()]
     s["agntcy"] = dict(agntcy_bridge.state)
-    s["cameras"] = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
+    s["cameras"] = cams
     return jsonify(s)
 
 
@@ -449,7 +456,8 @@ def api_closing_poll():
 @app.post("/api/camera/status")
 def api_camera_status():
     body = request.get_json(silent=True) or {}
-    state["cameras"][body.get("business", "?")] = {"counts": body.get("counts", {}), "seen": time.time()}
+    with lock:   # api_state iterates this dict from another thread
+        state["cameras"][body.get("business", "?")] = {"counts": body.get("counts", {}), "seen": time.time()}
     return jsonify(ok=True)
 
 
