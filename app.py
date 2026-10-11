@@ -337,7 +337,7 @@ def api_donate_menu():
     different safety rules, so each kind becomes its own donation."""
     body = request.get_json(silent=True) or {}
     biz = body.get("business")
-    foods = menu.foods_from_lines(biz, body.get("lines"))
+    foods = menu.foods_from_lines(biz, body.get("lines"), body.get("extras"))   # extras: one-time, not on the menu
     if not foods:
         return jsonify(error="Pick at least one item."), 400
     with lock:

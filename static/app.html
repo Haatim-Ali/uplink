@@ -91,7 +91,8 @@
         <div><label for="newServes">Servings each</label><input id="newServes" type="number" min="1" value="1" inputmode="numeric"></div>
       </div>
       <label for="newAlg">Allergens (separate with commas)</label><input id="newAlg" autocomplete="off" placeholder="for example: dairy, gluten">
-      <button class="btn primary lg" type="button" id="addSave" style="margin-top:1rem">Add to my menu</button>
+      <label class="check"><input id="newKeep" type="checkbox"><span>Save to my menu for next time<small>Leave this off for a one-time leftover.</small></span></label>
+      <button class="btn primary lg" type="button" id="addSave" style="margin-top:1rem">Add to this pickup</button>
       <p class="err" id="addErr" role="alert" hidden></p>
     </div>
     <div class="menu-total" id="menuTotal" hidden>

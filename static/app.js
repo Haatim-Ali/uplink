@@ -100,7 +100,7 @@ function fillBusinesses(){
   f.innerHTML = `<option value="all">All businesses</option>` + bs.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join("");
   f.value = bs.some(b => b.id === cur) ? cur : "all";
 }
-$("biz").onchange = () => { store.set("uplink_biz", $("biz").value); qty = {}; loadMenu(); };
+$("biz").onchange = () => { store.set("uplink_biz", $("biz").value); qty = {}; extras = []; loadMenu(); };
 $("bizFilter").onchange = () => { if(S) drawDonations(); };
 function bizName(id){ const b = S && S.businesses.find(x => x.id === id); return b ? b.name : null; }
 
@@ -203,6 +203,7 @@ function showSource(r){
   $("servings").classList.remove("check"); $("items").classList.remove("check");
   if(r.source === "demo"){ notice("warn", "This is a sample result (demo mode), not your photo. Please edit anything that's wrong."); }
   else if(r.source === "fallback"){ notice("bad", "We couldn't read this photo. Please fill in what you have."); openForm(true); }
+  else if(f.off_menu && f.off_menu.length){ notice("warn", `Not on your menu: ${f.off_menu.join(", ")}. Its allergens are our best guess from the photo, so please check them.${f.menu_matches ? ` The other ${f.menu_matches === 1 ? "item" : f.menu_matches + " items"} matched your menu.` : ""}`); openForm(true); }
   else if(f.menu_matches){ notice("ok", `We matched ${f.menu_matches === 1 ? "1 item" : f.menu_matches + " items"} to your menu, so the allergens come from your recipes. Please check the amounts.`); }
   else if(f.confidence === "high"){ notice("ok", "We read your photo. Please check that it looks right."); }
   else { notice("warn", "We're not sure about the amount. Please check the number of servings."); openForm(true); }
@@ -421,7 +422,7 @@ const touchDevice = matchMedia("(pointer: coarse)").matches;
 if(closingBtn) closingBtn.onclick = () => { location.hash = "#/schedule"; showTab("photo"); if(touchDevice) $("file").click(); };
 
 // ---------- your menu: tap + on what's left; allergens come from the recipes ----------
-let menuItems = [], menuFor = null, qty = {};
+let menuItems = [], menuFor = null, qty = {}, extras = [];   // extras: one-time leftovers that aren't on the menu
 const KIND = {"hot prepared":"Hot", "cold prepared":"Cold", packaged:"Packaged", produce:"Produce"};
 function showTab(which){
   ["menu","say","photo"].forEach(t => { $("tab-" + t).setAttribute("aria-selected", String(t === which)); $("sch-" + t).hidden = t !== which; });
@@ -435,24 +436,37 @@ async function loadMenu(){
   if(menuFor !== biz){ menuFor = biz; showTab(menuItems.length ? "menu" : "photo"); }
   drawMenu();
 }
+function qtyButtons(name, attr, n){
+  return `<div class="qty"><button type="button" aria-label="One fewer ${esc(name)}" ${attr} data-k="-1" ${n ? "" : "disabled"}>−</button>
+      <output aria-live="polite">${n}</output><button type="button" aria-label="One more ${esc(name)}" ${attr} data-k="1">+</button></div>`;
+}
 function drawMenu(){
-  $("menuList").innerHTML = menuItems.map(m => {
+  const once = extras.map((x, i) => {
+    const serves = x.serves > 1 ? `Serves ${x.serves} each` : `1 serving each`;
+    return `<li class="on"><div class="mi"><b>${esc(x.name)}</b><small>${serves}${x.allergens.length ? " · " + esc(x.allergens.join(", ")) : ""}</small>
+      <span class="kind">${KIND[x.category] || ""}${x.cold ? ", keep cold" : ""} · <span class="off-menu">Not on your menu, allergens unconfirmed</span></span></div>
+      ${qtyButtons(x.name, `data-x="${i}"`, x.qty)}</li>`;
+  }).join("");
+  $("menuList").innerHTML = once + menuItems.map(m => {
     const n = qty[m.id] || 0;
     const serves = m.serves > 1 ? `Serves ${m.serves} per ${esc(m.unit)}` : `1 serving each`;
     return `<li class="${n ? "on" : ""}"><div class="mi"><b>${esc(m.name)}</b><small>${serves}${m.allergens.length ? " · " + esc(m.allergens.join(", ")) : ""}</small>
       <span class="kind">${KIND[m.category] || ""}${m.cold ? ", keep cold" : ""}${m.added ? " · added by you" : ""}</span></div>
-      <div class="qty"><button type="button" aria-label="One fewer ${esc(m.name)}" data-id="${esc(m.id)}" data-k="-1" ${n ? "" : "disabled"}>−</button>
-      <output aria-live="polite">${n}</output><button type="button" aria-label="One more ${esc(m.name)}" data-id="${esc(m.id)}" data-k="1">+</button></div></li>`;
-  }).join("") || `<li class="none">Your menu is empty. Add what you have below, or take a photo.</li>`;
+      ${qtyButtons(m.name, `data-id="${esc(m.id)}"`, n)}</li>`;
+  }).join("") || (once ? "" : `<li class="none">Your menu is empty. Add what you have below, or take a photo.</li>`);
   const picked = menuItems.filter(m => qty[m.id] > 0);
-  const servings = picked.reduce((t, m) => t + qty[m.id] * m.serves, 0);
-  $("menuTotal").hidden = !picked.length || !$("addForm").hidden;   // don't cover the add form
-  $("mtCount").textContent = picked.length === 1 ? "1 item" : `${picked.length} items`;
+  const count = picked.length + extras.length;
+  const servings = picked.reduce((t, m) => t + qty[m.id] * m.serves, 0) + extras.reduce((t, x) => t + x.qty * x.serves, 0);
+  $("menuTotal").hidden = !count || !$("addForm").hidden;   // don't cover the add form
+  $("mtCount").textContent = count === 1 ? "1 item" : `${count} items`;
   $("mtServ").textContent = `About ${servings} servings`;
 }
 $("menuList").onclick = e => {
-  const b = e.target.closest("button[data-id]"); if(!b) return;
-  qty[b.dataset.id] = Math.max(0, (qty[b.dataset.id] || 0) + (+b.dataset.k));
+  const b = e.target.closest("button[data-k]"); if(!b) return;
+  if(b.dataset.x !== undefined){   // a one-time item: down to zero takes it off the pickup
+    const x = extras[+b.dataset.x]; x.qty = Math.max(0, x.qty + (+b.dataset.k));
+    if(!x.qty) extras.splice(+b.dataset.x, 1);
+  } else qty[b.dataset.id] = Math.max(0, (qty[b.dataset.id] || 0) + (+b.dataset.k));
   drawMenu();
 };
 $("addToggle").onclick = () => { const f = $("addForm"); f.hidden = !f.hidden; $("addToggle").setAttribute("aria-expanded", String(!f.hidden)); drawMenu(); if(!f.hidden) $("newName").focus(); };
@@ -460,22 +474,28 @@ $("addSave").onclick = async () => {
   $("addErr").hidden = true;
   const body = {name:$("newName").value, category:$("newKind").value, serves:+$("newServes").value || 1,
     allergens:$("newAlg").value.split(",").map(x => x.trim()).filter(Boolean), cold:$("newKind").value === "cold prepared"};
+  if(!body.name.trim()){ $("addErr").textContent = "Give the item a name."; $("addErr").hidden = false; return; }
+  const done = () => { $("newName").value = ""; $("newAlg").value = ""; $("newServes").value = 1; $("newKeep").checked = false;
+    $("addForm").hidden = true; $("addToggle").setAttribute("aria-expanded","false"); };
+  if(!$("newKeep").checked){   // a one-time leftover: on this pickup only, the menu stays as it is
+    extras.push({...body, name:body.name.trim().slice(0, 60), qty:1}); done(); drawMenu(); return;
+  }
   try{
     const r = await fetch("/api/menu/" + encodeURIComponent($("biz").value), {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
     const j = await r.json(); if(!r.ok) throw new Error(j.error || "Couldn't add it.");
     qty[j.item.id] = (qty[j.item.id] || 0) + 1;
-    $("newName").value = ""; $("newAlg").value = ""; $("newServes").value = 1; $("addForm").hidden = true; $("addToggle").setAttribute("aria-expanded","false");
+    done();
     await loadMenu();
   }catch(e){ $("addErr").textContent = e.message; $("addErr").hidden = false; }
 };
 $("menuConfirm").onclick = async () => {
   const lines = Object.entries(qty).filter(([, n]) => n > 0).map(([id, n]) => ({id, qty:n}));
-  if(!lines.length) return;
+  if(!lines.length && !extras.length) return;
   $("menuConfirm").disabled = true; $("menuConfirm").textContent = "Scheduling…"; $("menuErr").hidden = true;
   try{
-    const r = await post("/api/donate/menu", {business:$("biz").value, lines});
+    const r = await post("/api/donate/menu", {business:$("biz").value, lines, extras});
     store.set("uplink_biz", $("biz").value); store.set("uplink_last", r.ids[0]); try{ sessionStorage.setItem("uplink_new", r.ids[0]); }catch(e){}
-    qty = {}; drawMenu();
+    qty = {}; extras = []; drawMenu();
     location.hash = "#/track/" + r.ids[0];
     refresh();
   }catch(e){ $("menuErr").textContent = "We couldn't schedule this. Check your connection and try again."; $("menuErr").hidden = false; }
@@ -495,10 +515,10 @@ async function sendSaid(form){
   if(!r || !r.ok){ sayState("Tap to talk", j.error || "Try again.", false); return; }
   if(!j.lines.length && !j.extras.length){ sayState("Tap to talk", `Heard "${j.heard}", but nothing on your menu matched. Try naming the items, or tap them on the menu.`, false); return; }
   j.lines.forEach(l => qty[l.id] = (qty[l.id] || 0) + l.qty);
-  const extra = j.extras.length ? ` Not on your menu: ${j.extras.map(e => `${e.name} ×${e.qty}`).join(", ")}. Add ${j.extras.length > 1 ? "them" : "it"} below.` : "";
+  j.extras.forEach(e => extras.push(e));   // not on the menu: on this pickup only, with the model's guesses
+  const extra = j.extras.length ? ` Not on your menu, added for this pickup only: ${j.extras.map(e => `${e.name} ×${e.qty}`).join(", ")}. Its allergens are a best guess, so check them.` : "";
   $("sayNotice").textContent = `Heard: "${j.heard}". We filled in ${j.lines.length === 1 ? "1 item" : j.lines.length + " items"} from your menu. Check the amounts, then schedule.${extra}`;
   $("sayNotice").hidden = false;
-  if(j.extras.length){ $("addForm").hidden = false; $("addToggle").setAttribute("aria-expanded","true"); $("newName").value = j.extras[0].name; }
   sayState("Tap to talk", "", false);
   showTab("menu"); drawMenu(); window.scrollTo(0, 0);
 }

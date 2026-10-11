@@ -2,7 +2,8 @@
 
 - items(biz)               -> the menu, including anything the business added
 - add(biz, item)           -> add an item that wasn't on the menu (kept in data/menu_additions.json, not in git)
-- foods_from_lines(biz, lines) -> donations ready for /api/donate, one per food category
+- foods_from_lines(biz, lines, extras) -> donations ready for /api/donate, one per food category;
+  extras are one-time items that aren't on the menu (allergens unconfirmed, the menu is left alone)
 - hint(biz)                -> the menu as text for the vision prompt
 - enrich(food, biz)        -> after a photo read: match items to the menu and take its allergens and category
 """
@@ -58,27 +59,53 @@ def add(biz, item):
     return new
 
 
-def foods_from_lines(biz, lines):
-    """[{"id": item id, "qty": n}] -> list of donation foods, one per (category, must stay cold)."""
-    groups = {}
+def one_time(item):
+    """A leftover that isn't on the menu, cleaned up like a menu item but not saved. Returns None if it has no name."""
+    name = re.sub(r"\s+", " ", str(item.get("name", ""))).strip()[:60]
+    if not name:
+        return None
+    cat = item.get("category") if item.get("category") in CATEGORIES else "hot prepared"
+    try:
+        serves = max(1, min(200, int(float(item.get("serves") or 1))))
+        qty = max(0, min(500, int(float(item.get("qty") or 0))))
+    except (TypeError, ValueError):
+        return None
+    alg = [str(a).strip().lower() for a in (item.get("allergens") or []) if str(a).strip()][:8]
+    return {"name": name, "qty": qty, "serves": serves, "lbs": round(0.5 * serves, 1), "category": cat, "allergens": alg,
+            "cold": bool(item.get("cold")) or cat == "cold prepared", "one_time": True}
+
+
+def foods_from_lines(biz, lines, extras=None):
+    """[{"id": item id, "qty": n}] plus one-time items not on the menu -> list of donation foods,
+    one per (category, must stay cold). A group with a one-time item has unconfirmed allergens."""
+    picked = []
     for ln in lines or []:
         m = find(biz, ln.get("id"))
-        qty = int(float(ln.get("qty") or 0))
-        if not m or qty <= 0:
+        try:
+            qty = int(float(ln.get("qty") or 0))
+        except (TypeError, ValueError):
             continue
+        if m and qty > 0:
+            picked.append((m, qty))
+    picked += [(x, x["qty"]) for x in map(one_time, extras or []) if x and x["qty"] > 0]
+    groups = {}
+    for m, qty in picked:
         key = (m["category"], bool(m.get("cold")))
-        g = groups.setdefault(key, {"items": [], "servings": 0, "lbs": 0.0, "allergens": set()})
+        g = groups.setdefault(key, {"items": [], "servings": 0, "lbs": 0.0, "allergens": set(), "off_menu": []})
         g["items"].append(f"{m['name']} ×{qty}" if qty > 1 else m["name"])
         g["servings"] += qty * int(m.get("serves", 1))
         g["lbs"] += qty * float(m.get("lbs", 0.5))
         g["allergens"].update(m.get("allergens", []))
+        if m.get("one_time"):
+            g["off_menu"].append(m["name"])
     out = []
     for (cat, cold), g in groups.items():
         lbs = max(0.5, round(g["lbs"], 1))
+        notes = ("Picked from the business's menu, so the allergens come from its recipes." if not g["off_menu"] else
+                 f"Not on the menu: {', '.join(g['off_menu'])}. Its allergens are a best guess, not from a recipe.")
         out.append({"items": g["items"], "servings": g["servings"], "weight_lbs": [round(lbs * .9, 1), round(lbs * 1.1, 1)],
                     "category": cat, "needs_cold": cold, "allergens": sorted(g["allergens"]),
-                    "safe_minutes": SAFE_MINUTES[cat], "allergens_unverified": False,
-                    "notes": "Picked from the business's menu, so the allergens come from its recipes."})
+                    "safe_minutes": SAFE_MINUTES[cat], "allergens_unverified": bool(g["off_menu"]), "notes": notes})
     return out
 
 
@@ -97,16 +124,18 @@ def _norm(s):
 
 def enrich(food, biz):
     """After a photo read: items that match the menu take the menu's allergens and category.
-    Returns the food with "menu_matches" (how many items matched)."""
+    Returns the food with "menu_matches" (how many items matched) and "off_menu" (the names that didn't)."""
     ms = items(biz)
     if not ms or not food:
         return food
-    hits = []
+    hits, off = [], []
     for name in food.get("items", []):
         base = _norm(re.sub(r"\s*[x×(].*$", "", name) + " ")
         m = next((m for m in ms if _norm(m["name"] + " ") in base or base in _norm(m["name"] + " ")), None)
         if m:
             hits.append(m)
+        else:
+            off.append(name)
     if hits:
         food["allergens"] = sorted(set(food.get("allergens", [])) | {a for m in hits for a in m.get("allergens", [])})
         cats = [m["category"] for m in hits]
@@ -115,6 +144,7 @@ def enrich(food, biz):
         if len(hits) == len(food.get("items", [])):
             food["allergens_unverified"] = False   # every item is on the menu: its recipes are known
     food["menu_matches"] = len(hits)
+    food["off_menu"] = off   # named in the photo but not on the menu: its allergens are the model's guess
     return food
 
 
@@ -197,14 +227,16 @@ def parse_speech(biz, text):
                 "Reply with JSON only.",
                 f"Menu (id: name):\n{menu_txt}\n\nThey said: \"{text}\"\n\n"
                 'Return {"lines": [{"id": "<menu id>", "qty": <number of units>}], '
-                '"extras": [{"name": "<food not on the menu>", "qty": <number>}]}. '
-                "Count in the menu's units. Only use ids from the menu. Leave out anything that isn't food.",
+                '"extras": [{"name": "<food not on the menu>", "qty": <number>, "serves": <servings in each one>, '
+                '"category": "hot prepared|cold prepared|packaged|produce", "allergens": ["<likely allergen>"]}]}. '
+                "Count in the menu's units. Only use ids from the menu; anything else they have goes in extras, "
+                "with your best guess at its servings, category and common allergens (dairy, eggs, fish, shellfish, "
+                "tree nuts, peanuts, gluten, soy, sesame). Leave out anything that isn't food.",
                 max_tokens=800, effort="low", model=llm.agent_model())
             by_id = {m["id"]: m for m in ms}
             lines = [{"id": ln["id"], "name": by_id[ln["id"]]["name"], "qty": max(1, int(float(ln.get("qty") or 1))),
                       "serves": by_id[ln["id"]]["serves"]} for ln in out.get("lines", []) if ln.get("id") in by_id]
-            extras = [{"name": str(e.get("name", ""))[:60], "qty": max(1, int(float(e.get("qty") or 1)))}
-                      for e in out.get("extras", []) if e.get("name")]
+            extras = [x for x in (one_time({**e, "qty": e.get("qty") or 1}) for e in out.get("extras", [])) if x]
             if lines or extras:
                 return lines, extras, llm.provider()
         except Exception:  # noqa: BLE001 - fall back to the rules
