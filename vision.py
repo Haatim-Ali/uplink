@@ -8,8 +8,11 @@ reason, never a made-up guess.
 """
 import base64
 import io
+import math
+from concurrent.futures import ThreadPoolExecutor
 
 import llm
+from config import VISION_READS, VISION_SPLIT_MIN
 
 try:  # optional: shrink photos and convert HEIC/odd formats to JPEG before sending
     from PIL import Image, ImageOps
@@ -64,6 +67,14 @@ Return ONLY a JSON object, no other text:
  "notes": "one short sentence about anything uncertain"}
 If the photo does not show food, return {"is_food": false, "notes": "what the photo shows"}."""
 
+HALF_NOTE = """
+
+This is the {side} half of a larger photo, cut so you can see it up close. Count only food whose center
+is inside this half; skip anything cut off at the edge that is mostly in the other half."""
+SYSTEM = "You are a careful food-donation intake assistant. You count, you don't guess."
+CONFIDENCE = ["low", "medium", "high"]
+OUTLIER = 0.25   # a reading this far from the middle one only lowers confidence; it doesn't stretch the range
+
 DEMO = {
     "items": ["pepperoni pizza"],
     "servings": 12,
@@ -116,27 +127,41 @@ def _unit(name):
     return u if u in UNITS else "item"
 
 
+def _best(g):
+    """The best single estimate for a group: the middle reading's count, or the middle of the range."""
+    return g.get("count", (g["count_low"] + g["count_high"]) / 2)
+
+
+def _amounts(groups):
+    """Servings (from the best estimate) and weight range (from the count range), using the unit table."""
+    servings = sum(_best(g) * UNITS[g["unit"]][0] for g in groups)
+    lo_lbs = sum(g["count_low"] * UNITS[g["unit"]][1] for g in groups)
+    hi_lbs = sum(g["count_high"] * UNITS[g["unit"]][1] for g in groups)
+    return max(1, round(servings)), [round(max(lo_lbs, 0.5), 1), round(max(hi_lbs, lo_lbs, 0.5), 1)]
+
+
+def _counts_text(groups):
+    return "; ".join(f"{g['name']}: {g['count_low']}" + (f"-{g['count_high']}" if g["count_high"] != g["count_low"] else "")
+                     + f" {g['unit']}" + (f" ({g['how_counted']})" if g["how_counted"] else "") for g in groups)
+
+
 def from_counts(data):
     """Turn the model's counted groups into servings, weight and safe time, in code."""
-    groups, servings, lo_lbs, hi_lbs = [], 0.0, 0.0, 0.0
+    groups = []
     for g in data.get("groups") or []:
         lo = max(0, int(float(g.get("count_low", g.get("count", 0)) or 0)))
         hi = max(lo, int(float(g.get("count_high", lo) or lo)))
         unit = _unit(g.get("unit"))
-        per_serving, per_lb = UNITS[unit]
-        servings += (lo + hi) / 2 * per_serving
-        lo_lbs += lo * per_lb
-        hi_lbs += hi * per_lb
         groups.append({"name": str(g.get("name") or unit), "unit": unit, "count_low": lo, "count_high": hi,
                        "how_counted": str(g.get("how_counted") or "")})
     category = data.get("category") if data.get("category") in CATEGORIES else "hot prepared"
-    counts = "; ".join(f"{g['name']}: {g['count_low']}" + (f"-{g['count_high']}" if g["count_high"] != g["count_low"] else "")
-                       + f" {g['unit']}" + (f" ({g['how_counted']})" if g["how_counted"] else "") for g in groups)
+    counts = _counts_text(groups)
     notes = " ".join(x for x in [f"Counted {counts}." if counts else "", str(data.get("notes") or "")] if x)
+    servings, weight = _amounts(groups)
     return {
         "items": [g["name"] for g in groups] or ["food"],
-        "servings": max(1, round(servings)),
-        "weight_lbs": [round(max(lo_lbs, 0.5), 1), round(max(hi_lbs, lo_lbs, 0.5), 1)],
+        "servings": servings,
+        "weight_lbs": weight,
         "allergens": data.get("allergens") or [],
         "allergens_uncertain": bool(data.get("allergens_uncertain")),
         "category": category,
@@ -154,18 +179,98 @@ def failed(reason):
                 notes=f"Couldn't read the photo ({reason}). Please fill in the details by hand."), "fallback"
 
 
-def prepare(image_bytes, media_type):
-    """Fix rotation, shrink to MAX_EDGE and re-encode as JPEG. Returns (bytes, media_type)."""
+def _open(image_bytes):
+    """The photo upright and in RGB, at full size, or None if it can't be opened here."""
     if Image is None:
-        return image_bytes, media_type
+        return None
     try:
-        img = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
-    except Exception:  # noqa: BLE001 - unreadable here; let the type check below decide
-        return image_bytes, media_type
+        return ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
+    except Exception:  # noqa: BLE001 - unreadable here; let the type check decide
+        return None
+
+
+def _jpeg(img):
+    img = img.copy()
     img.thumbnail((MAX_EDGE, MAX_EDGE))
     out = io.BytesIO()
     img.save(out, "JPEG", quality=90)
-    return out.getvalue(), "image/jpeg"
+    return out.getvalue()
+
+
+def prepare(image_bytes, media_type):
+    """Fix rotation, shrink to MAX_EDGE and re-encode as JPEG. Returns (bytes, media_type)."""
+    img = _open(image_bytes)
+    return (_jpeg(img), "image/jpeg") if img is not None else (image_bytes, media_type)
+
+
+def halves(image_bytes):
+    """Cut the full-size photo in two along its long side, so each half is seen at more detail."""
+    img = _open(image_bytes)
+    if img is None:
+        return []
+    w, h = img.size
+    if w >= h:
+        return [("left", _jpeg(img.crop((0, 0, w // 2, h)))), ("right", _jpeg(img.crop((w // 2, 0, w, h))))]
+    return [("top", _jpeg(img.crop((0, 0, w, h // 2)))), ("bottom", _jpeg(img.crop((0, h // 2, w, h))))]
+
+
+def _total(food):
+    return sum(_best(g) for g in food["groups"])
+
+
+def _read_all(jobs):
+    """Run (image_bytes, prompt) model calls at the same time. Returns answers, with exceptions in place of failures."""
+    def one(job):
+        try:
+            return llm.chat_json(SYSTEM, job[1], image_b64=base64.b64encode(job[0]).decode(), media_type="image/jpeg",
+                                 max_tokens=4000, effort="high")
+        except Exception as e:  # noqa: BLE001 - one failed reading shouldn't sink the others
+            return e
+    with ThreadPoolExecutor(max(1, len(jobs))) as ex:
+        return list(ex.map(one, jobs))
+
+
+def combine(readings, split_total=None):
+    """Several readings of the same photo -> one answer.
+
+    The reading with the middle total is the best estimate. If the other readings (or the two halves
+    counted up close) disagree, each count's range is widened to cover them and confidence drops, so the
+    business is asked to check the number. A reading far off from the rest (an outlier) doesn't stretch
+    the range; it only lowers confidence. Allergens and "keep cold" are combined on the safe side: if any
+    reading saw them, they count."""
+    readings = sorted(readings, key=_total)
+    base = dict(readings[len(readings) // 2])
+    totals = [_total(r) for r in readings] + ([split_total] if split_total is not None else [])
+    mid = _total(base)
+    near = [t for t in totals if not mid or abs(t - mid) <= OUTLIER * mid]
+    outliers = len(totals) - len(near)
+    lo_t, hi_t = min(near), max(near)
+    groups = [dict(g, count=_best(g)) for g in base["groups"]]
+    if mid and hi_t > lo_t:
+        for g in groups:
+            g["count_low"] = min(g["count_low"], math.floor(g["count_low"] * lo_t / mid))
+            g["count_high"] = max(g["count_high"], math.ceil(g["count_high"] * hi_t / mid))
+    base["groups"] = groups
+    base["servings"], base["weight_lbs"] = _amounts(groups)
+    base["allergens"] = sorted({a for r in readings for a in r["allergens"]})
+    base["allergens_uncertain"] = any(r["allergens_uncertain"] for r in readings)
+    base["needs_cold"] = any(r["needs_cold"] for r in readings)
+    spread = (hi_t - lo_t) / mid if mid else 0
+    conf = base["confidence"]
+    if spread > 0.1 or outliers:
+        conf = "low"
+    elif spread > 0:
+        conf = min(conf, "medium", key=CONFIDENCE.index)
+    base["confidence"] = conf
+    checks = []
+    if len(readings) > 1:
+        checks.append(f"read {len(readings)} times: " + ", ".join(f"{t:g}" for t in totals[:len(readings)]) + " items")
+    if split_total is not None:
+        checks.append(f"halves counted up close: {split_total:g}")
+    if checks:
+        agree = "they agree" if hi_t == lo_t and not outliers else "they differ, so please check the count"
+        base["notes"] = f"Counted {_counts_text(groups)}. Checked ({'; '.join(checks)}): {agree}."
+    return base
 
 
 MULTI_PROMPT = """This photo shows food left over at a business at closing time, to be donated.
@@ -209,18 +314,25 @@ def analyze_many(image_bytes, media_type="image/jpeg", hint="nothing"):
 def analyze(image_bytes, media_type="image/jpeg", menu_hint=""):
     if not llm.available():
         return normalize(DEMO), "demo"
+    original = image_bytes
     image_bytes, media_type = prepare(image_bytes, media_type)
     if media_type not in SUPPORTED_TYPES:
         return failed(f"{media_type} photos aren't supported; use JPEG or PNG")
-    try:
-        b64 = base64.b64encode(image_bytes).decode()
-        data = llm.chat_json("You are a careful food-donation intake assistant. You count, you don't guess.",
-                             PROMPT + (menu_hint or ""), image_b64=b64, media_type=media_type, max_tokens=4000, effort="high")
-    except Exception as e:  # noqa: BLE001 - any failure becomes a clear message, never fake food
-        return failed(f"the vision model call failed: {type(e).__name__}")
-    if data.get("is_food") is False:
-        return failed(f"it doesn't look like food: {data.get('notes') or 'no food found'}")
-    food = from_counts(data)
-    if not food["groups"]:
+    prompt = PROMPT + (menu_hint or "")
+    answers = _read_all([(image_bytes, prompt)] * max(1, VISION_READS))
+    ok = [a for a in answers if isinstance(a, dict)]
+    if not ok:  # any failure becomes a clear message, never fake food
+        return failed(f"the vision model call failed: {type(answers[0]).__name__}")
+    not_food = [a for a in ok if a.get("is_food") is False]
+    if len(not_food) * 2 > len(ok):
+        return failed(f"it doesn't look like food: {not_food[0].get('notes') or 'no food found'}")
+    readings = [f for f in (from_counts(a) for a in ok if a.get("is_food") is not False) if f["groups"]]
+    if not readings:
         return failed("the model didn't find anything to count")
-    return normalize(food), llm.provider()
+    split_total = None
+    if max(_total(r) for r in readings) >= VISION_SPLIT_MIN:  # a big spread: count each half up close too
+        parts = halves(original)
+        got = _read_all([(img, prompt + HALF_NOTE.format(side=side)) for side, img in parts]) if parts else []
+        if got and all(isinstance(a, dict) for a in got):
+            split_total = sum(_total(from_counts(a)) for a in got)
+    return normalize(combine(readings, split_total)), llm.provider()

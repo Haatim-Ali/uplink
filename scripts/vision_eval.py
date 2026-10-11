@@ -51,7 +51,8 @@ def main(folder, out=None):
         ok_range = ok_name and lo <= want <= hi
         named += ok_name
         in_range += ok_range
-        err = abs((lo + hi) / 2 - want) / want if ok_name else None
+        best = sum(g.get("count", (g["count_low"] + g["count_high"]) / 2) for g in groups)
+        err = abs(best - want) / want if ok_name else None
         if ok_name:
             errors.append(err)
             close += err <= 0.1
