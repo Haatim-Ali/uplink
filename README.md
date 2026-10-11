@@ -104,6 +104,24 @@ Trigger closing time with **C** in the camera window or **Closing time (camera)*
 
 Click any past negotiation (D1, D2...) and **Replay debate** to walk judges through one decision, including vetoes.
 
+## Agents as separate services (the agent mesh)
+
+When you run `python app.py`, every agent starts as **its own process**: 7 shelter agents, 6 driver agents and the 3 negotiators (Speed, Cost, Need), plus any pantry or driver that joins mid-run. They find each other through an **agent directory** and talk over **AGNTCY: each agent process serves an A2A AgentCard over NATS** with the AGNTCY app-sdk, and each step of a donation is one A2A broadcast (to every shelter, every driver, or the three negotiators). Without the SDK or `nats-server` they talk over HTTP instead.
+
+```bash
+brew install nats-server                 # once; the app starts it for you
+pip install -r requirements-agntcy.txt   # once (agntcy-app-sdk)
+python app.py                            # prints: ...talking over AGNTCY A2A over NATS
+```
+
+- **Directory** (`mesh/directory.py`): each agent publishes a record of who it is, its skills (`food.receive`, `trip.bid`, `plan.vote`…), what it can do and where to reach it, modeled on AGNTCY's Agent Directory and OASF agent records. Agents heartbeat every 2 s; one that stops drops out within 6 s, or at once when it shuts down cleanly.
+- **Messages** (`mesh/agent.py`): A2A messages over NATS (AGNTCY app-sdk), with HTTP as the fallback. Shelters answer `offer.request`, drivers answer `bid.batch`, and the negotiators answer `plan.evaluate`, `plan.propose` and `plan.vote`. The negotiation table only relays messages and counts votes.
+- **Same decisions**: each agent service runs the same functions as the in-process version. `tests/test_mesh.py` replays all 9 scenarios through the real processes twice, over HTTP (about 1,700 messages) and over AGNTCY A2A/NATS (about 1,100 messages, all over A2A), and checks every metric and every negotiation is identical.
+- **Resilience**: stop an agent and it is no longer consulted; the food still gets delivered. A stopped negotiator is stood in for by the same logic, and that's logged. Agents exit when the app exits, even after a crash.
+- **On the dashboard**: Ops → Activity → **Agent services** lists every agent's process, port, skills, message count and reply time, with **Stop / Restart** buttons, plus a live trace of the messages between agents.
+
+`AGNTCY=0` keeps the separate processes on HTTP; `MESH=0 python app.py` keeps everything in one process (then `AGNTCY=1` serves shelters and drivers over AGNTCY inside the app, via `agntcy_bridge.py`). The scenarios and `test_core.py` always run in-process. The directory and heartbeats are ours; the messaging, A2A cards and NATS transport are AGNTCY's.
+
 ## How it works
 
 | File | What it does |
@@ -111,6 +129,7 @@ Click any past negotiation (D1, D2...) and **Replay debate** to walk judges thro
 | `world.py` | Simulated city: capability directory, **safety rules**, drivers, clock, events, impact, records, the nearest-shelter **baseline** and the **single-agent** policies |
 | `network.py` | **Shelter agents** (accept, counter-offer, decline) and **driver agents** (bid or refuse) |
 | `agents.py` | Speed, Cost, Need coordinator agents, their **red lines**, the **negotiation protocol** (rules or LLM) and the **evidence check** |
+| `mesh/` | **Agent mesh**: the agent directory, one service per agent, the client that discovers and messages them (with a trace), and the launcher |
 | `camera.py` | **Camera at the business**: webcam food detection that donates at closing time |
 | `scenarios.py` | Scripted scenarios, the comparison of 5 policies (`python scenarios.py`), and a seeded random-scenario generator |
 | `vision.py` / `llm.py` | Photo → food details; thin model wrapper (Anthropic, OpenAI, or OpenAI-compatible) |
@@ -157,6 +176,7 @@ Plans over $25 also go to a human.
 
 ```bash
 python3 tests/test_core.py      # or: python3 -m pytest
+python3 tests/test_mesh.py      # starts the real agent processes on ports 7600+ and checks they decide identically
 ```
 
 27 checks: cold food never goes somewhere without a fridge, allergens and capacity are respected, every plan arrives in time, the three agents genuinely disagree, short time forces a decision, cancellations lower reliability and trigger a replan, a new pantry is discoverable, the standoff escalates, the shelter phone flow works, pending requests hold capacity, scenarios are repeatable, the agents never lose more food than the baseline, shelter agents accept, counter-offer and decline correctly, counter-offers split without losing food, drivers refuse trips beyond their range, network messages are logged, camera counts become separate donations by food type, the camera ignores low-confidence false alarms, and the vision model's answer wins over the detector's guess. Run them before every push.

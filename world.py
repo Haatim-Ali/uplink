@@ -75,6 +75,7 @@ class World:
         self.donations = []
         self.feed, self.decisions, self.records = [], [], []
         self.weights = {a: 1.0 for a in agents.AGENTS}
+        self.mesh = None   # set by app.py when agents run as separate services (mesh/)
         self.impact = {"meals": 0, "lbs": 0.0, "cost": 0.0, "spoiled": 0, "escalations": 0, "orgs": set()}
         self.outcomes = {}         # how each negotiation ended (consensus, majority, urgent, ...)
         self.negotiation = None
@@ -220,32 +221,47 @@ class World:
                      f"{'Re-announcing' if d.get('announced') else 'Surplus'}: {f['servings']} servings of {', '.join(f['items'])}, "
                      f"safe until {hhmm(d['safe_until'])}. {len(ok)} shelters can safely take it.")
             d["announced"] = True
-        # each shelter agent answers from its own point of view
-        # with AGNTCY on, this is one A2A broadcast over NATS to the shelter agents (agntcy_bridge.py)
+        # each shelter agent answers from its own point of view: over AGNTCY (A2A over NATS, agntcy_bridge.py)
+        # when that's on, else as its own service (mesh/) when the mesh is on, else in-process
         remote = agntcy_bridge.offers(self, d, ok) if (log and self.live) else None
-        offers = {}
-        for n in ok:
-            o = remote[n["id"]] if remote else network.shelter_offer(self, n, d)
-            offers[n["id"]] = o
-            if log:
-                self.net(d, n["name"], d["business_name"], o["kind"], o["reason"])
+        if remote is not None:
+            offers = {n["id"]: remote[n["id"]] for n in ok}
+        elif self.mesh:
+            got = self.mesh.offers(self, d, ok)
+            removed += [(n, "its agent isn't answering") for n in ok if got[n["id"]] is None]
+            ok = [n for n in ok if got[n["id"]] is not None]
+            offers = {n["id"]: got[n["id"]] for n in ok}
+        else:
+            offers = {n["id"]: network.shelter_offer(self, n, d) for n in ok}
+        if log:
+            for n in ok:
+                self.net(d, n["name"], d["business_name"], offers[n["id"]]["kind"], offers[n["id"]]["reason"])
         ok = [n for n in ok if offers[n["id"]]["kind"] != "decline"]
-        # each driver agent bids on each trip
-        plans, late, refused = [], 0, 0
-        bids_by_driver = {}
-        trips = []
+        # each driver agent bids on each trip that could still arrive safely
+        trips, late = [], 0
         for n in ok:
             for dr in self.usable_drivers(d, n):
                 p = self.make_plan(d, n, dr)
                 if p["arrive"] > d["safe_until"] - SAFETY_MARGIN or p["arrive"] > n["open_min"]:
                     late += 1
                     continue
-                trips.append((f"{n['id']}|{dr['id']}", dr, n, p))
-        # with AGNTCY on, one A2A broadcast to the driver agents carries every trip they could make
-        remote_bids = agntcy_bridge.bids(self, d, trips) if (log and self.live) else None
-        for key, dr, n, p in trips:
+                trips.append((n, dr, p))
+        # one A2A broadcast over AGNTCY carries every trip the drivers could make; else the mesh; else in-process
+        remote_bids = agntcy_bridge.bids(self, d, [(f"{n['id']}|{dr['id']}", dr, n, p) for n, dr, p in trips]) \
+            if (log and self.live) else None
+        if remote_bids is not None:
+            bids = [remote_bids[f"{n['id']}|{dr['id']}"] for n, dr, p in trips]
+        elif self.mesh:
+            bids = self.mesh.bids(self, d, trips)
+        else:
+            bids = [network.driver_bid(self, dr, d, n, p) for n, dr, p in trips]
+        plans, refused, silent = [], 0, set()
+        bids_by_driver = {}
+        for (n, dr, p), bid in zip(trips, bids):
             o = offers[n["id"]]
-            bid = remote_bids[key] if remote_bids else network.driver_bid(self, dr, d, n, p)
+            if bid is None:
+                silent.add(dr["name"])
+                continue
             if not bid["willing"]:
                 refused += 1
                 bids_by_driver.setdefault(dr["name"], []).append(f"declines {n['name']}: {bid['reason']}")
@@ -255,6 +271,8 @@ class World:
             p["offer"] = o["reason"]
             bids_by_driver.setdefault(dr["name"], []).append(f"{n['name']}: {bid['reason']}")
             plans.append(p)
+        if log and silent:
+            self.decide(d, "blocked", f"No answer from the agent of {', '.join(sorted(silent))}")
         if log:
             for name, lines in bids_by_driver.items():
                 more = f" (+{len(lines) - 2} more)" if len(lines) > 2 else ""
@@ -622,6 +640,9 @@ class World:
             if dr["id"] not in self.drivers:
                 self.drivers[dr["id"]] = dict(dr, status="free", home=pos(dr), pos=pos(dr))
                 self.say("Directory", f"{dr['name']} started a shift ({dr['type']}, {dr['reliability']:.0%} reliable).", "event")
+                if self.mesh and self.mesh.launcher:   # the new driver's own agent starts and joins the directory
+                    self.mesh.launcher.spawn("driver", dr["id"], name=dr["name"], wait=8.0)
+                    self.mesh.agents(fresh=True)
         elif t == "confirm":
             d = next((x for x in self.donations if x["business"] == e["business"] and x["status"] == "awaiting_info"), None)
             if d:
@@ -740,6 +761,10 @@ class World:
         if n["id"] in self.nonprofits:
             return
         self._register(n)
+        if self.mesh and self.mesh.launcher:   # the new pantry's own agent starts and joins the directory
+            if self.mesh.launcher.spawn("shelter", n["id"], wait=8.0):
+                self.say("Directory", f"{n['name']}'s agent registered in the agent directory.", "event")
+            self.mesh.agents(fresh=True)   # discover it now, not on the next cache refresh
         for d in self.donations:
             if d["status"] in ("stuck", "awaiting_human"):
                 d["status"] = "new"

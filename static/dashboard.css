@@ -354,6 +354,11 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 @keyframes saysIn{from{transform:translateY(4px);opacity:.3}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.agent .says.now{animation:none}}
 
+/* agent services (mesh) */
+.mesh-h{font-size:.95rem;margin:1rem 0 .4rem}
+.mesh-h:first-child{margin-top:0}
+#mesh-trace code,#mesh-agents code{font-size:.8rem}
+
 /* ---------- Agent network diagram (live) ---------- */
 .wire{margin-bottom:1.25rem}
 .wire-body{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:1rem;align-items:stretch}

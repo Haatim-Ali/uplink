@@ -34,6 +34,38 @@ def W():
     return state["world"]
 
 
+# ---------------- agent mesh: every agent as its own service ----------------
+MESH = None   # a mesh.client.MeshClient once the agents are running as separate processes
+
+
+def start_mesh():
+    """Start the agent directory and one process per agent (MESH=0 keeps everything in-process).
+    If anything fails, Uplink runs in-process exactly as before."""
+    global MESH
+    if os.getenv("MESH", "1") != "1":
+        print("Agents: in-process (MESH=0)")
+        return
+    try:
+        from mesh.client import MeshClient
+        from mesh.launcher import Launcher, agntcy_available
+        # AGNTCY on whenever its SDK is installed (AGNTCY=0 turns it off): every agent process is then also
+        # an A2A agent over NATS, and each step of a donation is one A2A broadcast
+        use_agntcy = os.getenv("AGNTCY", "").strip().lower() not in ("0", "off", "false", "no") and agntcy_available()
+        nats_url = os.getenv("NATS_URL", "nats://localhost:4222") if use_agntcy else None
+        launcher = Launcher(int(os.getenv("MESH_PORT", "7300")), nats_url=nats_url)
+        listed = launcher.start(wait=20)
+        MESH = MeshClient(launcher.directory_url, launcher=launcher, nats_url=launcher.nats_url)
+        with lock:
+            state["world"].mesh = MESH
+        n = len(MESH.agents(fresh=True))
+        how = (f"AGNTCY A2A over NATS ({launcher.nats_url})" if MESH.transport == "a2a" else "HTTP")
+        print(f"Agent network: {n} agents, each its own process, talking over {how}; directory at {launcher.directory_url}"
+              + ("" if listed else " (some still starting)"))
+    except Exception as e:  # noqa: BLE001
+        MESH = None
+        print(f"Agent mesh unavailable ({type(e).__name__}: {e}); agents run in-process.")
+
+
 # ---------------- background loops ----------------
 
 def clock_loop():
@@ -143,7 +175,9 @@ def api_state():
                  "llm_error": llm.auth_error(),
                  # which models are actually answering, so the dashboard can credit them
                  "agents_model": (os.getenv("AGENT_MODEL") or (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL if claude else os.getenv("OPENAI_MODEL", ""))) if agents.use_llm() else "",
-                 "vision_model": (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL) if claude else (os.getenv("OPENAI_MODEL", "") if prov else "")}
+                 "vision_model": (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL) if claude else (os.getenv("OPENAI_MODEL", "") if prov else ""),
+                 "mesh": len(MESH.agents()) if MESH else 0,   # agents running as separate services
+                 "mesh_transport": MESH.transport if MESH else None}
     s["scenarios"] = [{"name": k, "title": v["title"]} for k, v in scenarios.SCENARIOS.items()]
     s["agntcy"] = dict(agntcy_bridge.state)
     s["cameras"] = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
@@ -156,8 +190,37 @@ def api_reset():
     sc = copy.deepcopy(scenarios.SCENARIOS[name]) if name in scenarios.SCENARIOS else None
     with lock:
         state["world"] = World(sc, live=True)
+        state["world"].mesh = MESH
         state["paused"] = False
+    if MESH:
+        MESH.launcher.reset_extras()   # agents that joined mid-run (a new pantry, new drivers) leave with it
     return jsonify(ok=True)
+
+
+@app.get("/api/mesh")
+def api_mesh():
+    if not MESH:
+        return jsonify(enabled=False)
+    return jsonify(enabled=True, **MESH.status())
+
+
+@app.post("/api/mesh/<action>")
+def api_mesh_action(action):
+    """Stop or restart one agent's process: {"id": "shelter:grace-kitchen"}."""
+    if not MESH:
+        return jsonify(error="the agent mesh isn't running"), 400
+    rid = (request.get_json(silent=True) or {}).get("id", "")
+    if action == "stop":
+        ok = MESH.launcher.stop(rid)
+    elif action == "start":
+        ok = MESH.launcher.restart(rid)
+    else:
+        return jsonify(error="unknown action"), 400
+    if ok:
+        with lock:
+            verb = "stopped: it leaves the agent directory" if action == "stop" else "restarted and re-registered"
+            W().say("Directory", f"Agent {rid} {verb}.", "event")
+    return jsonify(ok=ok)
 
 
 @app.post("/api/control")
@@ -407,10 +470,15 @@ def compare_results(n=50):
 
 
 if __name__ == "__main__":
+    import signal
+    import sys
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))   # runs atexit: the agent processes stop too
+    start_mesh()
     threading.Thread(target=clock_loop, daemon=True).start()
     threading.Thread(target=planner_loop, daemon=True).start()
-    st = agntcy_bridge.start(lambda: state["world"])   # shelter and driver agents on AGNTCY, if AGNTCY=1
-    print(f"Agent network: {st['transport']}" + (f" ({st['agents']} agents)" if st["on"] else f" · {st['reason']}"))
+    if not MESH:   # without separate agent processes, the AGNTCY bridge serves the agents inside this app
+        st = agntcy_bridge.start(lambda: state["world"])
+        print(f"Agent network: {st['transport']}" + (f" ({st['agents']} agents)" if st["on"] else f" · {st['reason']}"))
     threading.Thread(target=compare_results, daemon=True).start()   # warm the Evidence page in the background
     port = int(os.getenv("PORT", "5050"))   # 5000 is taken by AirPlay on Macs
     print("Uplink · food rescue agents")

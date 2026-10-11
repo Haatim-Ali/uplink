@@ -294,13 +294,101 @@ def use_llm():
 
 # ---------- the negotiation ----------
 
-def negotiate(world, d, plans):
+# ---------- one agent's own steps ----------
+# Each negotiator does three things, using only what it is sent. They run here in-process, or inside
+# that agent's own service (mesh/), which calls these same functions: the decisions are identical.
+
+def agent_evaluate(a, world, d, plans):
+    """Agent a scores every safe plan against its own goal and marks the ones past its red line."""
+    return ({p["id"]: round(score(a, world, d, p), 3) for p in plans},
+            {p["id"]: red_line(a, world, d, p, plans) for p in plans})
+
+
+def agent_propose(a, world, d, plans, S, V, r, history, mode):
+    """Agent a proposes one plan for round r. Returns (plan id, reason, used_llm)."""
+    pid, reason, used = _rules_round(world, d, plans, S, V, r)[a], None, False
+    if mode == "llm":
+        try:
+            pid, reason = _llm_propose(a, world, d, plans, S, r, history)
+            used = True
+        except Exception:  # noqa: BLE001 - fall back to rules for this agent
+            pass
+    best = max(S[q["id"]][a] for q in plans)
+    p = next(q for q in plans if q["id"] == pid)
+    return pid, reason or propose_reason(a, p, world, S[pid][a] < best - 1e-9), used
+
+
+def agent_vote(a, world, d, plans, proposed, S, V, r, mode):
+    """Agent a votes on every proposed plan. Returns ({plan id: {accept, reason, kind}}, used_llm)."""
     plans_by_id = {p["id"]: p for p in plans}
-    S = all_scores(world, d, plans)
-    V = {p["id"]: {a: red_line(a, world, d, p, plans) for a in AGENTS} for p in plans}
-    best_score = {a: max(S[p["id"]][a] for p in plans) for a in AGENTS}
-    best_plan = {a: max(plans, key=lambda p: S[p["id"]][a]) for a in AGENTS}
+    best_score = {x: max(S[p["id"]][x] for p in plans) for x in AGENTS}
+    best_plan = max(plans, key=lambda p: S[p["id"]][a])
+    llm_votes, used = None, False
+    if mode == "llm":
+        try:
+            llm_votes, used = _llm_vote(a, world, d, proposed, plans_by_id, S, r), True
+        except Exception:  # noqa: BLE001
+            pass
+    out = {}
+    for pid in proposed:
+        p = plans_by_id[pid]
+        if V[pid][a]:  # red lines hold in every round, whatever the model says
+            acc, why, kind = False, V[pid][a], ("reliability" if "reliable" in V[pid][a] else "veto")
+        elif llm_votes is not None and pid in llm_votes:
+            acc, why = llm_votes[pid]
+            kind = object_reason(a, p, best_plan, world)[1]
+            why = ("Accept: " if acc else "Object: ") + why if why else ("Accept." if acc else "Object.")
+        else:
+            acc = _rules_vote(a, pid, S, best_score, r, p)
+            if acc:
+                why, kind = accept_reason(a, p, world), None
+            else:
+                why, kind = object_reason(a, p, best_plan, world)
+        out[pid] = {"accept": acc, "reason": why, "kind": None if acc else kind}
+    return out, used
+
+
+class LocalCouncil:
+    """The three negotiators as plain function calls in this process."""
+    remote = False
+
+    def __init__(self, world, d, plans):
+        self.world, self.d, self.plans = world, d, plans
+
+    def evaluate(self, a):
+        return agent_evaluate(a, self.world, self.d, self.plans)
+
+    def propose(self, a, S, V, r, history, mode):
+        return agent_propose(a, self.world, self.d, self.plans, S, V, r, history, mode)
+
+    def vote(self, a, proposed, S, V, r, mode):
+        return agent_vote(a, self.world, self.d, self.plans, proposed, S, V, r, mode)
+
+
+def _each(fn, parallel):
+    """Run fn(agent) for all three agents: in parallel when they are slow (model calls, network)."""
+    if not parallel:
+        return {a: fn(a) for a in AGENTS}
+    with ThreadPoolExecutor(3) as ex:
+        futs = {a: ex.submit(fn, a) for a in AGENTS}
+    return {a: f.result() for a, f in futs.items()}
+
+
+# ---------- the negotiation ----------
+
+def negotiate(world, d, plans, council=None):
+    """No agent has the final say: this only relays messages and counts votes. The agents themselves
+    evaluate, propose and vote, in-process (LocalCouncil) or as separate services (mesh.RemoteCouncil)."""
+    if council is None:
+        mesh = getattr(world, "mesh", None)
+        council = mesh.council(world, d, plans) if mesh else LocalCouncil(world, d, plans)
+    plans_by_id = {p["id"]: p for p in plans}
     mode = "llm" if use_llm() else "rules"
+    parallel = council.remote or mode == "llm"
+    # step 0: each agent shares its own evaluation of every plan (scores and vetoes) with the others
+    ev = _each(council.evaluate, parallel)
+    S = {p["id"]: {a: ev[a][0][p["id"]] for a in AGENTS} for p in plans}
+    V = {p["id"]: {a: ev[a][1][p["id"]] for a in AGENTS} for p in plans}
     rounds, history = [], ""
     llm_ok = False
     weights = world.weights
@@ -313,46 +401,15 @@ def negotiate(world, d, plans):
         return dict(_result(outcome, plan, rounds, S, proposed, votes, "llm" if llm_ok else "rules", weights), **extra)
 
     for r in range(3):
-        proposals = _rules_round(world, d, plans, S, V, r)
-        reasons = {}
-        if mode == "llm":
-            with ThreadPoolExecutor(3) as ex:
-                futs = {a: ex.submit(_llm_propose, a, world, d, plans, S, r, history) for a in AGENTS}
-            for a, f in futs.items():
-                try:
-                    proposals[a], reasons[a] = f.result()
-                    llm_ok = True
-                except Exception:  # noqa: BLE001 - fall back to rules for this agent
-                    pass
+        props = _each(lambda a: council.propose(a, S, V, r, history, mode), parallel)
+        proposals = {a: props[a][0] for a in AGENTS}
+        reasons = {a: props[a][1] for a in AGENTS}
+        llm_ok = llm_ok or any(props[a][2] for a in AGENTS)
         proposed = list(dict.fromkeys(proposals[a] for a in AGENTS))
 
-        votes = {pid: {} for pid in proposed}
-        llm_votes = {}
-        if mode == "llm":
-            with ThreadPoolExecutor(3) as ex:
-                futs = {a: ex.submit(_llm_vote, a, world, d, proposed, plans_by_id, S, r) for a in AGENTS}
-            for a, f in futs.items():
-                try:
-                    llm_votes[a] = f.result()
-                    llm_ok = True
-                except Exception:  # noqa: BLE001
-                    pass
-        for pid in proposed:
-            p = plans_by_id[pid]
-            for a in AGENTS:
-                if V[pid][a]:  # red lines hold in every round, whatever the model says
-                    acc, why, kind = False, V[pid][a], ("reliability" if "reliable" in V[pid][a] else "veto")
-                elif a in llm_votes and pid in llm_votes[a]:
-                    acc, why = llm_votes[a][pid]
-                    kind = object_reason(a, p, best_plan[a], world)[1]
-                    why = ("Accept: " if acc else "Object: ") + why if why else ("Accept." if acc else "Object.")
-                else:
-                    acc = _rules_vote(a, pid, S, best_score, r, p)
-                    if acc:
-                        why, kind = accept_reason(a, p, world), None
-                    else:
-                        why, kind = object_reason(a, p, best_plan[a], world)
-                votes[pid][a] = {"accept": acc, "reason": why, "kind": None if acc else kind}
+        cast = _each(lambda a: council.vote(a, proposed, S, V, r, mode), parallel)
+        llm_ok = llm_ok or any(cast[a][1] for a in AGENTS)
+        votes = {pid: {a: cast[a][0][pid] for a in AGENTS} for pid in proposed}
 
         messages = []
         for a in AGENTS:
@@ -363,8 +420,7 @@ def negotiate(world, d, plans):
                 verb = "Stands firm on"
             else:
                 verb = "Revises to"
-            messages.append({"agent": a, "type": "propose",
-                             "text": f"{verb} {short(p)}. " + (reasons.get(a) or propose_reason(a, p, world, S[p["id"]][a] < best_score[a] - 1e-9))})
+            messages.append({"agent": a, "type": "propose", "text": f"{verb} {short(p)}. " + reasons[a]})
         for pid in proposed:
             for a in AGENTS:
                 v = votes[pid][a]
