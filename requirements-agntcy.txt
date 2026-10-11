@@ -1,0 +1,4 @@
+# Optional: run the shelter and driver agents on AGNTCY (Cisco Outshift's open agent stack).
+# Needs Python 3.12+ and a NATS server (Mac: brew install nats-server, then run: nats-server).
+# Then put AGNTCY=1 in .env. Without these, Uplink runs the agents in-process.
+agntcy-app-sdk>=0.5.5

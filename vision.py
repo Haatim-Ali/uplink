@@ -64,6 +64,10 @@ Return ONLY a JSON object, no other text:
  "notes": "one short sentence about anything uncertain"}
 If the photo does not show food, return {"is_food": false, "notes": "what the photo shows"}."""
 
+VIDEO_NOTE = ("\n\nThis image is a 2x2 grid of four frames from one short video panning across the same food. "
+              "The same items appear in more than one frame: count each physical item once, using the frame that "
+              "shows it best, and don't add up the frames.")
+
 DEMO = {
     "items": ["pepperoni pizza"],
     "servings": 12,

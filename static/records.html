@@ -5,18 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Uplink · Edible food recovery records (SB 1383)</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="/static/fonts/fonts.css">
 <link rel="stylesheet" href="/static/uplink.css">
+<link rel="stylesheet" href="/static/dashboard.css">
 <style>
-.rnav{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--line)}
-.rnav-in{max-width:90rem;margin:0 auto;padding:.5rem var(--s4);display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap}
-.rnav .brand{color:var(--ink);font-size:1.3rem}
-.rnav nav{display:flex;gap:.15rem;flex-wrap:wrap}
-.rnav nav a{font-weight:600;color:var(--ink-2);text-decoration:none;padding:.6rem .8rem;border-radius:var(--r2)}
-.rnav nav a:hover{background:var(--bg)}
-.rnav nav a.active{color:var(--brand-ink);background:var(--brand-soft)}
-.page{max-width:76rem;margin:0 auto;padding:var(--s5) var(--s4) var(--s6)}
+.rec-page{max-width:76rem;margin:0 auto;padding:var(--s5) var(--s4) var(--s6)}
 .doc-head{display:flex;justify-content:space-between;gap:var(--s4);flex-wrap:wrap;align-items:flex-end;padding-bottom:var(--s4);border-bottom:1px solid var(--line);margin-bottom:var(--s4)}
 .doc-head .brand{font-size:var(--t-lg);margin-bottom:var(--s3);color:var(--ink)}
 .doc-head h1{font-size:var(--t-3xl);line-height:1.1;letter-spacing:-.02em;font-weight:800}
@@ -62,11 +55,72 @@ table.data td.tag-t,table.data td.nowrap{white-space:nowrap}
 </style>
 </head>
 <body>
-<header class="rnav no-print"><div class="rnav-in">
-  <a class="brand" href="/ops#/live"><span class="brand-mark" aria-hidden="true">↑</span>Uplink</a>
-  <nav aria-label="Main"><a href="/ops#/live">Live</a><a href="/ops#/decisions">Decisions</a><a href="/ops#/activity/feed">Activity</a><a href="/ops#/evidence">Evidence</a><a href="/records" class="active" aria-current="page">Records</a><a href="/ops#/how">How it works</a></nav>
-</div></header>
-<div class="page">
+<header class="nav no-print">
+  <div class="nav-in">
+    <a class="brand" href="/ops#/live" aria-label="Uplink, live view"><span class="brand-mark" aria-hidden="true">↑</span>Uplink</a>
+    <nav class="menu" aria-label="Main">
+      <a href="/ops#/live" data-route="live">Live</a>
+      <a href="/ops#/decisions" data-route="decisions">Decisions <span class="count" id="dec-count" hidden>0</span></a>
+      <div class="dd">
+        <button class="dd-btn" type="button" data-route="activity" aria-expanded="false" aria-haspopup="true" aria-controls="dd-activity">Activity <span aria-hidden="true">▾</span></button>
+        <div class="dd-menu" id="dd-activity" hidden>
+          <a href="/ops#/activity/network"><b>Agent network</b><small>Who said what for a donation</small></a>
+          <a href="/ops#/activity/feed"><b>Agent feed</b><small>Every event, newest first</small></a>
+          <a href="/ops#/activity/safety"><b>Safety log</b><small>Plans the rules allowed or blocked</small></a>
+          <a href="/ops#/activity/donations"><b>Donations</b><small>Status and time left for each</small></a>
+        </div>
+      </div>
+      <a href="/ops#/evidence" data-route="evidence">Evidence</a>
+      <a href="/records" class="active" aria-current="page">Records</a>
+      <a href="/ops#/how" data-route="how">How it works</a>
+    </nav>
+    <div class="nav-right">
+      <a class="navlink" href="/" target="_blank" rel="noopener">Customer view ↗</a>
+      <div class="dd dd-right">
+        <button class="dd-btn solid" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="dd-demo">Demo controls <span aria-hidden="true">▾</span></button>
+        <div class="dd-menu wide" id="dd-demo" hidden>
+          <div class="dd-sec">
+            <h3>Scenario</h3>
+            <label class="sr-only" for="scenario">Scenario</label>
+            <select id="scenario"></select>
+            <div class="dd-row"><button class="btn primary sm" id="start" type="button" title="Reset the world and start the selected scenario">Run scenario</button><button class="btn sm" id="blank" type="button" title="Reset to an empty city with no donations">Empty world</button></div>
+          </div>
+          <div class="dd-sec">
+            <h3>Clock</h3>
+            <div class="dd-row">
+              <label class="sr-only" for="speed">Simulation speed</label>
+              <select id="speed" style="width:auto"><option value="1">1× speed</option><option value="2">2× speed</option><option value="4">4× speed</option><option value="8">8× speed</option></select>
+              <button class="btn sm" id="pause" type="button">Pause</button>
+            </div>
+          </div>
+          <div class="dd-sec">
+            <h3>Look</h3>
+            <div class="dd-row"><button class="btn sm" id="theme" type="button" title="Switch between dark and light (light is easier to read on some projectors)">Light mode</button></div>
+          </div>
+          <div class="dd-sec">
+            <h3>Inject a problem</h3>
+            <div class="dd-col">
+              <button class="btn sm" type="button" data-ev="decline" title="A shelter that was asked says it is full, so the agents must re-plan">Shelter says full</button>
+              <button class="btn sm" type="button" data-ev="cancel" title="A driver on the way cancels; their reliability drops and the agents adapt">Driver cancels</button>
+              <button class="btn sm" type="button" data-ev="new_pantry" title="A new pantry joins the directory mid-run">New pantry joins</button>
+              <button class="btn sm" type="button" id="closing" title="Ask the business camera to report leftover food">Closing time (camera)</button>
+              <p class="cam-status" id="cam-status">No camera connected</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dd dd-right">
+        <button class="dd-btn" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="dd-open">Open <span aria-hidden="true">▾</span></button>
+        <div class="dd-menu" id="dd-open" hidden>
+          <a href="/" target="_blank" rel="noopener"><b>Customer site ↗</b><small>What a business sees</small></a>
+          <a href="/shelter" target="_blank" rel="noopener"><b>Shelter phone page ↗</b><small>Where a shelter answers</small></a>
+        </div>
+      </div>
+      <div class="clock-box" title="Simulated time. One simulated minute is one real second at 1× speed."><span class="clock" id="clock">12:00</span><span class="badge-mode" id="mode" title="Agents: how the three agents reason (rules or an AI model). Vision: how photos are read.">…</span></div>
+    </div>
+  </div>
+</header>
+<div class="page rec-page">
   <header class="doc-head">
     <div>
       <div class="print-only"><b>Uplink</b> · food rescue</div>
@@ -135,6 +189,38 @@ function csv(){
   a.download = "donation_records.csv"; a.click();
 }
 load(); setInterval(load, 3000);
+
+// ---- shared top bar: menus, clock, mode badge, decisions count and demo controls (same as the dashboard) ----
+(function(){
+  const $ = id => document.getElementById(id);
+  const close = except => document.querySelectorAll(".dd-menu").forEach(m => { if(m !== except){ m.hidden = true; const b = document.querySelector(`[aria-controls="${m.id}"]`); if(b) b.setAttribute("aria-expanded","false"); } });
+  document.querySelectorAll(".dd-btn").forEach(b => b.addEventListener("click", e => { const m = $(b.getAttribute("aria-controls")); if(!m) return; const open = m.hidden; close(m); m.hidden = !open; b.setAttribute("aria-expanded", String(open)); e.stopPropagation(); }));
+  document.addEventListener("click", e => { if(!e.target.closest(".dd") || e.target.closest(".dd-menu a")) close(); });
+  document.addEventListener("keydown", e => { if(e.key === "Escape") close(); });
+  const post = (u, b) => fetch(u, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(b || {})});
+  if($("start")) $("start").onclick = async () => { await post("/api/reset", {scenario:$("scenario").value}); location.href = "/ops#/live"; };
+  if($("blank")) $("blank").onclick = () => post("/api/reset", {});
+  if($("speed")) $("speed").onchange = e => post("/api/control", {speed:+e.target.value});
+  let paused = false;
+  if($("pause")) $("pause").onclick = async () => { paused = !paused; await post("/api/control", {paused}); $("pause").textContent = paused ? "Resume" : "Pause"; };
+  document.querySelectorAll("[data-ev]").forEach(b => b.onclick = () => post("/api/event/" + b.dataset.ev));
+  if($("closing")) $("closing").onclick = () => post("/api/closing", {});
+  const tb = $("theme");
+  if(tb){ const sync = () => tb.textContent = document.documentElement.dataset.theme === "dark" ? "Light mode" : "Dark mode";
+    tb.onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; try{ localStorage.setItem("uplink_theme", t); }catch(e){} sync(); }; sync(); }
+  async function bar(){
+    let S; try{ S = await (await fetch("/api/state")).json(); }catch(e){ return; }
+    if($("clock")) $("clock").textContent = S.time || S.now || $("clock").textContent;
+    if($("mode") && S.mode){ const m = S.mode, who = (p, md) => p === "anthropic" ? `Claude${md ? " (" + md.replace(/^claude-/, "") + ")" : ""}` : p === "openai" ? (md || "open model") : "demo";
+      $("mode").textContent = `Agents: ${m.agents === "llm" ? who(m.vision === "anthropic" ? "anthropic" : "openai", m.agents_model) : "rules"} · Vision: ${who(m.vision, m.vision_model)} · Voice: ${m.voice === "elevenlabs" ? "ElevenLabs" : "browser"}`; }
+    const sc = $("scenario"); if(sc && !sc.options.length && S.scenarios) sc.innerHTML = S.scenarios.map(x => `<option value="${x.name}">${x.title.replace(/</g,"&lt;")}</option>`).join("");
+    if($("speed") && S.speed) $("speed").value = String(S.speed);
+    paused = !!S.paused; if($("pause")) $("pause").textContent = paused ? "Resume" : "Pause";
+    const n = (S.donations || []).filter(d => d.status === "awaiting_human").length;
+    const c = $("dec-count"); if(c){ c.hidden = !n; c.textContent = n; }
+  }
+  bar(); setInterval(bar, 2000);
+})();
 </script>
 </body>
 </html>

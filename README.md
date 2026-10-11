@@ -27,6 +27,12 @@ On a Mac, use `PORT=5050` because macOS reserves port 5000 for AirPlay.
 
 It runs with **no API key**: vision returns a demo pizza result and the agents use rules-based reasoning. The map needs internet for its tiles.
 
+### Run the agents on AGNTCY (optional)
+
+Shelter and driver agents can run as A2A agents over NATS with Cisco's AGNTCY app-sdk; the coordinators
+reach them by A2A broadcast, and every agent has an OASF record at `/agntcy/records`. See
+[docs/AGNTCY.md](docs/AGNTCY.md). Off by default; Uplink runs them in-process without it.
+
 ### Turn on the AI model and voices (keys in `.env`)
 
 ```bash

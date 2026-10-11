@@ -1,5 +1,5 @@
 const AGENTS = ["Speed","Cost","Need"];
-const GOALS = {Speed:"Fast, reliable, big safety margin", Cost:"Spend as little as possible", Need:"Feed whoever needs it most"};
+const GOALS = {Speed:"Cares about arrival time and driver reliability", Cost:"Cares about what the trip costs", Need:"Cares about which shelter: whoever has waited longest"};
 const COLORS = {Speed:"var(--speed)",Cost:"var(--cost)",Need:"var(--need)"};
 const ICON = {Speed:"",Cost:"",Need:""};   // agents are identified by name; color only reinforces it
 const OUTCOME = {
@@ -381,7 +381,10 @@ function drawGlobal(){
   const vals = {meals:i.meals, lbs:i.lbs, orgs:i.orgs, lost:i.spoiled, cost:"$"+i.cost.toFixed(2), esc:i.escalations};
   document.querySelectorAll("[data-k]").forEach(el=>{ el.textContent = vals[el.dataset.k]; if(el.hasAttribute("data-bad")) el.classList.toggle("nonzero", i.spoiled>0); });
   $("clock").textContent = S.now + (S.paused?" (paused)":"");
-  $("mode").textContent = `${S.mode.agents} agents · ${S.mode.vision} vision · ${S.mode.voice||"browser"} voice` + (S.mode.mesh ? ` · ${S.mode.mesh} agent services` : "");
+  $("mode").textContent = modeText(S.mode);
+  const ax = S.agntcy || {}, xp = $("xport");
+  if(xp){ xp.textContent = ax.on ? `AGNTCY · A2A over NATS · ${ax.agents} agents${ax.last_ms != null ? " · " + ax.last_ms + " ms" : ""}` : S.mode.mesh ? `Agent mesh · ${S.mode.mesh} agent services` : "in-process";
+    xp.title = ax.on ? `${ax.broadcasts} broadcasts, ${ax.messages} A2A messages so far` : (ax.reason || ""); xp.classList.toggle("on", !!(ax.on || S.mode.mesh)); }
   $("pause").textContent = S.paused ? "Resume" : "Pause";
   drawCamera();
   const pend = pendingList(), c = $("dec-count");
@@ -532,6 +535,35 @@ async function loadEvidence(force){
   evLoading = false; drawEvidence(evidence);
 }
 $("rerun").onclick = ()=>loadEvidence(true);
+// Together vs alone: the challenge's question, "can agents decide better together than individually?"
+function soloSection(R){
+  const T = R.totals; if(!T["solo:Speed"]) return "";
+  const P = [["solo:Speed","Speed alone","var(--speed)"],["solo:Cost","Cost alone","var(--cost)"],["solo:Need","Need alone","var(--need)"],["agents","Team (negotiating)","var(--brand)"]];
+  const bestSolo = Math.min(...P.slice(0,3).map(([p]) => T[p].servings_lost));
+  const fedSolo = Math.max(...P.slice(0,3).map(([p]) => T[p].shelters_fed));
+  const pct = Math.round(100 * (1 - T.agents.servings_lost / (bestSolo || 1)));
+  const num = v => Math.round(v).toLocaleString(), usd = v => "$" + Math.round(v).toLocaleString();
+  const metric = (label, key, fmt, better) => {
+    const max = Math.max(...P.map(([p]) => T[p][key])) || 1;
+    return `<div class="cbar"><div class="cbar-label">${label} <span class="muted">(${better})</span></div>` + P.map(([p, nm, c]) =>
+      `<div class="cbar-row"><span class="cbar-who">${nm}</span><div class="cbar-track"><i style="width:${Math.max(2, 100 * T[p][key] / max)}%;background:${c}" title="${nm}: ${fmt(T[p][key])}"></i></div><span class="cbar-val">${fmt(T[p][key])}</span></div>`).join("") + `</div>`;
+  };
+  const v = R.vs_solo || {};
+  return `<h2 class="sec-h">Together vs each agent alone</h2>
+    <p class="helper">Same ${R.n} random scenarios. "Alone" means one agent decides by itself with the same safety rules and no negotiation. Each one misses what it doesn't care about; together they cover each other.</p>
+    <div class="hero-row">
+      <div class="hero-stat"><b>${pct}%</b><span>less food lost than the best single agent</span></div>
+      <div class="hero-stat"><b>${v.team_best_or_tied ?? "–"} of ${R.n}</b><span>runs where the team lost the least food (or tied)</span></div>
+      <div class="hero-stat"><b>${num(T.agents.shelters_fed)}</b><span>shelters fed, vs ${num(fedSolo)} for the best agent alone</span></div>
+      <div class="hero-stat"><b>${usd(T["solo:Cost"].money_spent)}</b><span>Cost alone is cheapest, but loses ${num(T["solo:Cost"].servings_lost)} servings</span></div>
+    </div>
+    <div class="cbars four">
+      ${metric("Servings lost", "servings_lost", num, "lower is better")}
+      ${metric("Meals delivered safely", "meals_delivered_safely", num, "higher is better")}
+      ${metric("Shelters fed", "shelters_fed", num, "higher is better")}
+      ${metric("Paid-driver cost", "money_spent", usd, "lower is better")}
+    </div>`;
+}
 function drawEvidence(r){
   const b = r.random.totals.baseline, a = r.random.totals.agents, w = r.random.wins;
   const rel = (x,y)=> y ? Math.round(100*Math.abs(1-x/y)) : 0;
@@ -570,6 +602,7 @@ function drawEvidence(r){
       ${metric("Servings lost","servings_lost",num,"lower is better")}
       ${metric("Money spent on paid drivers","money_spent",usd,"lower is better")}
     </div>
+    ${soloSection(r.random)}
     <h2 class="sec-h">The ${sc.rows.length} scripted demo scenarios</h2>
     <p class="helper">Speed / Cost / Need alone: same safety rules, but one agent decides with no negotiation. Green = best in the row.</p>
     <div class="cmp-scroll"><table><thead><tr><th scope="col">Metric</th>${P.map(p=>`<th scope="col">${esc(sc.policies[p])}</th>`).join("")}</tr></thead><tbody>
@@ -659,7 +692,7 @@ function drawWire(){
 
   // the message log: network messages, then the debate lines as they're revealed
   const log = msgs.map(m => ({t:m.time, from:m.from, to:m.to === "network" ? "all shelters" : m.to, kind:m.kind, text:m.text}))
-    .concat(lines.slice(0, shown).map(l => ({t:n.time, from:l.agent, to:"team", kind:l.type === "objection" ? (/Veto/.test(l.text) ? "veto" : "object") : "propose", text:l.text.replace(/^R\d+ · /, "")})));
+    .concat(lines.slice(0, shown).map(l => ({t:n.time, from:l.agent === "News" ? "World" : l.agent, to:"team", kind:l.type === "objection" ? (/Veto/.test(l.text) ? "veto" : "object") : l.type === "news" ? "news" : l.type === "revise" ? "revise" : "propose", text:l.text.replace(/^R\d+ · /, "")})));
   if(done && n.plan) log.push({t:n.time, from:"Team", to:n.plan.np_name, kind:"decide", text:((OUTCOME[n.outcome]||{}).t || n.outcome) + ". " + n.plan.np_name + " via " + n.plan.driver_name});
   setHTML("wire-log", log.slice(-40).map(l => `<li class="k-${esc(l.kind)}"><span class="t">${esc(l.t||"")}</span><span class="r">${esc(short(l.from, 18))} → ${esc(short(l.to, 18))}</span><span class="kd">${esc(l.kind)}</span><span class="tx">${esc(l.text)}</span></li>`).join(""));
   const wl = $("wire-log"); wl.scrollTop = wl.scrollHeight;
@@ -743,4 +776,11 @@ function drawCall(){
   const tx = $("call-tx"); tx.scrollTop = tx.scrollHeight;
 }
 setInterval(() => { if(call && call.phase === "talk") drawCall(); }, 1000);
+
+// status badge: say plainly which AI is doing what
+function modeText(m){
+  const who = (prov, model) => prov === "anthropic" ? `Claude${model ? " (" + model.replace(/^claude-/, "") + ")" : ""}` : prov === "openai" ? (model || "open model") : "demo";
+  const agents = m.agents === "llm" ? who(m.vision === "anthropic" ? "anthropic" : "openai", m.agents_model) : "rules";
+  return `Agents: ${agents} · Vision: ${who(m.vision, m.vision_model)} · Voice: ${m.voice === "elevenlabs" ? "ElevenLabs" : "browser"}`;
+}
 

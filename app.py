@@ -14,6 +14,7 @@ import env
 env.load()   # API keys from .env (gitignored) before anything reads them
 
 import agents  # noqa: E402
+import agntcy_bridge  # noqa: E402
 import llm  # noqa: E402
 import menu  # noqa: E402
 import scenarios  # noqa: E402
@@ -162,10 +163,16 @@ def api_state():
         s = W().to_json()
     s["speed"] = state["speed"]
     s["paused"] = state["paused"]
-    s["mode"] = {"agents": "llm" if agents.use_llm() else "rules", "vision": llm.provider() or "demo",
+    prov = llm.provider()
+    claude = prov == "anthropic"
+    s["mode"] = {"agents": "llm" if agents.use_llm() else "rules", "vision": prov or "demo",
                  "voice": "elevenlabs" if voice.available() else "browser",
+                 # which models are actually answering, so the dashboard can credit them
+                 "agents_model": (os.getenv("AGENT_MODEL") or (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL if claude else os.getenv("OPENAI_MODEL", ""))) if agents.use_llm() else "",
+                 "vision_model": (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL) if claude else (os.getenv("OPENAI_MODEL", "") if prov else ""),
                  "mesh": len(MESH.agents()) if MESH else 0}   # agents running as separate services
     s["scenarios"] = [{"name": k, "title": v["title"]} for k, v in scenarios.SCENARIOS.items()]
+    s["agntcy"] = dict(agntcy_bridge.state)
     s["cameras"] = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
     return jsonify(s)
 
@@ -228,7 +235,10 @@ def api_vision():
         foods, source = vision.analyze_many(f.read(), f.mimetype or "image/jpeg", request.form.get("hint", ""))
         return jsonify(foods=foods, source=source)
     biz = request.form.get("business", "")
-    food, source = vision.analyze(f.read(), f.mimetype or "image/jpeg", menu.hint(biz))
+    extra = menu.hint(biz)
+    if request.form.get("frames"):   # a video, sent as a 2x2 grid of frames
+        extra = vision.VIDEO_NOTE + extra
+    food, source = vision.analyze(f.read(), f.mimetype or "image/jpeg", extra)
     if source not in ("demo", "fallback"):
         food = menu.enrich(food, biz)   # menu items bring their known allergens and category
     return jsonify(food=food, source=source)
@@ -248,6 +258,43 @@ def api_menu_add(biz):
         return jsonify(item=menu.add(biz, request.get_json(silent=True) or {}))
     except ValueError as e:
         return jsonify(error=str(e)), 400
+
+
+# ---------------- AGNTCY: agent cards and OASF records ----------------
+
+@app.get("/agntcy/records")
+def agntcy_records():
+    """Every Uplink agent as an OASF record (AGNTCY's agent description format), ready for an AGNTCY Directory."""
+    with lock:
+        recs, how = agntcy_bridge.oasf_records(W())
+    return jsonify(records=recs, count=len(recs), converted_by=how, transport=agntcy_bridge.state)
+
+
+@app.get("/agntcy/cards")
+def agntcy_cards():
+    """Every Uplink agent's A2A AgentCard."""
+    with lock:
+        return jsonify(cards=agntcy_bridge.all_cards(W()))
+
+
+@app.post("/api/voice/donation")
+def api_voice_donation():
+    """Hands-free donation: the business says what's left. ElevenLabs Scribe transcribes it (or the browser
+    sends its own transcript as 'text'), then Claude (or word matching) maps it onto the business's menu."""
+    biz = request.form.get("business", "")
+    text = (request.form.get("text") or "").strip()
+    f = request.files.get("audio")
+    stt = "browser"
+    if f and voice.available():
+        try:
+            text = voice.transcribe(f.read(), f.filename or "say.webm", f.mimetype or "audio/webm")
+            stt = "elevenlabs"
+        except Exception as e:  # noqa: BLE001
+            return jsonify(error=f"Couldn't transcribe that ({type(e).__name__}). Try again or tap items instead."), 502
+    if not text:
+        return jsonify(error="Didn't catch anything. Tap the mic and say what's left, like 'twenty turkey sandwiches'."), 400
+    lines, extras, parser = menu.parse_speech(biz, text)
+    return jsonify(heard=text, lines=lines, extras=extras, stt=stt, parser=parser)
 
 
 @app.post("/api/donate/menu")
@@ -400,11 +447,19 @@ def api_camera_status():
 def api_compare():
     """Scripted scenarios plus N seeded random runs. Deterministic, so cached after the first call."""
     n = max(5, min(200, int(request.args.get("n", 50))))
-    if n not in _compare_cache:
-        rnd = scenarios.compare_random(n)
-        rnd.pop("runs")
-        _compare_cache[n] = {"scripted": scenarios.compare(), "random": rnd}
-    return jsonify(_compare_cache[n])
+    return jsonify(compare_results(n))
+
+
+_compare_lock = threading.Lock()
+
+
+def compare_results(n=50):
+    with _compare_lock:   # the startup warm-up and a page load never compute it twice
+        if n not in _compare_cache:
+            rnd = scenarios.compare_random(n, solo=True)
+            rnd.pop("runs")
+            _compare_cache[n] = {"scripted": scenarios.compare(), "random": rnd}
+        return _compare_cache[n]
 
 
 if __name__ == "__main__":
@@ -414,6 +469,13 @@ if __name__ == "__main__":
     start_mesh()
     threading.Thread(target=clock_loop, daemon=True).start()
     threading.Thread(target=planner_loop, daemon=True).start()
+    st = agntcy_bridge.start(lambda: state["world"])   # shelter and driver agents on AGNTCY, if AGNTCY=1
+    if st["on"]:
+        print(f"Shelter and driver agents: {st['transport']} ({st['agents']} agents); negotiators "
+              + ("as separate services (agent mesh)" if MESH else "in-process"))
+    else:
+        print(f"Agent network: {'agent mesh (separate processes)' if MESH else 'in-process'} · {st['reason']}")
+    threading.Thread(target=compare_results, daemon=True).start()   # warm the Evidence page in the background
     port = int(os.getenv("PORT", "5050"))   # 5000 is taken by AirPlay on Macs
     print("Uplink · food rescue agents")
     print(f"Customer site: http://localhost:{port}   Schedule a pickup: http://localhost:{port}/#/schedule")

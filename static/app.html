@@ -4,10 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Uplink · Get your leftover food picked up</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap">
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+<script src="/static/vendor/leaflet/leaflet.js"></script>
+<link rel="stylesheet" href="/static/fonts/fonts.css">
 <link rel="stylesheet" href="/static/uplink.css">
 <link rel="stylesheet" href="/static/app.css">
 </head>
@@ -65,12 +64,24 @@
     <select id="biz"></select>
   </div>
   <div class="segmented" role="tablist" aria-label="How to add food">
-    <button type="button" role="tab" id="tab-menu" aria-selected="true" aria-controls="sch-menu">From your menu</button>
-    <button type="button" role="tab" id="tab-photo" aria-selected="false" aria-controls="sch-photo">Take a photo</button>
+    <button type="button" role="tab" id="tab-menu" aria-selected="true" aria-controls="sch-menu">Menu</button>
+    <button type="button" role="tab" id="tab-say" aria-selected="false" aria-controls="sch-say">Say it</button>
+    <button type="button" role="tab" id="tab-photo" aria-selected="false" aria-controls="sch-photo">Photo / video</button>
+  </div>
+
+  <div id="sch-say" role="tabpanel" aria-labelledby="tab-say" hidden>
+    <p class="lead">Hands full? Tap the mic and say what's left, like "twenty turkey sandwiches and two trays of pasta". We match it to your menu.</p>
+    <button class="mic-big" type="button" id="sayBtn" aria-describedby="sayStatus">
+      <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg>
+      <span id="sayLabel">Tap to talk</span>
+    </button>
+    <p class="say-status" id="sayStatus" role="status"></p>
+    <p class="say-credit">Speech to text by ElevenLabs Scribe. Matching to your menu by Claude.</p>
   </div>
 
   <div id="sch-menu" role="tabpanel" aria-labelledby="tab-menu">
     <p class="lead">Tap + on what you have left. Allergens come from your menu, so there's nothing to type.</p>
+    <div class="notice ok" id="sayNotice" hidden></div>
     <ul class="menu" id="menuList"></ul>
     <button class="add-toggle" type="button" id="addToggle" aria-expanded="false" aria-controls="addForm">+ Add something that's not on the menu</button>
     <div class="add-form" id="addForm" hidden>
@@ -91,13 +102,14 @@
   </div>
 
   <div id="sch-photo" role="tabpanel" aria-labelledby="tab-photo" hidden>
-    <p class="lead">Show everything in one shot. We match what we see to your menu.</p>
+    <p class="lead">Show everything in one shot, or pan slowly across it in a short video. We match what we see to your menu.</p>
     <label class="drop" for="file" id="dropLabel">
       <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-      <span id="dropText">Take or choose a photo</span>
+      <span id="dropText">Take or choose a photo or a short video</span>
     </label>
-    <input id="file" type="file" accept="image/*" capture="environment" class="sr-only">
+    <input id="file" type="file" accept="image/*,video/*" class="sr-only">
     <img id="preview" alt="Preview of your food photo">
+    <video id="previewVid" muted playsinline controls hidden></video>
     <button class="btn primary xl" id="analyze" type="button" disabled>Continue</button>
     <button class="linkbtn" id="skip" type="button">No photo? Type it in instead</button>
   </div>
@@ -171,7 +183,8 @@
 </main>
 
 <footer class="foot">
-  <a href="/ops">Behind the scenes (for judges) →</a>
+  <p class="powered">Photos read by Claude (Anthropic) · Voices by ElevenLabs</p>
+  <a href="/ops">Behind the scenes (for judges)</a>
 </footer>
 <script src="/static/app.js"></script>
 </body>

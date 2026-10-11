@@ -269,21 +269,33 @@ def run_scenario(sc, policy, max_minutes=900):
     return w.metrics()
 
 
-def compare_random(n=50, first_seed=1):
-    """Run the same n random scenarios through both policies. Returns totals, per-run results and win counts."""
+SOLO = ("solo:Speed", "solo:Cost", "solo:Need")
+
+
+def compare_random(n=50, first_seed=1, solo=False):
+    """Run the same n random scenarios through the baseline and the team (and, with solo=True, each agent
+    deciding alone with the same safety rules). Returns totals, per-run results and win counts."""
+    policies = ("baseline", "agents") + (SOLO if solo else ())
     runs = []
     for seed in range(first_seed, first_seed + n):
         sc = random_scenario(seed)
-        runs.append({"seed": seed, "baseline": run_scenario(sc, "baseline"), "agents": run_scenario(sc, "agents")})
+        runs.append({"seed": seed, **{p: run_scenario(sc, p) for p in policies}})
     keys = [k for k, v in runs[0]["agents"].items() if isinstance(v, (int, float))]
-    totals = {p: {k: round(sum(r[p][k] for r in runs), 2) for k in keys} for p in ("baseline", "agents")}
+    totals = {p: {k: round(sum(r[p][k] for r in runs), 2) for k in keys} for p in policies}
     lost = [(r["agents"]["servings_lost"], r["baseline"]["servings_lost"]) for r in runs]
     wins = {
         "less_food_lost": sum(a < b for a, b in lost),
         "same_food_lost": sum(a == b for a, b in lost),
         "more_food_lost": sum(a > b for a, b in lost),
     }
-    return {"n": n, "totals": totals, "wins": wins, "runs": runs}
+    out = {"n": n, "totals": totals, "wins": wins, "runs": runs}
+    if solo:
+        # together vs alone: in how many runs did the team lose less food than every single agent?
+        out["vs_solo"] = {
+            "team_best_or_tied": sum(r["agents"]["servings_lost"] <= min(r[p]["servings_lost"] for p in SOLO) for r in runs),
+            "team_strictly_best": sum(r["agents"]["servings_lost"] < min(r[p]["servings_lost"] for p in SOLO) for r in runs),
+        }
+    return out
 
 
 if __name__ == "__main__":
