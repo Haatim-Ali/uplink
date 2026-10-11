@@ -172,6 +172,7 @@ def api_state():
     claude = prov == "anthropic"
     s["mode"] = {"agents": "llm" if agents.use_llm() else "rules", "vision": prov or "demo",
                  "voice": "elevenlabs" if voice.available() else "browser",
+                 "llm_error": llm.auth_error(),
                  # which models are actually answering, so the dashboard can credit them
                  "agents_model": (os.getenv("AGENT_MODEL") or (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL if claude else os.getenv("OPENAI_MODEL", ""))) if agents.use_llm() else "",
                  "vision_model": (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL) if claude else (os.getenv("OPENAI_MODEL", "") if prov else ""),
@@ -483,6 +484,7 @@ if __name__ == "__main__":
     print("Uplink · food rescue agents")
     print(f"Customer site: http://localhost:{port}   Schedule a pickup: http://localhost:{port}/#/schedule")
     print(f"Ops dashboard (judges): http://localhost:{port}/ops   Shelter phone: http://localhost:{port}/shelter")
+    print("Claude:", llm.check_key())
     print(f"Agents: {'LLM' if agents.use_llm() else 'rules'} · Vision: {llm.provider() or 'demo (no API key)'}"
           f" · Voice: {'ElevenLabs' if voice.available() else 'browser (no ElevenLabs key)'}")
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
