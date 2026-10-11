@@ -100,7 +100,7 @@ function fillBusinesses(){
   f.innerHTML = `<option value="all">All businesses</option>` + bs.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join("");
   f.value = bs.some(b => b.id === cur) ? cur : "all";
 }
-$("biz").onchange = () => { store.set("uplink_biz", $("biz").value); qty = {}; loadMenu(); };
+$("biz").onchange = () => { store.set("uplink_biz", $("biz").value); qty = {}; extras = []; loadMenu(); };
 $("bizFilter").onchange = () => { if(S) drawDonations(); };
 function bizName(id){ const b = S && S.businesses.find(x => x.id === id); return b ? b.name : null; }
 
@@ -169,6 +169,27 @@ function shrink(file, maxEdge = 1568){
     img.src = url;
   });
 }
+// ---------- allergens: picked by a person; typed ingredients tick the ones they contain ----------
+const ALLERGENS = ["dairy","eggs","gluten","nuts","peanuts","soy","fish","shellfish","sesame"];
+const ALG_NAME = {nuts:"Tree nuts"};
+const ALG_ALIAS = {milk:"dairy", wheat:"gluten", egg:"eggs", "tree nuts":"nuts", "tree nut":"nuts", peanut:"peanuts"};
+const CONTAINS = {
+  dairy:/\b(milk|cheese|butter|cream|yogurt|ricotta|mozzarella|parmesan|cheddar|feta|whey|ghee|paneer)/,
+  eggs:/\b(eggs?|mayo|mayonnaise|aioli|meringue)\b/,
+  gluten:/\b(wheat|flour|bread|pasta|noodles?|lasagna|spaghetti|tortillas?|buns?|crust|barley|rye|couscous|croissants?|pastry|cake|cookies?|bagels?|croutons?|seitan)/,
+  nuts:/\b(almonds?|walnuts?|pecans?|cashews?|pistachios?|hazelnuts?|macadamias?|pine nuts?)/,
+  peanuts:/\bpeanut/, soy:/\b(soy|tofu|edamame|miso|tempeh)/,
+  fish:/\b(fish|salmon|tuna|cod|tilapia|anchov|halibut|trout|sardines?)/,
+  shellfish:/\b(shrimp|crab|lobster|prawns?|clams?|mussels?|oysters?|scallops?)/, sesame:/\b(sesame|tahini)/,
+};
+function algNorm(a){ a = String(a).trim().toLowerCase(); return ALG_ALIAS[a] || a; }
+function allergensIn(text){ const t = String(text).toLowerCase(); return ALLERGENS.filter(a => CONTAINS[a].test(t)); }
+function chipsHTML(sel, attr = ""){
+  return [...ALLERGENS, ...sel.filter(a => !ALLERGENS.includes(a))].map(a => { const on = sel.includes(a);
+    return `<button type="button" class="chip${on ? " on" : ""}" aria-pressed="${on}" data-a="${esc(a)}" ${attr}>${esc(ALG_NAME[a] || cap(a))}</button>`; }).join("");
+}
+function splitList(v){ return String(v).split(",").map(s => s.trim()).filter(Boolean); }
+
 function readForm(){
   const num = id => +$(id).value;
   return {
@@ -176,6 +197,7 @@ function readForm(){
     servings: num("servings"), safe_minutes: num("safe"),
     weight_lbs: [num("wlo"), num("whi")], category: $("category").value,
     allergens: $("allergens").value.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean),
+    ingredients: splitList($("ingredients").value),
     needs_cold: $("cold").checked, allergens_unverified: $("unsure").checked,
   };
 }
@@ -195,6 +217,13 @@ function drawSummary(){
     </ul>`);
 }
 ["items","servings","safe","wlo","whi","category","allergens","cold"].forEach(id => $(id).addEventListener("input", drawSummary));
+function setAllergens(list){ $("allergens").value = [...new Set(list.map(algNorm))].join(", "); $("algChips").innerHTML = chipsHTML(readForm().allergens); drawSummary(); }
+$("algChips").onclick = e => {
+  const b = e.target.closest("button[data-a]"); if(!b) return;
+  const cur = readForm().allergens;
+  setAllergens(cur.includes(b.dataset.a) ? cur.filter(a => a !== b.dataset.a) : [...cur, b.dataset.a]);
+};
+$("ingredients").addEventListener("input", () => setAllergens([...readForm().allergens, ...allergensIn($("ingredients").value)]));
 function notice(kind, text){ const n = $("notice"); n.hidden = !text; n.className = "notice " + (kind || ""); n.textContent = text || ""; }
 function openForm(open){ $("form").hidden = !open; $("edit").setAttribute("aria-expanded", String(open)); $("edit").textContent = open ? "Hide details" : "Edit details"; }
 $("edit").onclick = () => openForm($("form").hidden);
@@ -203,6 +232,8 @@ function showSource(r){
   $("servings").classList.remove("check"); $("items").classList.remove("check");
   if(r.source === "demo"){ notice("warn", "This is a sample result (demo mode), not your photo. Please edit anything that's wrong."); }
   else if(r.source === "fallback"){ notice("bad", "We couldn't read this photo. Please fill in what you have."); openForm(true); }
+  else if(f.off_menu && f.off_menu.length){ notice("warn", `Not on your menu: ${f.off_menu.join(", ")}. Please check its ingredients and allergens below, then untick "I'm not sure".${f.menu_matches ? ` The other ${f.menu_matches === 1 ? "item" : f.menu_matches + " items"} matched your menu.` : ""}`); openForm(true); }
+  else if(f.allergens_unverified){ notice("warn", `We couldn't confirm the allergens from the photo. Please check the ingredients and allergens below, then untick "I'm not sure".`); openForm(true); }
   else if(f.menu_matches){ notice("ok", `We matched ${f.menu_matches === 1 ? "1 item" : f.menu_matches + " items"} to your menu, so the allergens come from your recipes. Please check the amounts.`); }
   else if(f.confidence === "high"){ notice("ok", "We read your photo. Please check that it looks right."); }
   else { notice("warn", "We're not sure about the amount. Please check the number of servings."); openForm(true); }
@@ -210,7 +241,8 @@ function showSource(r){
 function fill(f){
   $("items").value = f.items.join(", "); $("servings").value = f.servings; $("safe").value = f.safe_minutes;
   $("wlo").value = f.weight_lbs[0]; $("whi").value = f.weight_lbs[1]; $("category").value = f.category;
-  $("allergens").value = f.allergens.join(", "); $("cold").checked = !!f.needs_cold; $("unsure").checked = !!f.allergens_unverified;
+  $("ingredients").value = (f.ingredients || []).join(", "); setAllergens(f.allergens);
+  $("cold").checked = !!f.needs_cold; $("unsure").checked = !!f.allergens_unverified;
   $("err").hidden = true; openForm(false); drawSummary();
   $("sch-pick").hidden = true; $("sch-confirm").hidden = false; setStep(2); window.scrollTo(0, 0);
 }
@@ -421,7 +453,7 @@ const touchDevice = matchMedia("(pointer: coarse)").matches;
 if(closingBtn) closingBtn.onclick = () => { location.hash = "#/schedule"; showTab("photo"); if(touchDevice) $("file").click(); };
 
 // ---------- your menu: tap + on what's left; allergens come from the recipes ----------
-let menuItems = [], menuFor = null, qty = {};
+let menuItems = [], menuFor = null, qty = {}, extras = [];   // extras: one-time leftovers that aren't on the menu
 const KIND = {"hot prepared":"Hot", "cold prepared":"Cold", packaged:"Packaged", produce:"Produce"};
 function showTab(which){
   ["menu","say","photo"].forEach(t => { $("tab-" + t).setAttribute("aria-selected", String(t === which)); $("sch-" + t).hidden = t !== which; });
@@ -435,47 +467,114 @@ async function loadMenu(){
   if(menuFor !== biz){ menuFor = biz; showTab(menuItems.length ? "menu" : "photo"); }
   drawMenu();
 }
+function qtyButtons(name, attr, n){
+  return `<div class="qty"><button type="button" aria-label="One fewer ${esc(name)}" ${attr} data-k="-1" ${n ? "" : "disabled"}>−</button>
+      <output aria-live="polite">${n}</output><button type="button" aria-label="One more ${esc(name)}" ${attr} data-k="1">+</button></div>`;
+}
+const KIND_OPTS = Object.entries({"hot prepared":"Hot, prepared", "cold prepared":"Cold, prepared", packaged:"Packaged", produce:"Produce"});
+function extraRow(x, i){
+  const serves = x.serves > 1 ? `Serves ${x.serves} each` : `1 serving each`;
+  const status = x.confirmed ? `<span class="checked">Allergens checked by you</span>` : `<span class="off-menu">Not on your menu · check allergens</span>`;
+  const row = `<li class="on"><div class="mi"><b>${esc(x.name)}</b><small>${serves} · ${x.allergens.length ? esc(x.allergens.join(", ")) : "no allergens picked"}</small>
+      <span class="kind">${KIND[x.category] || ""}${x.cold ? ", keep cold" : ""} · ${status}</span>
+      <button type="button" class="linkbtn x-open" data-x="${i}" aria-expanded="${!!x.open}">${x.open ? "Done" : "Check details"}</button></div>
+      ${qtyButtons(x.name, `data-x="${i}"`, x.qty)}</li>`;
+  if(!x.open) return row;
+  return row + `<li class="x-edit" data-x="${i}">
+      ${!x.sure && !x.confirmed ? `<p class="notice warn">We couldn't tell its allergens for sure. Add the ingredients or tap every allergen it contains.</p>` : ""}
+      <label>What is it?<input data-f="name" value="${esc(x.name)}" autocomplete="off"></label>
+      <div class="grid2"><label>Servings each<input data-f="serves" type="number" min="1" inputmode="numeric" value="${x.serves}"></label>
+      <label>Type of food<select data-f="category">${KIND_OPTS.map(([v, l]) => `<option value="${v}"${v === x.category ? " selected" : ""}>${l}</option>`).join("")}</select></label></div>
+      <label>Ingredients (separate with commas)<input data-f="ingredients" value="${esc(x.ingredients.join(", "))}" autocomplete="off" placeholder="for example: pasta, ricotta, spinach"></label>
+      <span class="lbl">Allergens it contains</span><div class="chips" role="group" aria-label="Allergens in ${esc(x.name)}">${chipsHTML(x.allergens)}</div>
+      <label class="check"><input type="checkbox" data-f="confirmed" ${x.confirmed ? "checked" : ""}><span>I've checked: these are all its allergens</span></label>
+      <label class="check"><input type="checkbox" data-f="save" ${x.save ? "checked" : ""} ${x.confirmed ? "" : "disabled"}><span>Save to my menu for next time<small>Leave this off for a one-time leftover.</small></span></label>
+    </li>`;
+}
 function drawMenu(){
-  $("menuList").innerHTML = menuItems.map(m => {
+  const once = extras.map(extraRow).join("");
+  $("menuList").innerHTML = once + menuItems.map(m => {
     const n = qty[m.id] || 0;
     const serves = m.serves > 1 ? `Serves ${m.serves} per ${esc(m.unit)}` : `1 serving each`;
     return `<li class="${n ? "on" : ""}"><div class="mi"><b>${esc(m.name)}</b><small>${serves}${m.allergens.length ? " · " + esc(m.allergens.join(", ")) : ""}</small>
       <span class="kind">${KIND[m.category] || ""}${m.cold ? ", keep cold" : ""}${m.added ? " · added by you" : ""}</span></div>
-      <div class="qty"><button type="button" aria-label="One fewer ${esc(m.name)}" data-id="${esc(m.id)}" data-k="-1" ${n ? "" : "disabled"}>−</button>
-      <output aria-live="polite">${n}</output><button type="button" aria-label="One more ${esc(m.name)}" data-id="${esc(m.id)}" data-k="1">+</button></div></li>`;
-  }).join("") || `<li class="none">Your menu is empty. Add what you have below, or take a photo.</li>`;
+      ${qtyButtons(m.name, `data-id="${esc(m.id)}"`, n)}</li>`;
+  }).join("") || (once ? "" : `<li class="none">Your menu is empty. Add what you have below, or take a photo.</li>`);
+  drawTotal();
+}
+function drawTotal(){
   const picked = menuItems.filter(m => qty[m.id] > 0);
-  const servings = picked.reduce((t, m) => t + qty[m.id] * m.serves, 0);
-  $("menuTotal").hidden = !picked.length || !$("addForm").hidden;   // don't cover the add form
-  $("mtCount").textContent = picked.length === 1 ? "1 item" : `${picked.length} items`;
-  $("mtServ").textContent = `About ${servings} servings`;
+  const count = picked.length + extras.length;
+  const servings = picked.reduce((t, m) => t + qty[m.id] * m.serves, 0) + extras.reduce((t, x) => t + x.qty * x.serves, 0);
+  const unchecked = extras.filter(x => !x.confirmed).length;
+  $("menuTotal").hidden = !count || !$("addForm").hidden;   // don't cover the add form
+  $("mtCount").textContent = count === 1 ? "1 item" : `${count} items`;
+  $("mtServ").textContent = `About ${servings} servings` + (unchecked ? ` · allergens not checked for ${unchecked}` : "");
+}
+function addExtra(e, open){
+  extras.push({name:e.name, qty:e.qty || 1, serves:e.serves || 1, category:e.category || "hot prepared", cold:!!e.cold,
+    ingredients:e.ingredients || [], allergens:(e.allergens || []).map(algNorm), sure:!!e.sure, confirmed:false, save:false, open});
 }
 $("menuList").onclick = e => {
-  const b = e.target.closest("button[data-id]"); if(!b) return;
-  qty[b.dataset.id] = Math.max(0, (qty[b.dataset.id] || 0) + (+b.dataset.k));
+  const ed = e.target.closest(".x-edit"), x = ed && extras[+ed.dataset.x];
+  const chip = e.target.closest("button[data-a]");
+  if(chip && x){
+    const a = chip.dataset.a; x.allergens = x.allergens.includes(a) ? x.allergens.filter(v => v !== a) : [...x.allergens, a];
+    drawMenu(); return;
+  }
+  const o = e.target.closest(".x-open");
+  if(o){ const y = extras[+o.dataset.x]; y.open = !y.open; drawMenu(); return; }
+  const b = e.target.closest("button[data-k]"); if(!b) return;
+  if(b.dataset.x !== undefined){   // a one-time item: down to zero takes it off the pickup
+    const x = extras[+b.dataset.x]; x.qty = Math.max(0, x.qty + (+b.dataset.k));
+    if(!x.qty) extras.splice(+b.dataset.x, 1);
+  } else qty[b.dataset.id] = Math.max(0, (qty[b.dataset.id] || 0) + (+b.dataset.k));
   drawMenu();
 };
+$("menuList").addEventListener("input", e => {   // typing in a one-time item's details: no redraw, so focus stays
+  const ed = e.target.closest(".x-edit"), f = e.target.dataset.f; if(!ed || !f || e.target.type === "checkbox") return;
+  const x = extras[+ed.dataset.x];
+  if(f === "serves") x.serves = Math.max(1, Math.min(200, +e.target.value || 1));
+  else if(f === "ingredients"){
+    x.ingredients = splitList(e.target.value);
+    const more = allergensIn(e.target.value).filter(a => !x.allergens.includes(a));
+    if(more.length){ x.allergens = [...x.allergens, ...more]; ed.querySelector(".chips").innerHTML = chipsHTML(x.allergens); }
+  }
+  else if(f === "category"){ x.category = e.target.value; x.cold = x.category === "cold prepared"; }
+  else x[f] = e.target.value.slice(0, 60);
+  drawTotal();
+});
+$("menuList").addEventListener("change", e => {
+  const ed = e.target.closest(".x-edit"), f = e.target.dataset.f; if(!ed || !f) return;
+  const x = extras[+ed.dataset.x];
+  if(e.target.type === "checkbox"){ x[f] = e.target.checked; if(f === "confirmed" && !x.confirmed) x.save = false; }
+  if(!x.name.trim()) x.name = "Food";
+  drawMenu();
+});
 $("addToggle").onclick = () => { const f = $("addForm"); f.hidden = !f.hidden; $("addToggle").setAttribute("aria-expanded", String(!f.hidden)); drawMenu(); if(!f.hidden) $("newName").focus(); };
 $("addSave").onclick = async () => {
   $("addErr").hidden = true;
-  const body = {name:$("newName").value, category:$("newKind").value, serves:+$("newServes").value || 1,
-    allergens:$("newAlg").value.split(",").map(x => x.trim()).filter(Boolean), cold:$("newKind").value === "cold prepared"};
-  try{
-    const r = await fetch("/api/menu/" + encodeURIComponent($("biz").value), {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
-    const j = await r.json(); if(!r.ok) throw new Error(j.error || "Couldn't add it.");
-    qty[j.item.id] = (qty[j.item.id] || 0) + 1;
-    $("newName").value = ""; $("newAlg").value = ""; $("newServes").value = 1; $("addForm").hidden = true; $("addToggle").setAttribute("aria-expanded","false");
-    await loadMenu();
-  }catch(e){ $("addErr").textContent = e.message; $("addErr").hidden = false; }
+  const text = $("newName").value.trim();
+  if(!text){ $("addErr").textContent = "Say what it is."; $("addErr").hidden = false; return; }
+  $("addSave").disabled = true; $("addSave").textContent = "Filling in the details…";
+  let j = null;
+  try{ j = await post("/api/menu/" + encodeURIComponent($("biz").value) + "/describe", {text}); }catch(e){}
+  $("addSave").disabled = false; $("addSave").textContent = "Add to this pickup";
+  if(j && (j.lines.length || j.extras.length)){
+    j.lines.forEach(l => qty[l.id] = (qty[l.id] || 0) + l.qty);   // it was on the menu after all
+    j.extras.forEach(e => addExtra(e, true));
+  } else addExtra({name:text.slice(0, 60)}, true);   // no estimate: the person fills it in
+  $("newName").value = ""; $("addForm").hidden = true; $("addToggle").setAttribute("aria-expanded","false");
+  drawMenu();
 };
 $("menuConfirm").onclick = async () => {
   const lines = Object.entries(qty).filter(([, n]) => n > 0).map(([id, n]) => ({id, qty:n}));
-  if(!lines.length) return;
+  if(!lines.length && !extras.length) return;
   $("menuConfirm").disabled = true; $("menuConfirm").textContent = "Scheduling…"; $("menuErr").hidden = true;
   try{
-    const r = await post("/api/donate/menu", {business:$("biz").value, lines});
+    const r = await post("/api/donate/menu", {business:$("biz").value, lines, extras});
     store.set("uplink_biz", $("biz").value); store.set("uplink_last", r.ids[0]); try{ sessionStorage.setItem("uplink_new", r.ids[0]); }catch(e){}
-    qty = {}; drawMenu();
+    qty = {}; extras = []; drawMenu();
     location.hash = "#/track/" + r.ids[0];
     refresh();
   }catch(e){ $("menuErr").textContent = "We couldn't schedule this. Check your connection and try again."; $("menuErr").hidden = false; }
@@ -495,10 +594,10 @@ async function sendSaid(form){
   if(!r || !r.ok){ sayState("Tap to talk", j.error || "Try again.", false); return; }
   if(!j.lines.length && !j.extras.length){ sayState("Tap to talk", `Heard "${j.heard}", but nothing on your menu matched. Try naming the items, or tap them on the menu.`, false); return; }
   j.lines.forEach(l => qty[l.id] = (qty[l.id] || 0) + l.qty);
-  const extra = j.extras.length ? ` Not on your menu: ${j.extras.map(e => `${e.name} ×${e.qty}`).join(", ")}. Add ${j.extras.length > 1 ? "them" : "it"} below.` : "";
+  j.extras.forEach(e => addExtra(e, !e.sure));   // not on the menu: on this pickup only; details open when unsure
+  const extra = j.extras.length ? ` Not on your menu, added for this pickup only: ${j.extras.map(e => `${e.name} ×${e.qty}`).join(", ")}. Please check ${j.extras.length > 1 ? "their" : "its"} ingredients and allergens.` : "";
   $("sayNotice").textContent = `Heard: "${j.heard}". We filled in ${j.lines.length === 1 ? "1 item" : j.lines.length + " items"} from your menu. Check the amounts, then schedule.${extra}`;
   $("sayNotice").hidden = false;
-  if(j.extras.length){ $("addForm").hidden = false; $("addToggle").setAttribute("aria-expanded","true"); $("newName").value = j.extras[0].name; }
   sayState("Tap to talk", "", false);
   showTab("menu"); drawMenu(); window.scrollTo(0, 0);
 }

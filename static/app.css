@@ -206,6 +206,16 @@ input,select{font-size:1.05rem;min-height:3.2rem;border-radius:14px;border-color
 .menu{list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:.6rem}
 .menu li{display:flex;align-items:center;gap:.75rem;background:var(--panel);border-radius:var(--r2);box-shadow:var(--shadow);padding:.85rem .85rem .85rem 1.1rem;border:2px solid transparent;transition:border-color .15s}
 .menu li.on{border-color:var(--brand)}
+.menu .off-menu{color:#6d4005;font-weight:700}
+.menu .checked{color:#14612f;font-weight:700}
+.menu .x-open{display:block;margin:.3rem 0 0;padding:0;font-size:.9rem}
+.menu li.x-edit{display:block;margin-top:-.4rem;padding:.25rem 1.1rem 1.1rem}
+.menu li.x-edit label:not(.check){display:block}
+.menu li.x-edit .notice{margin:.75rem 0 0}
+.lbl{display:block;font-weight:600;margin-top:1rem}
+.chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.5rem}
+.chip{border:1.5px solid var(--line-2);background:var(--panel);color:var(--ink);border-radius:99px;padding:.45rem .85rem;font:600 .9rem var(--font);cursor:pointer;min-height:2.4rem}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .menu li.none{color:var(--muted);justify-content:center;padding:1.5rem}
 .mi{flex:1;min-width:0}
 .mi b{display:block;font-size:1.05rem;line-height:1.25}

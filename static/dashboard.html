@@ -54,7 +54,7 @@
           </div>
           <div class="dd-sec">
             <h3>Sound and look</h3>
-            <div class="dd-row"><button class="btn sm" id="theme" type="button" title="Switch between dark and light (light is easier to read on some projectors)">Light mode</button><button class="btn sm" id="voice" type="button" aria-pressed="false" title="Each agent speaks its lines in its own voice (ElevenLabs; the browser's voice without a key)">Voices off</button></div>
+            <div class="dd-row"><button class="btn sm" id="theme" type="button" title="Switch between dark and light (light is easier to read on some projectors)">Light mode</button><button class="btn sm" id="voice" type="button" aria-pressed="false" title="Play the dispatcher's call to the shelter out loud (ElevenLabs voices)">Voices off</button></div>
           </div>
           <div class="dd-sec">
             <h3>Inject a problem</h3>
@@ -92,19 +92,28 @@
   </div>
   <a class="alert-strip" id="live-alert" href="#/decisions" hidden></a>
 
-  <div class="kpis" aria-label="Headline numbers">
-    <div class="kpi"><b data-k="meals">0</b><span>meals delivered safely</span></div>
-    <div class="kpi"><b data-k="orgs">0</b><span>organizations fed</span></div>
-    <div class="kpi"><b data-k="lost" data-bad>0</b><span>servings lost</span></div>
-    <div class="kpi"><b data-k="cost">$0</b><span>spent on paid drivers</span></div>
+  <!-- in the order the system works: the network answers and the three agents negotiate (side by side), then the
+       dispatcher's call and the delivery; the donation and the headline numbers sit above, unboxed -->
+  <div class="topline">
+    <div id="cur-don" class="cur-line"></div>
+        <div class="kpis plain" aria-label="Headline numbers">
+      <div class="kpi"><b data-k="meals">0</b><span>meals delivered safely</span></div>
+      <div class="kpi"><b data-k="orgs">0</b><span>organizations fed</span></div>
+      <div class="kpi"><b data-k="lost" data-bad>0</b><span>servings lost</span></div>
+      <div class="kpi"><b data-k="cost">$0</b><span>spent on paid drivers</span></div>
+    </div>
   </div>
 
-  <!-- the story, top to bottom: agents negotiate (left) while the network and the phone call show what that means (right);
-       then the donation, its message log and the map once the driver sets off -->
-  <div class="stage">
-    <div class="stage-left">
+  <div class="stage story">
+    <div class="row r1">
+      <div class="panel wire" aria-labelledby="wire-h">
+        <div class="panel-head"><h2 id="wire-h"><span class="stepno">1</span>Agent network <span class="sub-h">shelters answer, drivers bid, the three negotiators decide</span></h2><span class="wire-right"><span class="pill outline xport" id="xport" title="How the shelter and driver agents receive messages">in-process</span><span class="wire-stat" id="wire-stat"><i class="dot"></i>idle</span></span></div>
+        <svg id="wire" viewBox="0 0 1000 390" role="img" aria-label="Diagram of the business, shelter, driver and coordinator agents and the messages between them"></svg>
+        <div class="wire-log-wrap"><h3 class="log-h">Message log <span class="sub-h">every A2A message for this donation, in order</span></h3><ol class="wire-log" id="wire-log" aria-label="Message log"></ol></div>
+      </div>
+      <div class="stage-left">
       <div class="panel hero" id="hero-panel" hidden>
-        <div class="panel-head"><h2>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
+        <div class="panel-head"><h2><span class="stepno">2</span>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
         <div id="neg"></div>
         <details class="more" id="debate-more">
           <summary>See the debate <span class="muted small">transcript, votes by round</span></summary>
@@ -116,7 +125,7 @@
         </details>
       </div>
       <div class="panel hero-empty">
-        <div class="panel-head"><h2>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
+        <div class="panel-head"><h2><span class="stepno">2</span>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
         <div class="agents ghost" aria-hidden="true">
           <div class="agent Speed"><h3>Speed</h3><div class="goal">Cares about arrival time and driver reliability</div></div>
           <div class="agent Cost"><h3>Cost</h3><div class="goal">Cares about what the trip costs</div></div>
@@ -124,35 +133,19 @@
         </div>
         <p class="muted small empty-note">When a donation arrives, these three agents negotiate here. Run a scenario under Demo controls.</p>
       </div>
-      <div class="panel" id="cur-don"></div>
-    </div>
-
-    <div class="stage-right">
-      <div class="panel wire" aria-labelledby="wire-h">
-        <div class="panel-head"><h2 id="wire-h">Agent network <span class="sub-h">who is talking to whom</span></h2><span class="wire-right"><span class="pill outline xport" id="xport" title="How the shelter and driver agents receive messages">in-process</span><span class="wire-stat" id="wire-stat"><i class="dot"></i>idle</span></span></div>
-        <svg id="wire" viewBox="0 0 1000 390" role="img" aria-label="Diagram of the business, shelter, driver and coordinator agents and the messages between them"></svg>
       </div>
-
-      <div class="panel callp" aria-labelledby="call-h">
-        <div class="panel-head"><h2 id="call-h">Phone line <span class="sub-h">the dispatcher agent calls the chosen shelter</span></h2></div>
+    </div>
+    <div class="row r2">
+      <div class="callp open" aria-labelledby="call-h">
+        <div class="panel-head"><h2 id="call-h"><span class="stepno">3</span>Phone line <span class="sub-h">the dispatcher agent calls the chosen shelter</span></h2></div>
         <div class="call-badges"><span class="pill outline">Voices: ElevenLabs Flash v2.5</span><span class="pill outline">Speech to text: ElevenLabs Scribe</span></div>
         <div class="call-body">
           <div class="call-card" id="call-card"><p class="call-idle">No call yet. When the agents choose a shelter, the dispatcher agent calls it here.</p></div>
           <ol class="call-tx" id="call-tx" aria-live="polite" aria-label="Call transcript"></ol>
         </div>
       </div>
-    </div>
-  </div>
-
-  <div class="live-grid">
-    <div class="stack-col">
-      <div class="panel log-panel" aria-labelledby="log-h">
-        <div class="panel-head"><h2 id="log-h">Message log <span class="sub-h">every message between agents for this donation</span></h2></div>
-        <ol class="wire-log" id="wire-log" aria-label="Message log"></ol>
-      </div>
-    </div>
     <div class="panel map-panel">
-      <div class="panel-head"><h2>Map</h2><span class="muted small">Labeled pins are shelters in play</span></div>
+      <div class="panel-head"><h2><span class="stepno">4–5</span>Delivery</h2><span class="muted small">Labeled pins are shelters in play</span></div>
       <div id="map" role="img" aria-label="Map of businesses, shelters and drivers"></div>
       <ul class="legend" aria-label="Map legend">
         <li><i class="lg-np"></i>Shelter</li>
@@ -162,6 +155,8 @@
         <li><i class="lg-idle"></i>Idle driver</li>
         <li><i class="lg-line"></i>Route</li>
       </ul>
+    </div>
+    </div>
     </div>
   </div>
 </section>

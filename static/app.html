@@ -85,13 +85,9 @@
     <ul class="menu" id="menuList"></ul>
     <button class="add-toggle" type="button" id="addToggle" aria-expanded="false" aria-controls="addForm">+ Add something that's not on the menu</button>
     <div class="add-form" id="addForm" hidden>
-      <label for="newName">What is it?</label><input id="newName" autocomplete="off" placeholder="For example: vegetable soup">
-      <div class="grid2">
-        <div><label for="newKind">Type of food</label><select id="newKind"><option value="hot prepared">Hot, prepared</option><option value="cold prepared">Cold, prepared</option><option value="packaged">Packaged</option><option value="produce">Produce</option></select></div>
-        <div><label for="newServes">Servings each</label><input id="newServes" type="number" min="1" value="1" inputmode="numeric"></div>
-      </div>
-      <label for="newAlg">Allergens (separate with commas)</label><input id="newAlg" autocomplete="off" placeholder="for example: dairy, gluten">
-      <button class="btn primary lg" type="button" id="addSave" style="margin-top:1rem">Add to my menu</button>
+      <label for="newName">What is it, and how much?</label><input id="newName" autocomplete="off" placeholder="For example: vegetable lasagna, 3 trays">
+      <p class="hint">We'll fill in the details for you to check.</p>
+      <button class="btn primary lg" type="button" id="addSave" style="margin-top:1rem">Add to this pickup</button>
       <p class="err" id="addErr" role="alert" hidden></p>
     </div>
     <div class="menu-total" id="menuTotal" hidden>
@@ -134,7 +130,9 @@
       </div>
       <label for="category">Type of food</label>
       <select id="category"><option value="hot prepared">Hot, prepared</option><option value="cold prepared">Cold, prepared</option><option value="packaged">Packaged</option><option value="produce">Produce</option></select>
-      <label for="allergens">Allergens (separate with commas)</label><input id="allergens" placeholder="for example: wheat, milk" autocomplete="off">
+      <label for="ingredients">Ingredients (separate with commas)</label><input id="ingredients" placeholder="for example: pasta, ricotta, spinach" autocomplete="off">
+      <span class="lbl" id="algLbl">Allergens it contains</span>
+      <div class="chips" id="algChips" role="group" aria-labelledby="algLbl"></div><input id="allergens" type="hidden">
       <label class="check"><input id="cold" type="checkbox"><span>Needs to stay refrigerated</span></label>
     </div>
     <label class="check big"><input id="unsure" type="checkbox"><span>I'm not sure about the allergens<small>We may ask you one quick question.</small></span></label>

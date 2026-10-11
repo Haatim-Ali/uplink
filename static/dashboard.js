@@ -15,13 +15,15 @@ const OUTCOME = {
 let view = "live", sub = null;
 let S = null, roundSel = null, lastNegKey = null, pinned = null;
 // Debate playback: a new negotiation is revealed one message at a time, then the outcome lands.
-const PLAY_MS = 900;
+const PLAY_MS = 1200;   // one debate line every 1.2 s, slow enough to follow on a demo video
 let play = {seq: null, shown: 0, total: 0};
 setInterval(()=>{ if(voiceOn && speaking) return;   // with voices on, the next line waits for the current one
   if(play.seq !== null && play.shown < play.total){ play.shown++; if(S && view==="live") drawNegotiation(); } }, PLAY_MS);
 
 // ---- Voices: each agent speaks in its own ElevenLabs voice (browser voice if there's no key) ----
-let voiceOn = false, speaking = false, lastSpoken = null, speakTimer = null;
+let voiceOn = localStorage.getItem("uplink_voice") === "on", speaking = false, lastSpoken = null, speakTimer = null;
+let audioOK = false;   // browsers allow sound only after the first click or key press on the page
+["pointerdown", "keydown"].forEach(ev => addEventListener(ev, () => { if(!audioOK){ audioOK = true; try{ ringCtx(); }catch(e){} } }, {once: true}));
 const audioCache = {};
 const PITCH = {Speed:1.25, Cost:0.8, Need:1.05, Dispatch:1, Shelter:0.85};
 const plain = html => { const t = document.createElement("div"); t.innerHTML = html; return t.textContent; };
@@ -31,22 +33,6 @@ function audioFor(who, text){
   return audioCache[url];
 }
 function endSpeak(){ speaking = false; clearTimeout(speakTimer); }
-function browserSpeak(who, text){
-  if(!window.speechSynthesis){ endSpeak(); return; }
-  const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.rate = 1.08;
-  u.onend = u.onerror = endSpeak; speechSynthesis.speak(u);
-}
-function speak(who, text, next){
-  if(!voiceOn || !text) return;
-  who = PITCH[who] !== undefined ? who : "Dispatch";
-  speaking = true; clearTimeout(speakTimer); speakTimer = setTimeout(endSpeak, 20000);  // never stall the debate
-  if(S && S.mode && S.mode.voice === "elevenlabs"){
-    const a = audioFor(who, text); a.currentTime = 0;
-    a.onended = endSpeak; a.onerror = ()=>browserSpeak(who, text);
-    a.play().catch(()=>browserSpeak(who, text));
-    if(next) audioFor(next.agent in PITCH ? next.agent : "Dispatch", next.text);   // fetch the next line while this one plays
-  } else browserSpeak(who, text);
-}
 function replay(){ const n = pinned ? (S.negotiations||[]).find(h=>h.seq===pinned) : S.negotiation; if(!n) return; callFor = n.seq;
   play = {key: play.key, seq: n.seq, shown: 0, total: n.rounds.reduce((k,r)=>k+r.messages.length,0)}; drawNegotiation(); }
 const $ = id => document.getElementById(id);
@@ -124,6 +110,13 @@ function core(points){   // drop far-away outliers so the view fits the area tha
   const dist = p => Math.hypot(p[0]-c[0], p[1]-c[1]), lim = 2.5 * median(points.map(dist)) + 0.01;
   return points.filter(p => dist(p) <= lim);
 }
+function callPending(){
+  const n = S.negotiation; if(!n || !n.plan || pinned) return null;
+  const lines = n.rounds.reduce((t, r) => t + r.messages.length, 0);
+  const playing = play.seq === n.seq && play.shown < lines;
+  const calling = callFor === n.seq || (call && call.seq === n.seq && call.phase !== "ended");
+  return playing || calling ? n.donation : null;
+}
 function drawMap(){
   if(!map) return;
   const live = new Set(), F = focusSets();
@@ -152,7 +145,9 @@ function drawMap(){
 
   // routes: bold solid lines with an arrow near the destination
   layers.route.clearLayers();
-  const active = S.donations.filter(d=>d.status==="en_route" && d.plan);
+  // in order: a decision's route appears only once its debate replay and the dispatcher's call are over
+  const pend = callPending();
+  const active = S.donations.filter(d=>d.status==="en_route" && d.plan && d.id !== pend);
   const focus = [];
   active.forEach(d=>{
     const dr = S.drivers.find(x=>x.id===d.plan.driver); if(!dr) return;
@@ -194,7 +189,7 @@ function drawDonationCard(n){
   let d = n ? S.donations.find(x=>x.id===n.donation) : null;
   if(!d) d = S.donations.slice().reverse().find(x=>!["delivered","spoiled","expired"].includes(x.status)) || null;
   if(!d){
-    setHTML("cur-don", `<div class="empty-state"><p><b>No donation in progress</b></p><p class="muted">Choose a scenario under Demo controls and run it, or send a real donation from the Business page.</p><button class="btn primary sm" type="button" onclick="document.getElementById('start').click()">▶ Run selected scenario</button></div>`);
+    setHTML("cur-don", `<div class="empty-state"><p><b>No donation in progress</b></p><p class="muted">Run a scenario under Demo controls, or send a donation from the customer site.</p></div>`);
     return;
   }
   const live = !["delivered","spoiled","expired"].includes(d.status);
@@ -249,6 +244,7 @@ function drawNegotiation(){
     // already watched live as the agents spoke: no replay, straight to the result
     const watched = liveSeen.donation === n.donation && liveSeen.count > 0;
     play = {key: nkey, seq: n.seq, shown: watched ? msgs.length : 0, total: msgs.length}; callFor = n.seq; liveSeen = {donation: null, count: 0};
+    prefetchCall(n);
   }
   if(play.seq === null || play.seq === undefined){ play = {key: nkey, seq: n.seq, shown: msgs.length, total: msgs.length}; }   // old news
   wire();   // after the playback is set up for a new decision, so the diagram never flashes the final result first
@@ -264,7 +260,7 @@ function drawNegotiation(){
   const said = msgs.slice(0, shown);
   const cards = AGENTS.map(a=>{
     const pid = rr.proposals[a];
-    const last = said.filter(m => m.agent === a).pop();   // what this agent just said: the debate, visible without a click
+    const last = said.filter(m => m.agent === a && !(m.type === "propose" && !playing)).pop();   // what this agent just said (once settled, its vote, not a repeat of "Proposes")
     const quote = last ? `<div class="says ${last.type}${playing && said[said.length-1] === last ? " now" : ""}" title="${esc(last.text)}">“${esc(last.text)}”</div>` : "";
     return `<div class="agent ${a}"><div class="agent-top"><h3><span aria-hidden="true">${ICON[a]}</span><span class="a-name">${a}</span></h3><span class="wt" title="Vote weight. It grows when this agent's earlier warning about a driver turned out right.">vote ×${(n.weights||{})[a]??1}</span></div><div class="goal">${GOALS[a]}</div><div class="wants">Proposes: <b>${pid ? planName(pid) : "—"}</b></div>${quote}</div>`;
   }).join("");
@@ -278,14 +274,6 @@ function drawNegotiation(){
     <div class="neg-title"><div><span class="don-id">${esc(n.donation)}</span><b class="food">${esc(n.food)}</b></div><span class="pill outline" title="How the agents reason: fixed scoring rules, or an AI model (red lines are always enforced in code)">${n.mode==="llm"?"AI reasoning":"Rules reasoning"}</span></div>
     ${banner}
     <div class="agents">${cards}</div>`);
-  if(voiceOn && play.seq === n.seq){   // speak the newest line, then the outcome
-    const k = n.seq + ":" + (playing ? shown : "end");
-    if(k !== lastSpoken && !(speaking && !playing)){
-      lastSpoken = k;
-      if(playing && shown) speak(msgs[shown-1].agent, msgs[shown-1].text, msgs[shown]);
-      else if(!playing) speak("Dispatch", plain(o.t + ". " + (n.plan ? "Decision: " + planName(n.plan.id) : "")));
-    }
-  }
 
   if(!playing && n.plan && callFor === n.seq && !pinned){ callFor = null; startCall(n); }
   // nothing left to play for this decision (no plan, or no call coming): let the driver go now
@@ -549,7 +537,7 @@ async function refresh(){
 }
 let fastTimer = null;
 
-function resetLocal(){ lastNegKey=null; pinned=null; play={seq:0,shown:0,total:0}; lastSeq=0; }
+function resetLocal(){ lastNegKey=null; pinned=null; play={seq:0,shown:0,total:0}; lastSeq=0; call=null; callFor=null; endSpeak(); drawCall(); }
 $("start").onclick = async()=>{ closeMenus(); await post("/api/reset",{scenario:$("scenario").value}); resetLocal(); if(location.hash!=="#/live") location.hash = "#/live"; refresh(); };
 $("blank").onclick = async()=>{ closeMenus(); await post("/api/reset",{}); resetLocal(); refresh(); };
 $("speed").onchange = e=>post("/api/control",{speed:+e.target.value});
@@ -651,17 +639,19 @@ function drawEvidence(r){
 
 route(); refresh(); setInterval(refresh, 1000);
 
+const syncVoiceBtn = () => { const b = $("voice"); b.textContent = voiceOn ? "Voices on" : "Voices off"; b.classList.toggle("primary", voiceOn); b.setAttribute("aria-pressed", voiceOn); };
+syncVoiceBtn();
 $("voice").onclick = ()=>{
-  voiceOn = !voiceOn; ringCtx();
-  const b = $("voice"); b.textContent = voiceOn ? "Voices on" : "Voices off";
-  b.classList.toggle("primary", voiceOn); b.setAttribute("aria-pressed", voiceOn);
-  if(voiceOn){ toast(S && S.mode.voice==="elevenlabs" ? "Voices on (ElevenLabs). Replaying the debate." : "Voices on (browser voice; add an ElevenLabs key for real voices)", "info"); lastSpoken = null; if(S) replay(); }
+  voiceOn = !voiceOn; audioOK = true; ringCtx();
+  try{ localStorage.setItem("uplink_voice", voiceOn ? "on" : "off"); }catch(e){}
+  syncVoiceBtn();
+  if(voiceOn) toast(S && S.mode.voice==="elevenlabs" ? "Voices on: you'll hear the dispatcher's call" : "Voices need an ElevenLabs key in .env", S && S.mode.voice==="elevenlabs" ? "info" : "warn");
   else { endSpeak(); if(window.speechSynthesis) speechSynthesis.cancel(); Object.values(audioCache).forEach(a=>a.pause()); }
 };
 
 // ---------- Agent network: a live diagram of who is talking to whom for the current donation ----------
 const W_NS = "http://www.w3.org/2000/svg";
-const wireSeen = new Set();
+const wireSeen = new Map();   // line key -> {t: when it first appeared, delay: when it starts drawing}
 const short = (t, k=22) => { t = String(t||""); return t.length > k ? t.slice(0, k-1) + "…" : t; };
 function wireCurve(x1, y1, x2, y2, bend){ const mx = (x1+x2)/2, my = (y1+y2)/2 + (bend||0); return `M${x1},${y1} Q${mx},${my} ${x2},${y2}`; }
 // While the agents deliberate, the diagram follows the debate as it happens (S.deliberating), round by round.
@@ -707,10 +697,13 @@ function drawWire(){
   const done = !playing;
 
   const edges = [];
-  const add = (key, a, b, cls, bend) => { if(pos[a] && pos[b]) edges.push({key, a, b, cls, bend}); };
-  if(msgs.some(m => m.kind === "announce")) shelterNames.forEach(nm => add("ann:"+nm, "biz", "s:"+nm, "e-ann", 0));
-  Object.values(replies).forEach(m => add("rep:"+m.from+m.kind, "s:"+m.from, "biz", "e-"+m.kind, 26));
-  Object.values(bids).forEach(m => add("bid:"+m.from, "d:"+m.from, "hub", "e-bid", 0));
+  // a label sits to the right of its circle: lines leaving rightward start at the label's end so they never cross it
+  const LW = {biz: 205, s: 190, d: 190};
+  const tail = k => { const P = pos[k], w = k === "biz" ? LW.biz : LW[k.slice(0, 1)] || 0; return P && w ? {x: P.x + w, y: P.y} : P; };
+  const add = (key, a, b, cls, bend, fromTail, toTail) => { if(pos[a] && pos[b]) edges.push({key, a, b, cls, bend, A: fromTail ? tail(a) : pos[a], B: toTail ? tail(b) : pos[b]}); };
+  if(msgs.some(m => m.kind === "announce")) shelterNames.filter(nm => !replies[nm]).forEach(nm => add("ann:"+nm, "biz", "s:"+nm, "e-ann", 0, true));
+  Object.values(replies).forEach(m => add("rep:"+m.from+m.kind, "s:"+m.from, "biz", "e-"+m.kind, 26, false, true));
+  Object.values(bids).forEach(m => add("bid:"+m.from, "d:"+m.from, "hub", "e-bid", 0, true));
   // the debate: an objection draws an arc from the objector to whoever proposed that plan
   if(R && shown){
     const said = new Set(lines.slice(0, shown).filter(l => l.round === R.round).map(l => l.agent));
@@ -722,11 +715,17 @@ function drawWire(){
       });
     });
   }
-  if(done && chosenNp && pos["s:"+chosenNp]) add("award:"+n.seq, "hub", "s:"+chosenNp, "e-award", -70);
+  if(done && chosenNp && pos["s:"+chosenNp]) add("award:"+n.seq, "hub", "s:"+chosenNp, "e-award", -40, false, true);
 
   let html = `<g class="w-cols"><text x="30" y="18">Business</text><text x="280" y="18">Shelter agents</text><text x="550" y="18">Driver agents</text><text x="808" y="18">Coordinators</text></g>`;
-  html += edges.map(e => { const A = pos[e.a], B = pos[e.b], isNew = !wireSeen.has(n.seq + e.key);
-    return `<path class="edge ${e.cls}${isNew ? " new" : ""}" d="${wireCurve(A.x, A.y, B.x, B.y, e.bend)}"/>`; }).join("");
+  // new lines draw one after another in the order things happen: shelters answer, then drivers bid, then the debate
+  const stage = {"e-acc": 0, "e-cou": 0, "e-dec": 0, "e-bid": 1, "e-obj": 2, "e-awa": 2}, nth = [0, 0, 0];
+  const now = performance.now() / 1000;
+  html += edges.map(e => { const A = e.A, B = e.B, k = S.world_id + n.seq + e.key, g = stage[e.cls.split(" ")[0].slice(0, 5)] ?? 0;
+    if(!wireSeen.has(k)) wireSeen.set(k, {t: now, delay: (g === 1 ? 1.0 : 0) + 0.25 * nth[g]++});
+    const w = wireSeen.get(k), left = w.delay - (now - w.t);   // a redraw continues the animation where it was
+    const drawing = left > -1.0;
+    return `<path class="edge ${e.cls}${drawing ? " new" : ""}"${drawing ? ` style="animation-delay:${left.toFixed(2)}s"` : ""} d="${wireCurve(A.x, A.y, B.x, B.y, e.bend)}"/>`; }).join("");
   const node = (k, label, sub, cls) => { const P = pos[k]; return `<g class="node ${cls||""}" transform="translate(${P.x},${P.y})"><circle r="9"/><text x="16" y="-2">${esc(short(label, 20))}</text>${sub ? `<text x="16" y="14" class="sub">${esc(sub)}</text>` : ""}</g>`; };
   html += node("biz", d.business_name || "Business", `${d.food ? d.food.servings + " servings" : ""}`, "biz");
   shelterNames.forEach(nm => { const r = replies[nm];
@@ -740,7 +739,7 @@ function drawWire(){
     html += node(a, a, vetoed ? "veto" : wants, "coord " + a + (vetoed ? " vetoed" : "") + (n.live ? " thinking" : "")); });
   if(n.live) html += `<text x="770" y="378" text-anchor="middle" class="w-step">Deliberating · ${esc(step)}…</text>`;
   if(done){ const o = (OUTCOME[n.outcome] || {}).t || n.outcome; html += `<text x="770" y="378" text-anchor="middle" class="w-outcome ${n.outcome}">${esc(o)}</text>`; }
-  if(svg._h !== html){ svg._h = html; svg.innerHTML = html; edges.forEach(e => wireSeen.add(S.world_id + n.seq + e.key)); }
+  if(svg._h !== html){ svg._h = html; svg.innerHTML = html; }
 
   // the message log: network messages, then the debate lines as they're revealed
   const log = msgs.map(m => ({t:m.time, from:m.from, to:m.to === "network" ? "all shelters" : m.to, kind:m.kind, text:m.text}))
@@ -772,29 +771,41 @@ function ringTone(){
     o.connect(g).connect(actx.destination); o.start(actx.currentTime + t); o.stop(actx.currentTime + t + .4); }));
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
-function callSay(who, text){
+function callSay(who, say){
+  const text = say.replace(/\[[^\]]*\]\s*/g, "");
   return new Promise(resolve => {
     const done = () => { clearTimeout(t); resolve(); };
     const t = setTimeout(resolve, Math.max(2500, text.length * 75));   // never hang the call
-    if(!voiceOn){ clearTimeout(t); setTimeout(resolve, Math.max(1600, text.length * 45)); return; }
-    if(S && S.mode && S.mode.voice === "elevenlabs"){
-      const a = audioFor(who, text); a.currentTime = 0; a.onended = done;
-      a.onerror = () => { if(window.speechSynthesis){ const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.onend = done; speechSynthesis.speak(u); } else done(); };
-      a.play().catch(a.onerror);
-    } else if(window.speechSynthesis){ const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.rate = 1.05; u.onend = done; speechSynthesis.speak(u); }
-    else done();
+    if(!voiceOn || !audioOK){ clearTimeout(t); setTimeout(resolve, Math.max(1600, text.length * 45)); return; }
+    const silent = () => { clearTimeout(t); setTimeout(resolve, Math.max(1600, text.length * 45)); };
+    if(!(S && S.mode && S.mode.voice === "elevenlabs")) return silent();
+    const a = audioFor(who, say); a.currentTime = 0; a.onended = done; a.onerror = silent;
+    a.play().catch(silent);
   });
 }
+// The call, written to be spoken: contractions, pauses (…), CAPITALS for emphasis and ElevenLabs v3 cues in [brackets].
+// "say" is spoken; "text" (cues removed) is the transcript. The shelter's answer is its agent's real reply.
+const ampm = t => { const [h, m] = String(t || "").split(":").map(Number); return isNaN(h) ? String(t || "") : `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
+const shortNp = nm => String(nm || "").replace(/\s*\(.*\)$/, "");
 function callScript(n){
   const d = S.donations.find(x => x.id === n.donation) || {food:{items:[], servings:0}};
   const np = n.plan.np_name, drv = String(n.plan.driver_name || "").split(" (")[0];
   const reply = (S.network || []).filter(m => m.donation === n.donation && m.from === np && ["accept","counter","decline"].includes(m.kind)).pop();
-  const items = (d.food.items || []).join(", ");
-  const ask = `Hi ${np}, this is the Uplink dispatcher. ${d.business_name || "A business"} has ${d.food.servings} servings of ${items}${d.food.needs_cold ? ", and it has to stay cold" : ""}. ${drv} can bring it by ${n.plan.arrive_hhmm}. Can you take it?`;
-  const ans = reply ? reply.text : "Yes, please send it over.";
-  const close = !reply || reply.kind === "accept" ? `Great. ${drv} is on the way. Thank you!` : reply.kind === "counter" ? "Got it. We'll send you that much and find a home for the rest." : "Understood. We'll try another shelter.";
-  return {np, lines:[{who:"Dispatch", side:"a", name:"Uplink dispatcher", text:ask}, {who:"Shelter", side:"b", name:np, text:ans}, {who:"Dispatch", side:"a", name:"Uplink dispatcher", text:close}]};
+  const items = (d.food.items || []).join(" and ").toLowerCase();
+  const take = reply && (reply.text.match(/take (\d+)/) || [])[1];
+  const biz = d.business_name || "a business nearby", when = ampm(n.plan.arrive_hhmm);
+  const ask = `Hi, is this ${shortNp(np)}? … Hey! It's the Uplink dispatcher. So, ${biz} just closed up with ${d.food.servings} servings of ${items}${d.food.needs_cold ? ", and they REALLY need to stay cold" : ""}. ${drv} can have it to you by ${when}. [curious] Any chance you can take it?`;
+  const ans = !reply || reply.kind === "accept" ? `[excited] Oh, that's PERFECT timing! Yeah, we can take all ${d.food.servings}. Send it over!`
+    : reply.kind === "counter" ? `[sighs] Hmm… we're pretty tight on space tonight. We could take ${take || "some"} of them, though?`
+    : `[sighs] Ah, I'm so sorry… we're actually full right now.`;
+  const close = !reply || reply.kind === "accept" ? `Amazing! ${drv}'s heading your way now. Thank you SO much!`
+    : reply.kind === "counter" ? `No problem at all. We'll send you ${take || "what you can take"}, and find a home for the rest. Thanks!`
+    : `Totally get it. We'll try somewhere else… thanks anyway!`;
+  const ln = (who, side, name, say) => ({who, side, name, say, text: say.replace(/\[[^\]]*\]\s*/g, "")});
+  return {np, lines:[ln("Dispatch", "a", "Uplink dispatcher", ask), ln("Shelter", "b", np, ans), ln("Dispatch", "a", "Uplink dispatcher", close)]};
 }
+// generate the call's audio while the debate replays, so the call starts without a pause
+function prefetchCall(n){ if(voiceOn && n && n.plan && S.mode && S.mode.voice === "elevenlabs") try{ callScript(n).lines.forEach(l => audioFor(l.who, l.say)); }catch(e){} }
 async function startCall(n){
   const sc = callScript(n);
   const me = call = {seq:n.seq, donation:n.donation, np:sc.np, phase:"ringing", said:[], talking:null, t0:Date.now(), voiced:[]};
@@ -806,7 +817,7 @@ async function startCall(n){
   for(const ln of sc.lines){
     if(call !== me) return;
     me.talking = ln.side; me.said.push(ln); drawCall();
-    await callSay(ln.who, ln.text);
+    await callSay(ln.who, ln.say);
     me.talking = null; drawCall(); await wait(350);
   }
   me.phase = "ended"; me.secs = Math.round((Date.now() - me.t0) / 1000); drawCall();

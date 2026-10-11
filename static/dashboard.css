@@ -371,7 +371,7 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .w-cols text{font:600 11px var(--mono);fill:var(--faint);text-anchor:start;letter-spacing:.04em}
 .w-empty{font:500 14px var(--font);fill:var(--muted)}
 .edge{fill:none;stroke-width:1.6;opacity:.75}
-.edge.new{stroke-dasharray:600;stroke-dashoffset:600;animation:wdraw .9s ease-out forwards}
+.edge.new{stroke-dasharray:600;stroke-dashoffset:600;animation:wdraw 1s ease-in-out forwards}
 @keyframes wdraw{to{stroke-dashoffset:0}}
 .e-ann{stroke:var(--line-2);stroke-dasharray:3 4;opacity:.9}
 .e-ann.new{stroke-dasharray:3 4;animation:none}
@@ -512,3 +512,52 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .live-grid:has(.log-panel){align-items:stretch}
 .log-panel{display:flex;flex-direction:column}
 .log-panel .wire-log{flex:1 1 0;min-height:16rem;max-height:none}
+
+/* ---------- Live view in the order the system works ---------- */
+/* only the agent network, the negotiation and the map are boxed; everything else sits on the page */
+.topline{display:flex;justify-content:space-between;align-items:flex-end;gap:2rem;flex-wrap:wrap;margin:.25rem 0 1.5rem;padding-bottom:1.25rem;border-bottom:1px solid var(--line)}
+.cur-line{flex:1 1 32rem;min-width:0}
+.cur-line .cd{display:grid;gap:.35rem}
+.cur-line .cd-top{justify-content:flex-start;gap:.6rem}
+.cur-line .card-title{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--faint);font-weight:700}
+.cur-line .cd-food{font-size:var(--t-2xl);font-weight:800;letter-spacing:-.01em;line-height:1.15}
+.cur-line .cd-route{color:var(--ink-2)}
+.cur-line .tbar{max-width:28rem}
+.cur-line .empty-state{padding:0;text-align:left}
+.kpis.plain{display:flex;gap:2.25rem;margin:0;flex-wrap:wrap}
+.kpis.plain .kpi{background:none;border:none;padding:0}
+.kpis.plain .kpi b{font-size:var(--t-2xl)}
+.kpis.plain .kpi span{font-size:var(--t-xs)}
+
+.stepno{display:inline-grid;place-items:center;min-width:1.6rem;height:1.6rem;padding:0 .4rem;margin-right:.55rem;border-radius:999px;vertical-align:.12em;
+  background:var(--brand-soft);color:var(--brand-ink);font:700 var(--t-xs)/1 var(--font);letter-spacing:0}
+
+.stage.story{display:block;margin-bottom:0}
+.stage.story .row{display:grid;gap:1.5rem;margin-bottom:1.75rem}
+.stage.story .r1{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:stretch}
+.stage.story .r2{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);align-items:start}
+.stage.story .r3{grid-template-columns:1fr}
+.stage.story .stage-left{display:grid;gap:0;align-content:stretch}
+.stage.story .stage-left > .panel{height:100%}
+.stage.story .map-panel{position:static}
+.stage.story #map{height:clamp(22rem,50vh,34rem)}
+/* unboxed sections */
+.callp.open,.log-panel.open{background:none;border:none;padding:0}
+.callp.open .panel-head,.log-panel.open .panel-head{margin-bottom:.75rem}
+.callp.open h2,.log-panel.open h2{font-size:var(--t-lg);font-weight:800}
+.log-panel.open .wire-log{max-height:22rem;min-height:0}
+@media (max-width:1100px){.stage.story .r1,.stage.story .r2{grid-template-columns:1fr}}
+.stage.story .wire{display:flex;flex-direction:column}
+.stage.story .wire-log-wrap{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;margin-top:1rem;border-top:1px solid var(--line);padding-top:.85rem}
+.log-h{font-size:var(--t-md);font-weight:800;margin-bottom:.55rem}
+.stage.story .wire-log-wrap .wire-log{flex:1 1 0;min-height:9rem;max-height:none;overflow:auto}
+.callp.open .call-tx:empty{display:none}
+.callp.open .call-card{background:none;border:1px dashed var(--line-2)}
+.stage.story .wire-log-wrap .wire-log{min-height:6rem}
+.callp.open .call-card:has(.call-idle){min-height:0;padding:1.25rem 1rem}
+/* agent network on the page itself (no box), wider than the negotiation; its message log keeps a box */
+.stage.story .r1{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}
+.stage.story .wire.panel{background:none;border:none;padding:0;border-radius:0}
+.stage.story .wire-log-wrap{border-top:none;padding:1rem 1.1rem;margin-top:1.1rem;background:var(--panel);border:1px solid var(--line);border-radius:var(--r3)}
+.stage.story .wire-log-wrap .wire-log{background:none;padding:0 .1rem}
+.stage.story .r1 .agents{gap:.6rem}

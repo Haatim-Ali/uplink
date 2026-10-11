@@ -61,8 +61,10 @@ Return ONLY a JSON object, no other text:
              "how_counted": "3 rows of 4"}],
  "category": "hot prepared" | "cold prepared" | "packaged" | "produce",
  "needs_cold": true/false (must it stay refrigerated?),
- "allergens": ["dairy","gluten","eggs","nuts","peanuts","soy","fish","shellfish"] (only likely ones),
- "allergens_uncertain": true/false (true if allergens you can't see may be present, e.g. nuts in baked goods),
+ "ingredients": ["main ingredients you can see or that this dish is made with"],
+ "allergens": ["dairy","gluten","eggs","nuts","peanuts","soy","fish","shellfish","sesame"] (only ones you can confirm:
+     visible, on a label, or always in this dish, like cheese on pizza; don't guess),
+ "allergens_uncertain": true/false (true if any allergen depends on a recipe you can't see, e.g. nuts in baked goods),
  "confidence": "high" | "medium" | "low",
  "notes": "one short sentence about anything uncertain"}
 If the photo does not show food, return {"is_food": false, "notes": "what the photo shows"}."""
@@ -167,6 +169,7 @@ def from_counts(data):
         "weight_lbs": weight,
         "allergens": data.get("allergens") or [],
         "allergens_uncertain": bool(data.get("allergens_uncertain")),
+        "ingredients": [str(i) for i in (data.get("ingredients") or []) if str(i).strip()][:20],
         "category": category,
         "needs_cold": bool(data.get("needs_cold")),
         "safe_minutes": SAFE_MINUTES[category],
@@ -257,6 +260,7 @@ def combine(readings, split_total=None):
     base["servings"], base["weight_lbs"] = _amounts(groups)
     base["allergens"] = sorted({a for r in readings for a in r["allergens"]})
     base["allergens_uncertain"] = any(r["allergens_uncertain"] for r in readings)
+    base["ingredients"] = list(dict.fromkeys(i for r in readings for i in r.get("ingredients", [])))
     base["needs_cold"] = any(r["needs_cold"] for r in readings)
     spread = (hi_t - lo_t) / mid if mid else 0
     conf = base["confidence"]
