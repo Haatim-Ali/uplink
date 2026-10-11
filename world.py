@@ -424,10 +424,11 @@ class World:
             if not self.live:
                 self.approve(d["id"], d["options"][0]["id"], auto="scripted")
             return
-        label = {"consensus": "Agreed 3 of 3", "majority": "Majority", "urgent": "Time is short, acting on best-supported plan"}[result["outcome"]]
+        label = {"consensus": "Agreed 3 of 3", "majority": "Majority 2 of 3", "urgent": "Time is short, acting on best-supported plan"}[result["outcome"]]
         d["dissent"] = result["dissent"]
         if result["dissent"]:
-            label += " · dissent kept on record: " + ", ".join(x["agent"] for x in result["dissent"])
+            who = " and ".join(x["agent"] for x in result["dissent"])
+            label += f" ({who} {'disagrees' if len(result['dissent']) == 1 else 'disagree'}, kept on record)"
         if reconsidering:
             d.pop("locked_driver", None)
             if plan["np"] == d["plan"]["np"]:
