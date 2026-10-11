@@ -1,4 +1,5 @@
 """Every tuning knob in one place. Change these to make the agents argue more or less."""
+import os
 
 # --- world ---
 SPEED_KMH = 28.0         # average city driving speed
@@ -30,3 +31,7 @@ JOIN_BONUS = 0.25        # how much Cost values a combined trip (it keeps anothe
 # --- agent network ---
 MIN_LOT = 5              # smallest split a shelter will counter-offer, in servings
 VOLUNTEER_MAX_KM = 12    # default farthest trip a volunteer driver agrees to (drivers can set their own max_km)
+
+# --- photo reading ---
+VISION_READS = int(os.getenv("VISION_READS", "3"))      # most readings per photo; extra ones only when the first is unsure
+VISION_SPLIT_MIN = int(os.getenv("VISION_SPLIT_MIN", "20"))  # with this many items or more, also count each half up close

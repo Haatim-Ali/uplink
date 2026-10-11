@@ -463,6 +463,35 @@ def test_new_information_opens_the_replan_and_each_agent_says_if_it_changed_its_
     assert any(m["text"].startswith("That changes my pick") for m in first if m["type"] == "revise")
 
 
+def test_a_rejected_key_stops_ai_calls_and_falls_back():
+    import llm
+    saved = (llm._call, llm._auth_error, os.environ.get("ANTHROPIC_API_KEY"))
+    calls = []
+
+    class Unauthorized(Exception):
+        status_code = 401
+
+    def bad(*a, **k):
+        calls.append(1)
+        raise Unauthorized("invalid x-api-key")
+    os.environ["ANTHROPIC_API_KEY"] = "sk-ant-test-0000"
+    llm._call, llm._auth_error = bad, None
+    try:
+        for _ in range(3):
+            try:
+                llm.chat_json("s", "u", retries=2)
+            except Exception:
+                pass
+        assert len(calls) == 1, "a 401 must not be retried or repeated"
+        assert llm.provider() is None and not llm.available() and "rejected" in llm.auth_error()
+    finally:
+        llm._call, llm._auth_error = saved[0], saved[1]
+        if saved[2] is None:
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+        else:
+            os.environ["ANTHROPIC_API_KEY"] = saved[2]
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

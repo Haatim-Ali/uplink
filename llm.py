@@ -35,10 +35,55 @@ def _load_env_file(path=os.path.join(HERE, ".env")):
             os.environ.setdefault(key.strip(), value.strip().strip("'\""))
 
 
+# Was the key set in the terminal (or ~/.zshrc) before .env was read? That one wins over .env.
+try:   # app.py reads .env (env.py) before importing this module, so ask env.py what the terminal had
+    import env as _env
+    KEY_FROM_SHELL = "ANTHROPIC_API_KEY" in _env.SHELL_KEYS
+except Exception:  # noqa: BLE001
+    KEY_FROM_SHELL = "ANTHROPIC_API_KEY" in os.environ
 _load_env_file()
+_auth_error = None   # set once a provider rejects the key; then we stop calling it and fall back
+
+
+def _is_auth_error(e):
+    status = getattr(e, "status_code", None) or getattr(getattr(e, "response", None), "status_code", None)
+    return status in (401, 403) or type(e).__name__ in ("AuthenticationError", "PermissionDeniedError")
+
+
+def key_hint():
+    """'sk-ant-…a1b2 (from .env)' so you can tell which key is being used without printing it."""
+    k = os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+    if not k:
+        return "no key"
+    src = "from your terminal or ~/.zshrc, which wins over .env" if (os.getenv("ANTHROPIC_API_KEY") and KEY_FROM_SHELL) else "from .env"
+    hint = f"{k[:7]}…{k[-4:]} ({src})"
+    if not k.startswith(("sk-ant-", "sk-")) and os.getenv("ANTHROPIC_API_KEY"):
+        hint += f"; Claude keys start with 'sk-ant-', this one starts with '{k[:7]}'"
+    return hint
+
+
+def auth_error():
+    return _auth_error
+
+
+def check_key():
+    """One cheap call at startup so a bad key shows up immediately, not as silent fallbacks."""
+    global _auth_error
+    if provider() != "anthropic":
+        return "no Claude key" if not os.getenv("OPENAI_API_KEY") else "OpenAI-compatible key set"
+    try:
+        _claude().models.list(limit=1)
+        return f"Claude key OK: {key_hint()}"
+    except Exception as e:  # noqa: BLE001
+        if _is_auth_error(e):
+            _auth_error = f"Claude rejected the key {key_hint()}"
+            return _auth_error + ". Paste a valid key into .env (ANTHROPIC_API_KEY=...) and restart."
+        return f"Couldn't check the Claude key ({type(e).__name__}); will try when needed"
 
 
 def provider():
+    if _auth_error:
+        return None   # the key was rejected: behave as if there were no key (rules agents, demo vision)
     if os.getenv("ANTHROPIC_API_KEY"):
         return "anthropic"
     if os.getenv("OPENAI_API_KEY"):
@@ -66,6 +111,9 @@ def chat_json(system, user, image_b64=None, media_type="image/jpeg", max_tokens=
               effort="medium"):
     """Ask the model for a JSON object. Raises on failure (callers fall back).
     effort (Claude only): "low" for quick agent votes, "high" for careful photo counting."""
+    global _auth_error
+    if _auth_error:
+        raise RuntimeError(_auth_error)
     last = None
     for _ in range(retries + 1):
         try:
@@ -73,6 +121,12 @@ def chat_json(system, user, image_b64=None, media_type="image/jpeg", max_tokens=
             return _extract_json(text)
         except Exception as e:  # noqa: BLE001 - we retry then re-raise
             last = e
+            if _is_auth_error(e):   # a bad key won't fix itself: stop calling, say so once
+                if not _auth_error:
+                    _auth_error = f"Claude rejected the key {key_hint()}"
+                    print(f"!! {_auth_error}. Falling back to rules agents and demo vision. "
+                          "Paste a valid key into .env (ANTHROPIC_API_KEY=...) and restart.", flush=True)
+                break
     raise last
 
 

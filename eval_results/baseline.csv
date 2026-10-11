@@ -1,0 +1,18 @@
+file,want,said,low,high,named,in_range,error,confidence,seconds
+bagels_0.jpg,6.0,sesame bagels; plain bagels; poppy seed bagels; everything bagels,6,6,True,True,0.0,medium,11.3
+box_of_donuts_0.jpg,12.0,cinnamon sugar donuts; honey/classic glazed donuts; chocolate glazed donuts; vanilla/white glazed donuts; chocolate coconut donut; chocolate sprinkle donut; pink (strawberry) glazed donut,12,12,True,True,0.0,high,11.3
+bread_rolls_tray_0.jpg,11.0,golden-brown scored bread rolls (pretzel-style or egg-washed); pale scored bread rolls,11,11,True,True,0.0,high,7.5
+bread_rolls_tray_1.jpg,14.0,"browned scored bread rolls (pretzel-style, glossy crust); pale scored bread rolls",14,14,True,True,0.0,high,9.5
+bread_rolls_tray_2.jpg,15.0,glazed bread rolls (brioche-style buns),15,17,True,True,0.067,medium,10.6
+cinnamon_rolls_pan_2.jpg,7.0,"cinnamon rolls (unbaked, proofed dough)",7,8,True,True,0.071,medium,7.0
+cinnamon_rolls_pan_3.jpg,7.0,unbaked cinnamon rolls,7,7,True,True,0.0,high,5.2
+cookies_baking_sheet_0.jpg,12.0,oatmeal chocolate chip cookies,12,12,True,True,0.0,high,6.6
+cookies_baking_sheet_1.jpg,10.0,chocolate chip oatmeal drop cookies (possibly peanut butter),10,10,True,True,0.0,high,6.5
+dumplings_steamer_basket_0.jpg,8.0,soup dumplings (xiao long bao),8,8,True,True,0.0,high,6.2
+dumplings_steamer_basket_3.jpg,3.0,shrimp dumplings (har gow),3,3,True,True,0.0,high,5.2
+egg_carton_0.jpg,6.0,brown eggs; white eggs,6,6,True,True,0.0,high,5.7
+macarons_box_1.jpg,18.0,pink macarons with chocolate filling; brown macarons with yellow/gold filling,18,18,True,True,0.0,high,10.3
+muffins_baking_tray_0.jpg,12.0,poppy seed muffins,12,12,True,True,0.0,high,10.6
+muffins_baking_tray_3.jpg,12.0,pink cream/mousse cups topped with a raspberry; pink cream/mousse cups without a raspberry topping,12,12,True,True,0.0,high,8.4
+burritos_3.jpg,3.0,"mole tamales (labeled 'mole'); red/rojo tamales (labeled, likely 'rojo')",0,0,False,False,,low,10.2
+sushi_platter_2.jpg,20.0,lean tuna nigiri; fatty tuna nigiri; squid nigiri; white fish nigiri; shrimp nigiri; glazed eel nigiri (likely anago); silver-skinned mackerel-type nigiri; salmon nigiri; clam nigiri (likely surf clam); sea urchin gunkan; salmon roe gunkan; tuna maki roll pieces,20,20,True,True,0.0,medium,16.8

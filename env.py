@@ -5,6 +5,7 @@ Each line looks like  NAME=value . Variables already set in the terminal win ove
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+SHELL_KEYS = set(os.environ)   # what the terminal already had before any .env was read
 
 
 def load(path=os.path.join(HERE, ".env")):

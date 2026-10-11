@@ -3,7 +3,29 @@
 [AGNTCY](https://github.com/agntcy) is the open agent stack Cisco Outshift started (now a Linux Foundation
 project). Uplink uses it for the part of the system where independent agents talk to each other.
 
-## What runs on AGNTCY
+## How it runs (default)
+
+Every agent is **its own process** and **its own A2A agent over NATS**: 7 shelter agents, 6 driver agents
+and the 3 negotiators (Speed, Cost, Need), plus any pantry or driver that joins mid-run (`mesh/`).
+
+| Step of a donation | A2A message over NATS |
+| --- | --- |
+| Announce the food | one broadcast to every shelter agent that can safely take it (`offer.request`) |
+| Collect bids | one broadcast to every driver agent with the trips it could make (`bid.batch`) |
+| Negotiate | one broadcast to Speed, Cost and Need per step: `plan.evaluate`, then `plan.propose` and `plan.vote` for each round |
+
+Each process serves its A2A AgentCard (`uplink/shelters/<id>`, `uplink/drivers/<id>`, `uplink/negotiators/<name>`)
+with the AGNTCY app-sdk's `add_a2a_card`, and the negotiation table reaches them with the SDK's A2A client
+(`broadcast_message`). Agents also register in our agent directory and heartbeat every 2 s, so a stopped
+agent drops out and isn't consulted; the dashboard's Activity → Agent services can stop and restart any of
+them live. `tests/test_mesh.py` checks all 9 scenarios give identical results over A2A/NATS and in-process
+(about 1,100 A2A messages, 0 failed).
+
+`python app.py` starts `nats-server` for you if it isn't running. `AGNTCY=0` keeps the agent processes on
+HTTP; `MESH=0` runs everything in one process, where `AGNTCY=1` serves only the shelter and driver agents
+over AGNTCY inside the app (`agntcy_bridge.py`, below).
+
+## What runs on AGNTCY (in-process mode, `MESH=0 AGNTCY=1`)
 
 | Uplink agent | AGNTCY / A2A role |
 | --- | --- |

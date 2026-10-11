@@ -26,6 +26,7 @@
           <a href="#/activity/feed"><b>Agent feed</b><small>Every event, newest first</small></a>
           <a href="#/activity/safety"><b>Safety log</b><small>Plans the rules allowed or blocked</small></a>
           <a href="#/activity/donations"><b>Donations</b><small>Status and time left for each</small></a>
+          <a href="#/activity/mesh"><b>Agent services</b><small>Each agent as its own process, live messages</small></a>
         </div>
       </div>
       <a href="#/evidence" data-route="evidence">Evidence</a>
@@ -161,6 +162,7 @@
     <a role="tab" href="#/activity/feed" data-tab="feed">Agent feed</a>
     <a role="tab" href="#/activity/safety" data-tab="safety">Safety log</a>
     <a role="tab" href="#/activity/donations" data-tab="donations">Donations</a>
+    <a role="tab" href="#/activity/mesh" data-tab="mesh">Agent services</a>
   </div>
   <div class="tabpanel" data-tabpanel="network">
     <div class="panel-head net-head"><p class="helper" style="margin:0">For the donation on the Live view.</p><span class="muted small" id="net-agents"></span></div>
@@ -179,6 +181,13 @@
   </div>
   <div class="tabpanel" data-tabpanel="donations" hidden>
     <div class="panel"><div class="dons" id="dons"></div></div>
+  </div>
+  <div class="tabpanel" data-tabpanel="mesh" hidden>
+    <p class="helper">Every shelter, driver and negotiator runs as its own process and is an AGNTCY A2A agent over NATS (HTTP if NATS isn't available). Each one registers in the agent directory and sends a heartbeat every 2 s. Stop one and it drops out of the directory; the rest carry on without it.</p>
+    <div id="mesh-sum" class="mesh-sum"></div>
+    <div class="panel"><div id="mesh-agents"></div></div>
+    <h2 class="sec-h">Messages between agents <span class="muted small">(newest first)</span></h2>
+    <div class="panel"><div id="mesh-trace"></div></div>
   </div>
 </section>
 
