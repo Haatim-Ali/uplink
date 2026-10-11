@@ -477,3 +477,8 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 @media (prefers-reduced-motion:reduce){.thinking i{animation:none;opacity:.6}}
 /* the 3-line quote: bottom space is a transparent border, so a 4th line can't peek through the padding */
 .agent .says{padding-bottom:0;border-bottom:.5rem solid transparent}
+/* agent network: coordinators still deliberating */
+.node.coord.thinking circle{animation:wthink 1.2s ease-in-out infinite}
+@keyframes wthink{0%,100%{stroke-width:2.5;stroke-opacity:1}50%{stroke-width:6;stroke-opacity:.45}}
+.w-step{font:600 12px var(--mono);fill:var(--muted)}
+@media (prefers-reduced-motion:reduce){.node.coord.thinking circle{animation:none;stroke-width:4}}
