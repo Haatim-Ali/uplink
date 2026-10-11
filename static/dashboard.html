@@ -92,29 +92,25 @@
   </div>
   <a class="alert-strip" id="live-alert" href="#/decisions" hidden></a>
 
-  <!-- the donation's journey: one strip of seven steps, then the panels in the same order, top to bottom -->
-  <section class="flow-wrap" aria-labelledby="flow-h">
-    <div class="flow-head"><h2 id="flow-h">Donations in flight</h2><span class="flow-id">every donation passes the same five stages, several at once</span></div>
-    <ol class="board" id="flow"></ol>
-  </section>
+  <!-- in the order the system works: the network answers and the three agents negotiate (side by side), then the
+       dispatcher's call and the delivery; the donation and the headline numbers sit above, unboxed -->
+  <div class="topline">
+    <div id="cur-don" class="cur-line"></div>
+        <div class="kpis plain" aria-label="Headline numbers">
+      <div class="kpi"><b data-k="meals">0</b><span>meals delivered safely</span></div>
+      <div class="kpi"><b data-k="orgs">0</b><span>organizations fed</span></div>
+      <div class="kpi"><b data-k="lost" data-bad>0</b><span>servings lost</span></div>
+      <div class="kpi"><b data-k="cost">$0</b><span>spent on paid drivers</span></div>
+    </div>
+  </div>
 
   <div class="stage story">
     <div class="row r1">
-      <div class="col-don">
-        <div class="panel don-panel"><div class="panel-head"><h2>Current donation</h2></div><div id="cur-don"></div></div>
-        <div class="kpis compact" aria-label="Headline numbers">
-          <div class="kpi"><b data-k="meals">0</b><span>meals delivered safely</span></div>
-          <div class="kpi"><b data-k="orgs">0</b><span>organizations fed</span></div>
-          <div class="kpi"><b data-k="lost" data-bad>0</b><span>servings lost</span></div>
-          <div class="kpi"><b data-k="cost">$0</b><span>spent on paid drivers</span></div>
-        </div>
-      </div>
       <div class="panel wire" aria-labelledby="wire-h">
         <div class="panel-head"><h2 id="wire-h"><span class="stepno">1</span>Agent network <span class="sub-h">shelters answer, drivers bid, the three negotiators decide</span></h2><span class="wire-right"><span class="pill outline xport" id="xport" title="How the shelter and driver agents receive messages">in-process</span><span class="wire-stat" id="wire-stat"><i class="dot"></i>idle</span></span></div>
         <svg id="wire" viewBox="0 0 1000 390" role="img" aria-label="Diagram of the business, shelter, driver and coordinator agents and the messages between them"></svg>
+        <div class="wire-log-wrap"><h3 class="log-h">Message log <span class="sub-h">every A2A message for this donation, in order</span></h3><ol class="wire-log" id="wire-log" aria-label="Message log"></ol></div>
       </div>
-    </div>
-    <div class="row r2">
       <div class="stage-left">
       <div class="panel hero" id="hero-panel" hidden>
         <div class="panel-head"><h2><span class="stepno">2</span>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
@@ -138,19 +134,15 @@
         <p class="muted small empty-note">When a donation arrives, these three agents negotiate here. Run a scenario under Demo controls.</p>
       </div>
       </div>
-      <div class="panel callp" aria-labelledby="call-h">
+    </div>
+    <div class="row r2">
+      <div class="callp open" aria-labelledby="call-h">
         <div class="panel-head"><h2 id="call-h"><span class="stepno">3</span>Phone line <span class="sub-h">the dispatcher agent calls the chosen shelter</span></h2></div>
         <div class="call-badges"><span class="pill outline">Voices: ElevenLabs Flash v2.5</span><span class="pill outline">Speech to text: ElevenLabs Scribe</span></div>
         <div class="call-body">
           <div class="call-card" id="call-card"><p class="call-idle">No call yet. When the agents choose a shelter, the dispatcher agent calls it here.</p></div>
           <ol class="call-tx" id="call-tx" aria-live="polite" aria-label="Call transcript"></ol>
         </div>
-      </div>
-    </div>
-    <div class="row r3">
-      <div class="panel log-panel" aria-labelledby="log-h">
-        <div class="panel-head"><h2 id="log-h">Message log <span class="sub-h">every A2A message, in order</span></h2></div>
-        <ol class="wire-log" id="wire-log" aria-label="Message log"></ol>
       </div>
     <div class="panel map-panel">
       <div class="panel-head"><h2><span class="stepno">4–5</span>Delivery</h2><span class="muted small">Labeled pins are shelters in play</span></div>
@@ -163,6 +155,7 @@
         <li><i class="lg-idle"></i>Idle driver</li>
         <li><i class="lg-line"></i>Route</li>
       </ul>
+    </div>
     </div>
     </div>
   </div>

@@ -432,48 +432,6 @@ function drawGlobal(){
   prevPending = pend.length;
 }
 
-// ---------- The donation's journey: one strip, seven steps, lit up as the agents work ----------
-function flowDonation(){
-  const n = liveNeg() || currentNeg();
-  const id = n ? n.donation : ((S.donations||[]).slice().reverse().find(x => !["delivered","spoiled","expired"].includes(x.status)) || {}).id;
-  return {n, d: (S.donations||[]).find(x => x.id === id)};
-}
-const SHORT_OUT = {consensus:"all agree", majority:"majority", urgent:"time short", unacceptable:"red line hit", irreconcilable:"deadlock",
-  insufficient_evidence:"needed a fact", over_budget:"over budget", human_timeout:"fallback rule"};
-function boardRow(d, focus){
-  const msgs = (S.network||[]).filter(m => m.donation === d.id);
-  const cnt = k => msgs.filter(m => m.kind === k).length;
-  const yes = cnt("accept") + cnt("counter"), bids = cnt("bid");
-  const neg = (S.negotiations||[]).filter(x => x.donation === d.id).pop();
-  const liveHere = S.busy && S.deliberating && S.deliberating.donation === d.id;
-  const playing = neg && play.seq === neg.seq && play.shown < neg.rounds.reduce((t, r) => t + r.messages.length, 0);
-  const human = ["awaiting_human","awaiting_info"].includes(d.status);
-  const lost = ["spoiled","expired"].includes(d.status), delivered = d.status === "delivered";
-  const moving = d.status === "en_route", picked = delivered || (moving && d.picked);
-  const callHere = call && call.donation === d.id && call.phase !== "ended";
-  const dispatched = moving || delivered;
-  const st = (state, cap) => ({state, cap});
-  const st1 = yes || bids ? st("done", `${yes} shelter${yes===1?"":"s"} · ${bids} bid${bids===1?"":"s"}`) : st("active", "asking the network");
-  const st2 = liveHere || playing ? st("active", "debating") : human ? st("warn", d.status === "awaiting_info" ? "asking the business" : "asking a person")
-    : neg && (d.plan || dispatched) ? st("done", SHORT_OUT[neg.outcome] || "decided") : yes || bids ? st("active", "negotiating") : st("pending", "");
-  const st3 = callHere || d.status === "awaiting_shelter" ? st("active", callHere ? "on the call" : "waiting for reply")
-    : dispatched && d.plan ? st("done", short(d.plan.np_name, 18)) : st("pending", "");
-  const st4 = picked ? st("done", d.plan ? short(firstName(d.plan.driver_name), 14) : "") : moving ? st("active", "driver on the way") : lost ? st("bad", "") : st("pending", "");
-  const st5 = delivered ? st("done", "delivered") : lost ? st("bad", "spoiled") : picked ? st("active", d.plan ? "arrives " + d.plan.arrive_hhmm : "on the way") : st("pending", "");
-  const cells = [st1, st2, st3, st4, st5].map((x, i) => `<div class="bd-st ${x.state}"><span class="bd-dot">${x.state === "done" ? "✓" : x.state === "bad" ? "✕" : i + 1}</span><small>${esc(x.cap || "")}</small></div>`).join("");
-  return `<li class="board-row${focus ? " focus" : ""}"><div class="bd-don"><b>${esc(d.id)}</b>${esc(d.food.servings)} servings<span>${esc(short(d.food.items.join(", "), 30))} · ${esc(d.business_name)}</span></div>${cells}</li>`;
-}
-function firstName(n){ return String(n||"").split(" (")[0]; }
-function drawFlow(){
-  const el = $("flow"); if(!el) return;
-  const all = S.donations || [];
-  if(!all.length){ setHTML(el, `<li class="board-empty">No donations yet. Run a scenario under Demo controls.</li>`); return; }
-  const {d: focus} = flowDonation();
-  const rows = all.slice(-5);
-  setHTML(el, `<li class="board-row head"><span>Donation</span><span>1 · Matched</span><span>2 · Negotiated</span><span>3 · Shelter called</span><span>4 · Picked up</span><span>5 · Delivered</span></li>`
-    + rows.map(d => boardRow(d, focus && focus.id === d.id)).join(""));
-}
-
 function drawLive(){
   const scn = (S.scenarios.find(x=>x.name===S.scenario)||{}).title;
   const run = $("sl-run");
@@ -483,7 +441,7 @@ function drawLive(){
   const pend = pendingList(), al = $("live-alert");
   al.hidden = !pend.length;
   setHTML(al, pend.length ? `<span>${pend.length} decision${pend.length>1?"s":""} waiting for you (${pend.map(d=>esc(d.id)).join(", ")}). Open Decisions</span>` : "");
-  drawNegotiation(); drawMap(); drawFlow();
+  drawNegotiation(); drawMap();
 }
 
 // ---------- agent services (the mesh) ----------
@@ -750,7 +708,7 @@ function drawWire(){
 
   const edges = [];
   // a label sits to the right of its circle: lines leaving rightward start at the label's end so they never cross it
-  const LW = {biz: 175, s: 190, d: 190};
+  const LW = {biz: 205, s: 190, d: 190};
   const tail = k => { const P = pos[k], w = k === "biz" ? LW.biz : LW[k.slice(0, 1)] || 0; return P && w ? {x: P.x + w, y: P.y} : P; };
   const add = (key, a, b, cls, bend, fromTail, toTail) => { if(pos[a] && pos[b]) edges.push({key, a, b, cls, bend, A: fromTail ? tail(a) : pos[a], B: toTail ? tail(b) : pos[b]}); };
   if(msgs.some(m => m.kind === "announce")) shelterNames.forEach(nm => add("ann:"+nm, "biz", "s:"+nm, "e-ann", 0, true));
