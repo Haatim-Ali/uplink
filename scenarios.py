@@ -288,7 +288,7 @@ def compare_random(n=50, first_seed=1, solo=False):
         "same_food_lost": sum(a == b for a, b in lost),
         "more_food_lost": sum(a > b for a, b in lost),
     }
-    out = {"n": n, "totals": totals, "wins": wins, "runs": runs}
+    out = {"n": n, "first_seed": first_seed, "totals": totals, "wins": wins, "runs": runs}
     if solo:
         # together vs alone: in how many runs did the team lose less food than every single agent?
         out["vs_solo"] = {

@@ -251,7 +251,7 @@ tr.winner td.plan{box-shadow:inset 5px 0 0 var(--ok)}
 .cmp-scroll th:first-child,.cmp-scroll td:first-child{text-align:left;position:sticky;left:0;background:var(--panel)}
 .cmp-scroll thead th{position:sticky;top:0;background:var(--chip);z-index:2;font:700 var(--t-xs)/1.25 var(--font);vertical-align:bottom}
 .cmp-scroll thead th:first-child{z-index:3;background:var(--chip)}
-.cmp-scroll tr.sect th{text-align:left;background:var(--ink);color:var(--bg);position:static;font-size:var(--t-sm)}
+.cmp-scroll tr.sect th{text-align:left;background:var(--panel-2);color:var(--ink);border-top:2px solid var(--line-2);position:static;font-size:var(--t-sm);font-weight:800}
 .cmp-scroll td.better{color:var(--ok-ink);font-weight:800;background:var(--ok-soft)}
 .cmp-scroll td.better::after{content:" ★"}
 .cmp-scroll td.note{text-align:left}

@@ -179,7 +179,7 @@ python3 tests/test_core.py      # or: python3 -m pytest
 python3 tests/test_mesh.py      # starts the real agent processes on ports 7600+ and checks they decide identically
 ```
 
-27 checks: cold food never goes somewhere without a fridge, allergens and capacity are respected, every plan arrives in time, the three agents genuinely disagree, short time forces a decision, cancellations lower reliability and trigger a replan, a new pantry is discoverable, the standoff escalates, the shelter phone flow works, pending requests hold capacity, scenarios are repeatable, the agents never lose more food than the baseline, shelter agents accept, counter-offer and decline correctly, counter-offers split without losing food, drivers refuse trips beyond their range, network messages are logged, camera counts become separate donations by food type, the camera ignores low-confidence false alarms, and the vision model's answer wins over the detector's guess. Run them before every push.
+56 checks, including: cold food never goes somewhere without a fridge, allergens and capacity are respected, every plan arrives in time, the three agents genuinely disagree, short time forces a decision, cancellations lower reliability and trigger a replan, a new pantry is discoverable, the standoff escalates, the shelter phone flow works, pending requests hold capacity, scenarios are repeatable, the agents never lose more food than the baseline, shelter agents accept, counter-offer and decline correctly, counter-offers split without losing food, drivers refuse trips beyond their range, network messages are logged, camera counts become separate donations by food type, the camera ignores low-confidence false alarms, and the vision model's answer wins over the detector's guess. Run them before every push.
 
 ## Results
 
@@ -191,14 +191,14 @@ python3 tests/test_mesh.py      # starts the real agent processes on ports 7600+
 |---|---:|---:|---:|---:|---:|
 | Meals delivered safely | 763 | 934 | 934 | 934 | 934 |
 | Servings lost | 171 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 186.47 | 259.99 | 99.38 | 200.24 | 228.59 |
+| Money spent ($) | 186.47 | 259.99 | 84.45 | 185.01 | 228.59 |
 | Shelters fed | 17 | 20 | 20 | 22 | 23 |
 | Avg minutes to spare (perishable food) | 76 | 73 | 69 | 66 | 68 |
 | Asked a human | 0 | 1 | 1 | 1 | 6 |
 
-**How the team's negotiations ended:** consensus 40, unacceptable 4, insufficient evidence 2, majority 1, irreconcilable 1
+**How the team's negotiations ended:** consensus 39, unacceptable 4, majority 2, insufficient evidence 2, irreconcilable 1
 
-With shelter and driver agents, the team fed the most shelters (23) and lost no food, but it is no longer the cheapest policy on these scripted cases ($228.59 vs $99.38 for Cost alone). The difference is mostly *Standoff*: Need and Speed wanted to send produce to the pantry that had waited 6 days, Cost vetoed the $35 courier as over its $20 red line, and the scripted stand-in coordinator chose the agents' top-ranked option, which split the food and needed a second paid trip. On the 100 random runs below, the team is still 28% cheaper than the baseline.
+With shelter and driver agents, the team fed the most shelters (23) and lost no food, but it is no longer the cheapest policy on these scripted cases ($228.59 vs $84.45 for Cost alone). The difference is mostly *Standoff*: Need and Speed wanted to send produce to the pantry that had waited 6 days, Cost vetoed the $35 courier as over its $20 red line, and the scripted stand-in coordinator chose the agents' top-ranked option, which split the food and needed a second paid trip. On the 100 random runs below, the team is still 28% cheaper than the baseline.
 
 **100 random lunch rushes the rules were never tuned on** (`python3 -c "import scenarios; print(scenarios.compare_random(100, 1001)['totals'])"`):
 
@@ -209,7 +209,7 @@ With shelter and driver agents, the team fed the most shelters (23) and lost no 
 | Money spent on paid drivers | $2,927 | $2,115 | −28% (−41% per meal) |
 | Runs where agents lost more food | | 0 of 100 | |
 
-The dashboard's **Evidence** button shows the same comparison on 50 runs (seeds 1–50): −77% food lost, +22% meals, −14% cost, never worse.
+The dashboard's **Evidence** page shows these same 100 held-out runs (seeds 1001–1100), computed live when the app starts.
 
 **Lessons learned (for Devpost).** Testing on random runs surfaced two failures we fixed. (1) A baseline that retried the same closed shelter forever made us look better than we were; we made the baseline fair. (2) The agents trusted an 80%-reliable volunteer with sandwiches that had 10 minutes of margin; he cancelled and the food spoiled. Speed now objects to anything below 90% reliable when the margin is under 20 minutes. A third bug: a nonprofit's van couldn't deliver elsewhere after its own shelter filled up. (3) When drivers became agents that refuse trips beyond their range, the baseline was still allowed to send volunteers anywhere; we made it respect the same refusals. Counter-offers were the biggest single gain: food that used to be stranded because no shelter had room for all of it now gets split across shelters.
 

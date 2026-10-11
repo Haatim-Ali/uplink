@@ -107,6 +107,12 @@ def _extract_json(text):
         raise
 
 
+def agent_model():
+    """The model for the quick agent calls (votes, proposals, parsing speech): AGENT_MODEL, else Claude's
+    fast model when Claude is the provider (the big model is far slower for these short replies)."""
+    return os.getenv("AGENT_MODEL") or ("claude-haiku-5-5" if provider() == "anthropic" else None)
+
+
 def chat_json(system, user, image_b64=None, media_type="image/jpeg", max_tokens=400, model=None, retries=1,
               effort="medium", timeout=None):
     """Ask the model for a JSON object. Raises on failure (callers fall back).

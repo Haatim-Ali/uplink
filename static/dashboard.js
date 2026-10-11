@@ -560,7 +560,7 @@ let evidence = null, evLoading = false;
 async function loadEvidence(force){
   if(evLoading || (evidence && !force)) return;
   evLoading = true; setHTML("takeaway", ""); setHTML("cmp", "<p class='muted'>Running 50 random scenarios… this takes a few seconds.</p>");
-  try{ evidence = await (await fetch("/api/compare?n=50")).json(); }
+  try{ evidence = await (await fetch("/api/compare?n=100")).json(); }
   catch(e){ evidence = null; evLoading = false; setHTML("cmp", "<p class='muted'>Couldn't load the comparison. Check the server and try again.</p>"); return; }
   evLoading = false; drawEvidence(evidence);
 }
@@ -625,7 +625,7 @@ function drawEvidence(r){
       <div class="hero-stat"><b>${rel(a.money_spent, b.money_spent)}%</b><span>${costWord} driver cost</span></div>
       <div class="hero-stat"><b>${w.more_food_lost} of ${r.random.n}</b><span>runs where agents lost more food</span></div>
     </div>
-    <p class="muted small">Runs include 3–6 donations, driver no-shows, full shelters and new pantries.</p>
+    <p class="muted small">${r.random.n} random scenarios${r.random.first_seed > 1 ? ` (seeds ${r.random.first_seed}–${r.random.first_seed + r.random.n - 1}), held out: never used while building` : ""}. Each has 3–6 donations, driver no-shows, full shelters and new pantries.</p>
     <div class="dlg-key" aria-hidden="true"><span><i style="background:#64748b"></i>Baseline (nearest shelter)</span><span><i style="background:var(--brand)"></i>Agents together</span></div>
     <div class="cbars">
       ${metric("Meals delivered safely","meals_delivered_safely",num,"higher is better")}

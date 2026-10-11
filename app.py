@@ -184,7 +184,7 @@ def api_state():
                  "voice": "elevenlabs" if voice.available() else "browser",
                  "llm_error": llm.auth_error(),
                  # which models are actually answering, so the dashboard can credit them
-                 "agents_model": (os.getenv("AGENT_MODEL") or (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL if claude else os.getenv("OPENAI_MODEL", ""))) if agents.use_llm() else "",
+                 "agents_model": (llm.agent_model() or os.getenv("OPENAI_MODEL", "")) if agents.use_llm() else "",
                  "vision_model": (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL) if claude else (os.getenv("OPENAI_MODEL", "") if prov else ""),
                  "mesh": len(MESH.agents()) if MESH else 0,   # agents running as separate services
                  "mesh_transport": MESH.transport if MESH else None}
@@ -464,17 +464,20 @@ def api_camera_status():
 @app.get("/api/compare")
 def api_compare():
     """Scripted scenarios plus N seeded random runs. Deterministic, so cached after the first call."""
-    n = max(5, min(200, int(request.args.get("n", 50))))
+    n = max(5, min(200, int(request.args.get("n", 100))))
     return jsonify(compare_results(n))
 
 
 _compare_lock = threading.Lock()
 
 
-def compare_results(n=50):
+HELD_OUT = 1001   # seeds 1001+ were never used while building: the same runs as docs/RESULTS.md and the Devpost
+
+
+def compare_results(n=100):
     with _compare_lock:   # the startup warm-up and a page load never compute it twice
         if n not in _compare_cache:
-            rnd = scenarios.compare_random(n, solo=True)
+            rnd = scenarios.compare_random(n, first_seed=HELD_OUT, solo=True)
             rnd.pop("runs")
             _compare_cache[n] = {"scripted": scenarios.compare(), "random": rnd}
         return _compare_cache[n]

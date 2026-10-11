@@ -292,7 +292,7 @@ def _llm_propose(agent, world, d, plans, S, r, history):
     user = (f"Food: {', '.join(d['food']['items'])}, {d['food']['servings']} servings, "
             f"{d['safe_until'] - world.now} minutes until unsafe.\nRound {r + 1} of 3.\n"
             f"Safe candidate plans:\n{_table(world, d, plans, S, agent)}\n\nEarlier rounds:\n{history or 'none'}")
-    out = llm.chat_json(sysmsg, user, max_tokens=200, model=os.getenv("AGENT_MODEL"), effort="low",
+    out = llm.chat_json(sysmsg, user, max_tokens=200, model=llm.agent_model(), effort="low",
                          retries=0, timeout=LLM_AGENT_TIMEOUT)
     pid = out["propose"]
     if pid not in S:
@@ -311,7 +311,7 @@ def _llm_vote(agent, world, d, proposed, plans_by_id, S, r, best=None):
               'Reply with JSON only: {"votes": {"<plan id>": {"accept": true|false, "reason": "<under 20 words>"}}}')
     user = (f"Round {r + 1} of 3. {d['safe_until'] - world.now} minutes until the food is unsafe.\n"
             f"Proposed plans:\n{_table(world, d, [plans_by_id[i] for i in proposed], S, agent, best)}")
-    out = llm.chat_json(sysmsg, user, max_tokens=300, model=os.getenv("AGENT_MODEL"), effort="low",
+    out = llm.chat_json(sysmsg, user, max_tokens=300, model=llm.agent_model(), effort="low",
                          retries=0, timeout=LLM_AGENT_TIMEOUT)
     return {pid: (bool(out["votes"][pid]["accept"]), out["votes"][pid].get("reason", "")) for pid in proposed}
 
