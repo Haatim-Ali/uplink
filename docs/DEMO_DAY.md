@@ -1,72 +1,138 @@
-# Demo day checklist
+# Demo day
 
-Devpost closes **1:30 PM Sunday** (late submissions aren't judged). Feature freeze **10:30 AM**.
+Devpost closes **1:30 PM Sunday** (late submissions aren't judged). **Submit by 12:30.** Awards 5:15 PM.
 
-## 1. Set up the demo laptop (once, about 15 minutes)
+The story in one line: *a business says what's left, three AI agents with competing goals argue over where it goes, the dispatcher calls the shelter out loud, and the driver sets off.*
+
+---
+
+## 1. Set up the demo laptop (once)
+
+Keep the code **outside iCloud** (not on the Desktop or in Documents): iCloud locks git files and makes `git pull` hang.
 
 ```bash
-git clone https://github.com/saraxjain/uplink && cd uplink     # or git pull if already cloned
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-pip install -r requirements-agntcy.txt      # AGNTCY app-sdk
-pip install ultralytics opencv-python         # counter camera (large download)
-brew install nats-server                     # the app starts it for you
+cd ~ && git clone https://github.com/saraxjain/uplink && cd uplink     # later: cd ~/uplink && git pull
+pip3 install -r requirements.txt
+pip3 install -r requirements-agntcy.txt     # AGNTCY app-sdk
+brew install nats-server                    # the app starts NATS and the 16 agents for you
 ```
 
-Create `.env` in the `uplink` folder with the keys (never commit it):
+`.env` in the `uplink` folder (never commit it, never show it on screen):
 
 ```
-ANTHROPIC_API_KEY=...
+ANTHROPIC_API_KEY=sk-ant-...
 ELEVENLABS_API_KEY=...
+LLM_AGENTS=1                  # Claude speaks for each agent
+AGENT_MODEL=claude-haiku-5-5  # fast model for agent turns (also the default)
 ```
 
-## 2. Check it before you present
+Start it:
 
 ```bash
-python app.py
+cd ~/uplink && PORT=5050 python3 app.py
 ```
 
 The first lines must say:
 
-- `Agent network: 16 agents, each its own process, talking over AGNTCY A2A over NATS` (if it says HTTP, NATS or the SDK is missing)
-- `Vision: anthropic` and `Voice: ElevenLabs`
+- `Agent network: 16 agents, each its own process, talking over AGNTCY A2A over NATS`
+- `Claude: Claude key OK`
+- `Agents: LLM · Vision: anthropic · Voice: ElevenLabs`
 
-Then open http://localhost:5050/ops and confirm:
+---
 
-- [ ] The Agent network badge says **AGNTCY · A2A over NATS · 16 agent processes**
-- [ ] Demo controls → Lunch rush → Run scenario: the debate plays and trucks move
-- [ ] Activity → Agent services: messages marked **A2A/NATS**, 0 unanswered
-- [ ] Stop a shelter agent, run a scenario, restart it
-- [ ] Demo controls → Sound and look → Voices on: you hear the agents (laptop volume up)
-- [ ] Customer site (http://localhost:5050): schedule a pickup with a real photo
-- [ ] Counter camera: in a second terminal, `python camera.py --business corner-bakery` (allow camera access for Terminal the first time). Point the webcam at baked goods; the Live page says "Camera at Kelly's French Bakery sees: …". Click Demo controls → **Closing time (camera)** and the leftovers become donations. No webcam? Add `--image eval_photos/box_of_donuts_0.jpg`
+## 2. Five-minute check before you present
 
-Run the tests if there's time: `python tests/test_core.py` and `python tests/test_mesh.py`.
+Open http://localhost:5050/ops and hard-refresh (Cmd+Shift+R).
 
-If anything misbehaves on stage: `AGNTCY=0 python app.py` (HTTP), or `MESH=0 python app.py` (one process). The decisions are identical in all three.
+- [ ] Agent network badge: **AGNTCY · A2A over NATS · 16 agent processes**
+- [ ] Demo controls → **Voices** on, laptop volume up
+- [ ] Run **Majority with dissent**: the debate streams in, ends "Majority 2 of 3 (Cost disagrees, kept on record)", the dispatcher calls, then the driver moves on the map
+- [ ] Customer site (http://localhost:5050) → Schedule a pickup → **Say it**: the mic works (allow microphone access)
+- [ ] **Photo / video**: one real photo of food reads correctly
+- [ ] Close other tabs and notifications (Do Not Disturb on)
+
+### If something goes wrong
+
+| Problem | Fix |
+| --- | --- |
+| "Address already in use" | `lsof -ti :5050 \| xargs kill`, then start again |
+| `git pull` hangs or "index.lock" | `rm -f .git/*.lock`, then pull again (and move the folder out of iCloud) |
+| "Claude key rejected" | check `.env`: the key starts `sk-ant-` (one s) |
+| A debate stalls | wait: Claude falls back to the rules after 20 s on its own |
+| AGNTCY/NATS trouble on stage | `MESH=0 PORT=5050 python3 app.py`: same decisions, one process |
+| No sound | Demo controls → Voices; check the laptop output device |
+
+---
 
 ## 3. The 3-minute demo
 
-1. **Problem (30 s).** Food businesses throw away edible food; California now requires many to donate it, but donating is a hassle full of tradeoffs.
-2. **Photo (20 s).** On the customer site, photograph real leftovers. Claude counts them; confirm.
-3. **Agents negotiate (40 s).** On /ops: shelters answer, drivers bid, Speed, Cost and Need argue (voices on), the safety rules remove an unsafe shelter, a plan wins, the Phone line calls the shelter.
-3b. **Counter camera (20 s).** The webcam on the counter has been counting all day. Click **Closing time (camera)**: Claude identifies the leftovers and they become donations, one per food type, with nobody taking a photo.
-4. **Things change (45 s).** Shelter says full → they reroute. Driver cancels → reliability drops, the agent that warned gains weight. Run *Irreconcilable goals* → they ask a human with a deadline. Activity → Agent services → **stop a shelter's agent** → it drops out, the next donation goes elsewhere.
-5. **Evidence (25 s).** "On 100 scenarios it had never seen, the team lost a third as much food as the best agent working alone, and 93% less than the simple approach."
-6. **Close (20 s).** "Every agent is its own service on AGNTCY. They negotiate real tradeoffs with no boss, safety is never up for debate, and they ask a human when they truly can't agree."
+Two people works best: one drives the laptop, one talks.
 
-## 4. Backup video shot list (record before 10:30 AM; 2–3 minutes)
+**1. Problem (20 s).** "California requires many food businesses to donate edible leftovers, but at closing time donating is a pile of tradeoffs: the fast courier costs money, the free volunteer might not show, and the closest shelter already ate today while another has waited five days."
 
-Record the screen (QuickTime → File → New Screen Recording) with voices on.
+**2. The business side (35 s).** Customer site → Schedule a pickup.
+- **Say it:** tap the mic and say *"we've got two pepperoni pizzas, a dozen cookies and five bananas."* ElevenLabs Scribe transcribes it; Claude maps it onto the café's menu with allergens.
+- Or **Photo / video:** pan the phone over real food; Claude counts it.
+- Confirm. "That's all a café manager does. Now let's see what happens behind the scenes."
 
-1. Terminal: `python app.py` and the "AGNTCY A2A over NATS" line (5 s)
-2. Customer site: photo → "Does this look right?" → scheduled → tracking (25 s)
-3. /ops Live: run Lunch rush; the network diagram fills, the agents argue, the Phone line plays (40 s)
-4. Shelter says full / Driver cancels: the re-plan (25 s)
-5. Decisions: an irreconcilable case with "Decide by"; approve an option (20 s)
-6. Activity → Agent services: A2A/NATS messages; stop an agent, show it drop out; restart it (25 s)
-7. Evidence page and the held-out results table (15 s)
+**3. The agents argue (60 s).** Switch to `/ops` (already open), Demo controls → **Majority with dissent** → Run. Voices on.
+- Point at the empty Negotiation panel first: "Three agents, no boss. **Speed** cares about getting there reliably, **Cost** about money, **Need** about whoever has waited longest. Each has a red line it won't cross."
+- As lines stream in: "Speed wants the reliable paid courier. Cost wants the free volunteer. Need wants the shelter that has waited five days. Speed objects to the volunteer: 50% reliable, a no-show would spoil the food."
+- Point at the **Agent network** graph: "Every one of these is its own process, talking over Cisco's AGNTCY A2A protocol on NATS. The shelters answered, the drivers bid, and now the coordinators are voting."
+- Result: "Round 3, Speed and Cost both move toward Need's shelter. Majority two of three, and **Cost's objection stays on the record**. Agreement isn't forced."
 
-## 5. Submit by 12:30 PM (buffer before 1:30)
+**4. The phone call (20 s).** Let the **Phone line** play: the dispatcher agent calls the shelter agent in ElevenLabs voices. "Only after the call does the driver set off." Scroll down to the map as it starts moving.
 
-Paste `docs/DEVPOST.md` into Devpost, add the repo link and the video, attach the guide PDF.
+**5. When they can't agree (25 s).** Run **Irreconcilable goals**: "Sometimes no compromise is acceptable. Instead of forcing one, they ask a person, with a decide-by deadline so the food never spoils waiting." Optional: Demo controls → **Shelter says full** and watch them re-plan, each saying whether it changed its mind.
+
+**6. Evidence (20 s).** Evidence tab: "On 100 scenarios it had never seen, the team lost **82% less food than the simple approach** and **49% less than the best agent working alone**, and lost the least food in 95 of 100. Each agent alone fails on its blind spot; together they veto each other's."
+
+**7. Close (10 s).** "Uplink: agents that disagree out loud, never compromise on safety, and ask a human when agreeing would be wrong."
+
+---
+
+## 4. What we improved during the hackathon (good for Q&A and the video)
+
+| Before | After |
+| --- | --- |
+| Every negotiation ended in round-1 consensus | Red lines and a dropping acceptance bar: real 3-round debates, majority with dissent on record |
+| Claude agents caved and argued each other's goals | Each agent sees only its own facts and votes against a numeric bar; rules overrule a far-below-bar accept |
+| Agents ran inside one program | 16 agents, each its own process, on AGNTCY A2A over NATS; identical decisions, 0 failed messages |
+| One way to donate: a photo | Say it (ElevenLabs Scribe + Claude), photo, video, or tap the menu |
+| The debate appeared all at once at the end | Streams live as each agent speaks; the clock waits so no food-safety time is lost |
+| Silent decisions | ElevenLabs voices for each agent, plus a dispatcher-to-shelter phone call |
+| The map raced ahead of the story | The driver sets off after the call |
+| One busy screen for everyone | A simple customer site for businesses; a separate ops dashboard for judges |
+| "Need never matters" | Data: Need's first choice became the decision most often; it vetoes unfair splits |
+
+---
+
+## 5. Likely judge questions
+
+- **"Isn't this just a weighted score?"** No single score picks the plan. Each agent scores against its own goal, proposes, votes with a reason, and can veto. The table only counts votes. It can end in consensus, majority with dissent, or asking a human, and we show all three.
+- **"What happens when they can't agree?"** Three cases stop and ask a person: the only compromise crosses a red line, the goals are irreconcilable, or a fact is unconfirmed (allergens). The person gets options and a deadline.
+- **"Why multiple agents instead of one model?"** We tested it: on 100 unseen scenarios each agent alone loses 1,336 to 1,726 servings; the team loses 676. Each one catches the others' blind spot.
+- **"What's real and what's simulated?"** Real: the negotiation, the safety rules, Claude reading photos, video and speech, ElevenLabs voices, the AGNTCY agents. Simulated: the city, the drivers' movement and the clock.
+- **"How do you use AGNTCY?"** Every shelter, driver and negotiator is an A2A agent on NATS with an AgentCard and an OASF record (`/agntcy/records`). A test replays every scenario in-process and over A2A: identical decisions.
+- **"How do you use ElevenLabs?"** Speech-to-text (Scribe) for voice donations and shelter answers; text-to-speech (Flash v2.5) with a distinct voice per agent for the debate and the dispatcher's phone call.
+- **"Does it cost more?"** Yes, compared with Cost alone ($2,115 vs $1,305 over 100 runs). It's still 28% cheaper than the simple approach, and it loses far less food. We disclose it.
+
+---
+
+## 6. Backup video shot list (2–3 minutes; record before submitting)
+
+QuickTime → File → New Screen Recording, voices on, volume up.
+
+1. Terminal: `python3 app.py` with the "AGNTCY A2A over NATS" and "Claude key OK" lines (5 s)
+2. Customer site: **Say it** → the order fills in → confirm → tracking (25 s)
+3. Photo or video upload read by Claude (15 s)
+4. `/ops`: Majority with dissent, debate streaming, network graph lighting up, result with dissent (45 s)
+5. The Phone line call, then scroll to the map as the driver sets off (25 s)
+6. Irreconcilable goals → Decisions → approve an option before the deadline (20 s)
+7. Evidence page: team vs each agent alone (15 s)
+
+---
+
+## 7. Submit (by 12:30)
+
+Paste `docs/DEVPOST.md` into Devpost section by section. Add the repo link, the video and the guide PDF, and opt in to **Best Use of ElevenLabs** and the **Cisco** track. Never paste API keys or sponsor codes anywhere.
