@@ -358,7 +358,9 @@ function drawTrackMap(d){
   const showDrv = drv && (d.status === "en_route" || d.status === "delivered");
   put("pickup", [d.origin.lat, d.origin.lng], "m-pickup", "Pickup: " + d.business_name);
   put("dest", d.plan && d.dest ? [d.dest.lat, d.dest.lng] : null, "m-dest", d.plan ? d.plan.np_name : "");
-  put("drv", showDrv ? [drv.lat, drv.lng] : null, "m-drv", drv ? firstName(drv.name) : "");
+  // once delivered, the driver has moved on to other trips: show where they dropped this food off
+  const drvAt = d.status === "delivered" && d.dest ? [d.dest.lat, d.dest.lng] : drv && [drv.lat, drv.lng];
+  put("drv", showDrv ? drvAt : null, "m-drv", drv ? firstName(drv.name) : "");
   if(tlayers.line){ tlayers.line.remove(); delete tlayers.line; }
   if(d.plan && d.dest){
     const pts = showDrv && d.status === "en_route" ? (d.picked ? [[drv.lat,drv.lng],[d.dest.lat,d.dest.lng]] : [[drv.lat,drv.lng],[d.origin.lat,d.origin.lng],[d.dest.lat,d.dest.lng]]) : [[d.origin.lat,d.origin.lng],[d.dest.lat,d.dest.lng]];
