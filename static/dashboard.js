@@ -23,7 +23,7 @@ setInterval(()=>{ if(voiceOn && speaking) return;   // with voices on, the next 
 // ---- Voices: each agent speaks in its own ElevenLabs voice (browser voice if there's no key) ----
 let voiceOn = false, speaking = false, lastSpoken = null, speakTimer = null;
 const audioCache = {};
-const PITCH = {Speed:1.25, Cost:0.8, Need:1.05, Dispatch:1};
+const PITCH = {Speed:1.25, Cost:0.8, Need:1.05, Dispatch:1, Shelter:0.85};
 const plain = html => { const t = document.createElement("div"); t.innerHTML = html; return t.textContent; };
 function audioFor(who, text){
   const url = `/api/tts?who=${encodeURIComponent(who)}&text=${encodeURIComponent(text)}`;
@@ -47,7 +47,7 @@ function speak(who, text, next){
     if(next) audioFor(next.agent in PITCH ? next.agent : "Dispatch", next.text);   // fetch the next line while this one plays
   } else browserSpeak(who, text);
 }
-function replay(){ const n = pinned ? (S.negotiations||[]).find(h=>h.seq===pinned) : S.negotiation; if(!n) return;
+function replay(){ const n = pinned ? (S.negotiations||[]).find(h=>h.seq===pinned) : S.negotiation; if(!n) return; callFor = n.seq;
   play = {seq: n.seq, shown: 0, total: n.rounds.reduce((k,r)=>k+r.messages.length,0)}; drawNegotiation(); }
 const $ = id => document.getElementById(id);
 // Write HTML only when it changed: no flicker, hover and scroll survive the 1-second refresh.
@@ -220,7 +220,7 @@ function drawNegotiation(){
   hero.hidden = false;
   const shownSeq = pinned || n.seq;
   const msgs = n.rounds.flatMap(r => r.messages.map(m => ({...m, round: r.round})));
-  if(!pinned && n.seq !== play.seq && play.seq !== null && n.seq > play.seq){ play = {seq: n.seq, shown: 0, total: msgs.length}; }
+  if(!pinned && n.seq !== play.seq && play.seq !== null && n.seq > play.seq){ play = {seq: n.seq, shown: 0, total: msgs.length}; callFor = n.seq; }
   if(play.seq === null){ play = {seq: n.seq, shown: msgs.length, total: msgs.length}; }   // first load: no replay of old news
   const shown = play.seq === n.seq ? play.shown : msgs.length;
   const playing = shown < msgs.length;
@@ -256,6 +256,8 @@ function drawNegotiation(){
       else if(!playing) speak("Dispatch", plain(o.t + ". " + (n.plan ? "Decision: " + planName(n.plan.id) : "")));
     }
   }
+
+  if(!playing && n.plan && callFor === n.seq && !pinned){ callFor = null; startCall(n); }
 
   // ---- detail (inside "See the debate"): only built when opened ----
   if(!$("debate-more").open) return;
@@ -534,7 +536,7 @@ function drawEvidence(r){
 route(); refresh(); setInterval(refresh, 1000);
 
 $("voice").onclick = ()=>{
-  voiceOn = !voiceOn;
+  voiceOn = !voiceOn; ringCtx();
   const b = $("voice"); b.textContent = voiceOn ? "Voices on" : "Voices off";
   b.classList.toggle("primary", voiceOn); b.setAttribute("aria-pressed", voiceOn);
   if(voiceOn){ toast(S && S.mode.voice==="elevenlabs" ? "Voices on (ElevenLabs). Replaying the debate." : "Voices on (browser voice; add an ElevenLabs key for real voices)", "info"); lastSpoken = null; if(S) replay(); }
@@ -628,4 +630,73 @@ function drawWire(){
   b.onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; try{ localStorage.setItem("uplink_theme", t); }catch(e){} sync(); };
   sync();
 })();
+
+// ---------- Phone line: after the agents decide, the dispatcher agent calls the shelter agent ----------
+// Both sides speak with ElevenLabs voices (Dispatch and Shelter); a staff member's spoken answer on the
+// shelter phone shows up here too, transcribed by ElevenLabs Scribe.
+let callFor = null, call = null, actx = null;
+function ringCtx(){ try{ actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); }catch(e){} }
+function ringTone(){
+  if(!voiceOn || !actx) return;
+  [0, .5].forEach(t => [440, 480].forEach(f => { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = f;
+    g.gain.setValueAtTime(.06, actx.currentTime + t); g.gain.setValueAtTime(0, actx.currentTime + t + .38);
+    o.connect(g).connect(actx.destination); o.start(actx.currentTime + t); o.stop(actx.currentTime + t + .4); }));
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function callSay(who, text){
+  return new Promise(resolve => {
+    const done = () => { clearTimeout(t); resolve(); };
+    const t = setTimeout(resolve, Math.max(2500, text.length * 75));   // never hang the call
+    if(!voiceOn){ clearTimeout(t); setTimeout(resolve, Math.max(1600, text.length * 45)); return; }
+    if(S && S.mode && S.mode.voice === "elevenlabs"){
+      const a = audioFor(who, text); a.currentTime = 0; a.onended = done;
+      a.onerror = () => { if(window.speechSynthesis){ const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.onend = done; speechSynthesis.speak(u); } else done(); };
+      a.play().catch(a.onerror);
+    } else if(window.speechSynthesis){ const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.rate = 1.05; u.onend = done; speechSynthesis.speak(u); }
+    else done();
+  });
+}
+function callScript(n){
+  const d = S.donations.find(x => x.id === n.donation) || {food:{items:[], servings:0}};
+  const np = n.plan.np_name, drv = String(n.plan.driver_name || "").split(" (")[0];
+  const reply = (S.network || []).filter(m => m.donation === n.donation && m.from === np && ["accept","counter","decline"].includes(m.kind)).pop();
+  const items = (d.food.items || []).join(", ");
+  const ask = `Hi ${np}, this is the Uplink dispatcher. ${d.business_name || "A business"} has ${d.food.servings} servings of ${items}${d.food.needs_cold ? ", and it has to stay cold" : ""}. ${drv} can bring it by ${n.plan.arrive_hhmm}. Can you take it?`;
+  const ans = reply ? reply.text : "Yes, please send it over.";
+  const close = !reply || reply.kind === "accept" ? `Great. ${drv} is on the way. Thank you!` : reply.kind === "counter" ? "Got it. We'll send you that much and find a home for the rest." : "Understood. We'll try another shelter.";
+  return {np, lines:[{who:"Dispatch", side:"a", name:"Uplink dispatcher", text:ask}, {who:"Shelter", side:"b", name:np, text:ans}, {who:"Dispatch", side:"a", name:"Uplink dispatcher", text:close}]};
+}
+async function startCall(n){
+  const sc = callScript(n);
+  const me = call = {seq:n.seq, donation:n.donation, np:sc.np, phase:"ringing", said:[], talking:null, t0:Date.now(), voiced:[]};
+  drawCall();
+  for(let i = 0; i < 40 && speaking; i++) await wait(250);   // let the spoken outcome finish first
+  ringTone(); await wait(1300); ringTone(); await wait(1100);
+  if(call !== me) return;
+  me.phase = "talk"; me.t0 = Date.now();
+  for(const ln of sc.lines){
+    if(call !== me) return;
+    me.talking = ln.side; me.said.push(ln); drawCall();
+    await callSay(ln.who, ln.text);
+    me.talking = null; drawCall(); await wait(350);
+  }
+  me.phase = "ended"; me.secs = Math.round((Date.now() - me.t0) / 1000); drawCall();
+}
+const WAVE = "<i></i>".repeat(14);
+function drawCall(){
+  const card = $("call-card"); if(!card) return;
+  if(!call){ setHTML("call-card", `<p class="call-idle">No call yet. When the agents choose a shelter, the dispatcher agent calls it here.</p>`); setHTML("call-tx", ""); return; }
+  // a staff member who answered on the shelter phone by voice (ElevenLabs Scribe transcribed it)
+  const human = (S && S.feed || []).filter(f => f.donation === call.donation && /^\(by voice\)/.test(f.text));
+  const secs = call.phase === "ended" ? call.secs : Math.round((Date.now() - call.t0) / 1000);
+  const state = call.phase === "ringing" ? "Ringing…" : call.phase === "talk" ? `On the call · ${Math.floor(secs/60)}:${String(secs%60).padStart(2,"0")}` : `Call ended · ${Math.floor(secs/60)}:${String(secs%60).padStart(2,"0")}`;
+  const side = (k, name, role, letter) => `<div class="caller ${k}${call.talking === k ? " talking" : ""}"><span class="av">${esc(letter)}</span><b>${esc(name)}</b><small>${esc(role)}</small><div class="wave" aria-hidden="true">${WAVE}</div></div>`;
+  setHTML("call-card", `${side("a", "Uplink dispatcher", "agent · ElevenLabs voice", "U")}
+    <div class="line ${call.phase}"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg><span>${esc(state)}</span></div>
+    ${side("b", call.np, human.length ? "shelter staff · answered by voice" : "shelter agent · ElevenLabs voice", (call.np || "S").charAt(0))}`);
+  setHTML("call-tx", call.said.map(l => `<li class="${l.side}"><b>${esc(l.name)}</b><span>${esc(l.text)}</span><small>${l.who === "Dispatch" ? "spoken with ElevenLabs (dispatcher voice)" : "spoken with ElevenLabs (shelter voice)"}</small></li>`).join("")
+    + human.map(f => `<li class="b human"><b>${esc(f.agent)} staff</b><span>${esc(f.text.replace(/^\(by voice\)\s*/, ""))}</span><small>said out loud on the shelter phone · transcribed by ElevenLabs Scribe</small></li>`).join(""));
+  const tx = $("call-tx"); tx.scrollTop = tx.scrollHeight;
+}
+setInterval(() => { if(call && call.phase === "talk") drawCall(); }, 1000);
 
