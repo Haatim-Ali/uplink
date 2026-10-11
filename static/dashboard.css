@@ -447,3 +447,6 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .built b{display:block;margin-bottom:.25rem}
 .built span{color:var(--muted);font-size:var(--t-sm);line-height:1.5}
 @media (max-width:760px){.built{grid-template-columns:1fr}}
+
+.cbars.four{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:900px){.cbars.four{grid-template-columns:1fr}}

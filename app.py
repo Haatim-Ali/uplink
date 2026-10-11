@@ -348,16 +348,25 @@ def api_camera_status():
 def api_compare():
     """Scripted scenarios plus N seeded random runs. Deterministic, so cached after the first call."""
     n = max(5, min(200, int(request.args.get("n", 50))))
-    if n not in _compare_cache:
-        rnd = scenarios.compare_random(n)
-        rnd.pop("runs")
-        _compare_cache[n] = {"scripted": scenarios.compare(), "random": rnd}
-    return jsonify(_compare_cache[n])
+    return jsonify(compare_results(n))
+
+
+_compare_lock = threading.Lock()
+
+
+def compare_results(n=50):
+    with _compare_lock:   # the startup warm-up and a page load never compute it twice
+        if n not in _compare_cache:
+            rnd = scenarios.compare_random(n, solo=True)
+            rnd.pop("runs")
+            _compare_cache[n] = {"scripted": scenarios.compare(), "random": rnd}
+        return _compare_cache[n]
 
 
 if __name__ == "__main__":
     threading.Thread(target=clock_loop, daemon=True).start()
     threading.Thread(target=planner_loop, daemon=True).start()
+    threading.Thread(target=compare_results, daemon=True).start()   # warm the Evidence page in the background
     port = int(os.getenv("PORT", "5050"))   # 5000 is taken by AirPlay on Macs
     print("Uplink · food rescue agents")
     print(f"Customer site: http://localhost:{port}   Schedule a pickup: http://localhost:{port}/#/schedule")
