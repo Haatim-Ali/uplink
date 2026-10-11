@@ -15,7 +15,7 @@ const OUTCOME = {
 let view = "live", sub = null;
 let S = null, roundSel = null, lastNegKey = null, pinned = null;
 // Debate playback: a new negotiation is revealed one message at a time, then the outcome lands.
-const PLAY_MS = 900;
+const PLAY_MS = 1600;   // one debate line every 1.6 s, slow enough to follow on a demo video
 let play = {seq: null, shown: 0, total: 0};
 setInterval(()=>{ if(voiceOn && speaking) return;   // with voices on, the next line waits for the current one
   if(play.seq !== null && play.shown < play.total){ play.shown++; if(S && view==="live") drawNegotiation(); } }, PLAY_MS);
@@ -194,7 +194,7 @@ function drawDonationCard(n){
   let d = n ? S.donations.find(x=>x.id===n.donation) : null;
   if(!d) d = S.donations.slice().reverse().find(x=>!["delivered","spoiled","expired"].includes(x.status)) || null;
   if(!d){
-    setHTML("cur-don", `<div class="empty-state"><p><b>No donation in progress</b></p><p class="muted">Choose a scenario under Demo controls and run it, or send a real donation from the Business page.</p><button class="btn primary sm" type="button" onclick="document.getElementById('start').click()">▶ Run selected scenario</button></div>`);
+    setHTML("cur-don", `<div class="empty-state"><p><b>No donation in progress</b></p><p class="muted">Run a scenario under Demo controls, or send a donation from the customer site.</p></div>`);
     return;
   }
   const live = !["delivered","spoiled","expired"].includes(d.status);
@@ -549,7 +549,7 @@ async function refresh(){
 }
 let fastTimer = null;
 
-function resetLocal(){ lastNegKey=null; pinned=null; play={seq:0,shown:0,total:0}; lastSeq=0; }
+function resetLocal(){ lastNegKey=null; pinned=null; play={seq:0,shown:0,total:0}; lastSeq=0; call=null; callFor=null; endSpeak(); drawCall(); }
 $("start").onclick = async()=>{ closeMenus(); await post("/api/reset",{scenario:$("scenario").value}); resetLocal(); if(location.hash!=="#/live") location.hash = "#/live"; refresh(); };
 $("blank").onclick = async()=>{ closeMenus(); await post("/api/reset",{}); resetLocal(); refresh(); };
 $("speed").onchange = e=>post("/api/control",{speed:+e.target.value});
@@ -661,7 +661,7 @@ $("voice").onclick = ()=>{
 
 // ---------- Agent network: a live diagram of who is talking to whom for the current donation ----------
 const W_NS = "http://www.w3.org/2000/svg";
-const wireSeen = new Set();
+const wireSeen = new Map();   // line key -> {t: when it first appeared, delay: when it starts drawing}
 const short = (t, k=22) => { t = String(t||""); return t.length > k ? t.slice(0, k-1) + "…" : t; };
 function wireCurve(x1, y1, x2, y2, bend){ const mx = (x1+x2)/2, my = (y1+y2)/2 + (bend||0); return `M${x1},${y1} Q${mx},${my} ${x2},${y2}`; }
 // While the agents deliberate, the diagram follows the debate as it happens (S.deliberating), round by round.
@@ -711,7 +711,7 @@ function drawWire(){
   const LW = {biz: 205, s: 190, d: 190};
   const tail = k => { const P = pos[k], w = k === "biz" ? LW.biz : LW[k.slice(0, 1)] || 0; return P && w ? {x: P.x + w, y: P.y} : P; };
   const add = (key, a, b, cls, bend, fromTail, toTail) => { if(pos[a] && pos[b]) edges.push({key, a, b, cls, bend, A: fromTail ? tail(a) : pos[a], B: toTail ? tail(b) : pos[b]}); };
-  if(msgs.some(m => m.kind === "announce")) shelterNames.forEach(nm => add("ann:"+nm, "biz", "s:"+nm, "e-ann", 0, true));
+  if(msgs.some(m => m.kind === "announce")) shelterNames.filter(nm => !replies[nm]).forEach(nm => add("ann:"+nm, "biz", "s:"+nm, "e-ann", 0, true));
   Object.values(replies).forEach(m => add("rep:"+m.from+m.kind, "s:"+m.from, "biz", "e-"+m.kind, 26, false, true));
   Object.values(bids).forEach(m => add("bid:"+m.from, "d:"+m.from, "hub", "e-bid", 0, true));
   // the debate: an objection draws an arc from the objector to whoever proposed that plan
@@ -728,8 +728,14 @@ function drawWire(){
   if(done && chosenNp && pos["s:"+chosenNp]) add("award:"+n.seq, "hub", "s:"+chosenNp, "e-award", -40, false, true);
 
   let html = `<g class="w-cols"><text x="30" y="18">Business</text><text x="280" y="18">Shelter agents</text><text x="550" y="18">Driver agents</text><text x="808" y="18">Coordinators</text></g>`;
-  html += edges.map(e => { const A = e.A, B = e.B, isNew = !wireSeen.has(n.seq + e.key);
-    return `<path class="edge ${e.cls}${isNew ? " new" : ""}" d="${wireCurve(A.x, A.y, B.x, B.y, e.bend)}"/>`; }).join("");
+  // new lines draw one after another in the order things happen: shelters answer, then drivers bid, then the debate
+  const stage = {"e-acc": 0, "e-cou": 0, "e-dec": 0, "e-bid": 1, "e-obj": 2, "e-awa": 2}, nth = [0, 0, 0];
+  const now = performance.now() / 1000;
+  html += edges.map(e => { const A = e.A, B = e.B, k = S.world_id + n.seq + e.key, g = stage[e.cls.split(" ")[0].slice(0, 5)] ?? 0;
+    if(!wireSeen.has(k)) wireSeen.set(k, {t: now, delay: (g === 1 ? 1.4 : 0) + 0.35 * nth[g]++});
+    const w = wireSeen.get(k), left = w.delay - (now - w.t);   // a redraw continues the animation where it was
+    const drawing = left > -1.4;
+    return `<path class="edge ${e.cls}${drawing ? " new" : ""}"${drawing ? ` style="animation-delay:${left.toFixed(2)}s"` : ""} d="${wireCurve(A.x, A.y, B.x, B.y, e.bend)}"/>`; }).join("");
   const node = (k, label, sub, cls) => { const P = pos[k]; return `<g class="node ${cls||""}" transform="translate(${P.x},${P.y})"><circle r="9"/><text x="16" y="-2">${esc(short(label, 20))}</text>${sub ? `<text x="16" y="14" class="sub">${esc(sub)}</text>` : ""}</g>`; };
   html += node("biz", d.business_name || "Business", `${d.food ? d.food.servings + " servings" : ""}`, "biz");
   shelterNames.forEach(nm => { const r = replies[nm];
@@ -743,7 +749,7 @@ function drawWire(){
     html += node(a, a, vetoed ? "veto" : wants, "coord " + a + (vetoed ? " vetoed" : "") + (n.live ? " thinking" : "")); });
   if(n.live) html += `<text x="770" y="378" text-anchor="middle" class="w-step">Deliberating · ${esc(step)}…</text>`;
   if(done){ const o = (OUTCOME[n.outcome] || {}).t || n.outcome; html += `<text x="770" y="378" text-anchor="middle" class="w-outcome ${n.outcome}">${esc(o)}</text>`; }
-  if(svg._h !== html){ svg._h = html; svg.innerHTML = html; edges.forEach(e => wireSeen.add(S.world_id + n.seq + e.key)); }
+  if(svg._h !== html){ svg._h = html; svg.innerHTML = html; }
 
   // the message log: network messages, then the debate lines as they're revealed
   const log = msgs.map(m => ({t:m.time, from:m.from, to:m.to === "network" ? "all shelters" : m.to, kind:m.kind, text:m.text}))
