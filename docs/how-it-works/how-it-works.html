@@ -362,7 +362,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <h2><span class="num">10</span>Voices</h2>
 <p class="lead">With an ElevenLabs key, the debate can be heard, and shelters can answer by speaking.</p>
 <ul>
-<li><b>The agents speak.</b> Turn on Demo controls → Sound → Voices on the ops dashboard. Speed, Cost and Need each read their lines in a different voice, and a dispatcher voice announces the outcome. Each line waits for the previous one to finish.</li>
+<li><b>The agents speak.</b> Turn on Demo controls → Sound and look → Voices on the ops dashboard. Speed, Cost and Need each read their lines in a different voice, and a dispatcher voice announces the outcome. Each line waits for the previous one to finish.</li>
 <li><b>The shelter hears requests.</b> On the shelter phone page, turn Voice on, and each new request is read aloud.</li>
 <li><b>The shelter answers out loud.</b> Tap "Answer by voice" and say "yes", "no", or a number like "just 20". ElevenLabs turns speech into text, and Uplink's code turns that into accept, decline or take part.</li>
 <li><b>The Phone line.</b> On the ops dashboard, after the agents choose a shelter, a dispatcher voice "calls" it: it reads out the food, driver and arrival time, and the shelter answers with its agent's actual reply ("We'll take 20 of the 30"). Voices use ElevenLabs Flash; spoken answers are transcribed with ElevenLabs Scribe. It's a voiced replay in the browser, not a call over the phone network; a staff member's real spoken answer from the shelter phone page appears in it too.</li>
@@ -441,7 +441,17 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <li><b>Refusing bad compromises involves people.</b> The team asked a human 6 times, where single agents just acted. That is by design: those are the cases where agreeing would have been wrong.</li>
 <li><b>Real disagreement needs red lines.</b> Before red lines were added, every negotiation in the original scenarios ended in full agreement. Now the team's 48 decisions ended: consensus 39, unacceptable compromise 4, majority 2, insufficient evidence 2, irreconcilable 1.</li>
 </ol>
-<div class="tech"><span class="tag">Randomized check</span>The dashboard's Evidence page also runs 50 randomized scenarios (3 to 6 donations each, with no-shows, full shelters and new pantries) against the nearest-shelter baseline. In the run we checked, the agents lost 77% less food, delivered 22% more meals and spent 14% less on drivers, and lost more food than the baseline in 0 of 50 runs. Random runs vary slightly each time.</div>
+<h3>The strongest evidence: random scenarios the system had never seen</h3>
+<p>100 random scenarios (3 to 6 donations each, driver no-shows, full shelters, new pantries), not used while building:</p>
+<table>
+<tr><th>Policy</th><th class="n">Servings lost</th><th class="n">Meals delivered</th><th class="n">Shelters fed</th><th class="n">Driver cost</th></tr>
+<tr><td>Nearest shelter</td><td class="n">3,834</td><td class="n">13,620</td><td class="n">254</td><td class="n">$2,927</td></tr>
+<tr><td>Speed alone</td><td class="n">1,336</td><td class="n">16,118</td><td class="n">309</td><td class="n">$3,228</td></tr>
+<tr><td>Cost alone</td><td class="n">1,726</td><td class="n">15,728</td><td class="n">292</td><td class="n"><b>$1,305</b></td></tr>
+<tr><td>Need alone</td><td class="n">1,459</td><td class="n">15,995</td><td class="n">386</td><td class="n">$2,581</td></tr>
+<tr><td><b>Team</b></td><td class="n"><b>676</b></td><td class="n"><b>16,778</b></td><td class="n"><b>440</b></td><td class="n">$2,115</td></tr>
+</table>
+<div class="plain"><span class="tag">In plain words</span>Working together, the agents lost <b>half as much food as the best agent working alone</b> (49% less) and 82% less than the simple approach, delivered the most meals and reached the most shelters. They were never worse than the simple approach in any run. The trade-off: the cost-minimizing agent alone is cheaper.</div>
 </div>
 
 <!-- ============ 13 ============ -->
