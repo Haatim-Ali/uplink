@@ -353,7 +353,7 @@ def api_compare():
 if __name__ == "__main__":
     threading.Thread(target=clock_loop, daemon=True).start()
     threading.Thread(target=planner_loop, daemon=True).start()
-    port = int(os.getenv("PORT", "5000"))
+    port = int(os.getenv("PORT", "5050"))   # 5000 is taken by AirPlay on Macs
     print("Uplink · food rescue agents")
     print(f"Customer site: http://localhost:{port}   Schedule a pickup: http://localhost:{port}/#/schedule")
     print(f"Ops dashboard (judges): http://localhost:{port}/ops   Shelter phone: http://localhost:{port}/shelter")
