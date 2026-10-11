@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
+<script>try{var t=localStorage.getItem("uplink_theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,7 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="/static/uplink.css">
 <link rel="stylesheet" href="/static/dashboard.css">
 </head>
@@ -52,8 +53,8 @@
             </div>
           </div>
           <div class="dd-sec">
-            <h3>Sound</h3>
-            <div class="dd-row"><button class="btn sm" id="voice" type="button" aria-pressed="false" title="Each agent speaks its lines in its own voice (ElevenLabs; the browser's voice without a key)">Voices off</button></div>
+            <h3>Sound and look</h3>
+            <div class="dd-row"><button class="btn sm" id="theme" type="button" title="Switch between dark and light (light is easier to read on some projectors)">Light mode</button><button class="btn sm" id="voice" type="button" aria-pressed="false" title="Each agent speaks its lines in its own voice (ElevenLabs; the browser's voice without a key)">Voices off</button></div>
           </div>
           <div class="dd-sec">
             <h3>Inject a problem</h3>
@@ -95,6 +96,14 @@
     <div class="kpi"><b data-k="orgs">0</b><span>organizations fed</span></div>
     <div class="kpi"><b data-k="lost" data-bad>0</b><span>servings lost</span></div>
     <div class="kpi"><b data-k="cost">$0</b><span>spent on paid drivers</span></div>
+  </div>
+
+  <div class="panel wire" aria-labelledby="wire-h">
+    <div class="panel-head"><h2 id="wire-h">Agent network <span class="sub-h">live messages for the current donation</span></h2><span class="wire-stat" id="wire-stat"><i class="dot"></i>idle</span></div>
+    <div class="wire-body">
+      <svg id="wire" viewBox="0 0 1000 300" role="img" aria-label="Diagram of the business, shelter, driver and coordinator agents and the messages between them"></svg>
+      <ol class="wire-log" id="wire-log" aria-label="Message log"></ol>
+    </div>
   </div>
 
   <div class="live-grid">

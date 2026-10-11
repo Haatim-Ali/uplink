@@ -210,6 +210,7 @@ function drawDonationCard(n){
 
 function pin(seq){ pinned = (pinned===seq ? null : seq); lastNegKey=null; drawNegotiation(); }
 function drawNegotiation(){
+  try{ drawWire(); }catch(e){ console.error(e); }
   const hero = $("hero-panel");
   const hist = S.negotiations || [];
   const n = currentNeg();
@@ -539,3 +540,92 @@ $("voice").onclick = ()=>{
   if(voiceOn){ toast(S && S.mode.voice==="elevenlabs" ? "Voices on (ElevenLabs). Replaying the debate." : "Voices on (browser voice; add an ElevenLabs key for real voices)", "info"); lastSpoken = null; if(S) replay(); }
   else { endSpeak(); if(window.speechSynthesis) speechSynthesis.cancel(); Object.values(audioCache).forEach(a=>a.pause()); }
 };
+
+// ---------- Agent network: a live diagram of who is talking to whom for the current donation ----------
+const W_NS = "http://www.w3.org/2000/svg";
+const wireSeen = new Set();
+const short = (t, k=22) => { t = String(t||""); return t.length > k ? t.slice(0, k-1) + "…" : t; };
+function wireCurve(x1, y1, x2, y2, bend){ const mx = (x1+x2)/2, my = (y1+y2)/2 + (bend||0); return `M${x1},${y1} Q${mx},${my} ${x2},${y2}`; }
+function drawWire(){
+  const svg = $("wire"); if(!svg || !S) return;
+  const n = currentNeg();
+  const stat = $("wire-stat");
+  if(!n){ svg.innerHTML = `<text x="500" y="150" text-anchor="middle" class="w-empty">Waiting for a donation. Run a scenario under Demo controls.</text>`; setHTML("wire-log", ""); stat.className = "wire-stat"; stat.innerHTML = `<i class="dot"></i>idle`; return; }
+  const all = (S.network||[]).filter(m => m.donation === n.donation);
+  let start = 0; all.forEach((m,i) => { if(m.kind === "announce") start = i; });
+  const msgs = all.slice(start);
+  const d = S.donations.find(x => x.id === n.donation) || {};
+  // the debate, revealed in step with the playback
+  const lines = n.rounds.flatMap(r => r.messages.map(m => ({...m, round:r.round})));
+  const shown = play.seq === n.seq ? play.shown : lines.length;
+  const playing = shown < lines.length;
+  const rIdx = playing ? Math.max(0, (shown ? lines[shown-1].round : 1) - 1) : n.rounds.length - 1;
+  const R = n.rounds[rIdx];
+
+  // nodes
+  const replies = {}; msgs.filter(m => ["accept","counter","decline"].includes(m.kind)).forEach(m => replies[m.from] = m);
+  const bids = {}; msgs.filter(m => m.kind === "bid").forEach(m => bids[m.from] = m);
+  const shelterNames = Object.keys(replies).concat((S.nonprofits||[]).map(x => x.name).filter(nm => !replies[nm])).slice(0, 7);
+  const driverNames = Object.keys(bids).concat((S.drivers||[]).map(x => x.name).filter(nm => !bids[nm])).slice(0, 6);
+  const spread = (k, i, top=34, bot=266) => k <= 1 ? 150 : top + (bot - top) * i / (k - 1);
+  const pos = {};
+  pos.biz = {x:70, y:150};
+  shelterNames.forEach((nm, i) => pos["s:"+nm] = {x:330, y:spread(shelterNames.length, i)});
+  driverNames.forEach((nm, i) => pos["d:"+nm] = {x:600, y:spread(driverNames.length, i, 50, 250)});
+  pos.Speed = {x:850, y:70}; pos.Cost = {x:850, y:150}; pos.Need = {x:850, y:230}; pos.hub = {x:790, y:150};
+  const chosenNp = n.plan && n.plan.np_name, chosenDr = n.plan && n.plan.driver_name;
+  const done = !playing;
+
+  const edges = [];
+  const add = (key, a, b, cls, bend) => { if(pos[a] && pos[b]) edges.push({key, a, b, cls, bend}); };
+  if(msgs.some(m => m.kind === "announce")) shelterNames.forEach(nm => add("ann:"+nm, "biz", "s:"+nm, "e-ann", 0));
+  Object.values(replies).forEach(m => add("rep:"+m.from+m.kind, "s:"+m.from, "biz", "e-"+m.kind, 26));
+  Object.values(bids).forEach(m => add("bid:"+m.from, "d:"+m.from, "hub", "e-bid", 0));
+  // the debate: an objection draws an arc from the objector to whoever proposed that plan
+  if(R && shown){
+    const said = new Set(lines.slice(0, shown).filter(l => l.round === R.round).map(l => l.agent));
+    ["Speed","Cost","Need"].forEach(a => {
+      if(!said.has(a)) return;
+      Object.entries(R.votes||{}).forEach(([pid, v]) => {
+        if(!v[a] || v[a].accept) return;
+        ["Speed","Cost","Need"].filter(b => b !== a && R.proposals[b] === pid).forEach(b => add(`obj:${R.round}:${a}>${b}`, a, b, "e-obj " + a, a === "Cost" ? 60 : -60));
+      });
+    });
+  }
+  if(done && chosenNp && pos["s:"+chosenNp]) add("award:"+n.seq, "hub", "s:"+chosenNp, "e-award", -70);
+
+  let html = `<g class="w-cols"><text x="70" y="16">Business</text><text x="330" y="16">Shelter agents</text><text x="600" y="16">Driver agents</text><text x="850" y="16">Coordinators</text></g>`;
+  html += edges.map(e => { const A = pos[e.a], B = pos[e.b], isNew = !wireSeen.has(n.seq + e.key);
+    return `<path class="edge ${e.cls}${isNew ? " new" : ""}" d="${wireCurve(A.x, A.y, B.x, B.y, e.bend)}"/>`; }).join("");
+  const node = (k, label, sub, cls) => { const P = pos[k]; return `<g class="node ${cls||""}" transform="translate(${P.x},${P.y})"><circle r="9"/><text x="15" y="-1">${esc(short(label))}</text>${sub ? `<text x="15" y="12" class="sub">${esc(sub)}</text>` : ""}</g>`; };
+  html += node("biz", d.business_name || "Business", `${d.food ? d.food.servings + " servings" : ""}`, "biz");
+  shelterNames.forEach(nm => { const r = replies[nm];
+    const sub = r ? (r.kind === "accept" ? "yes" : r.kind === "counter" ? (r.text.match(/take (\d+)/) ? "takes " + r.text.match(/take (\d+)/)[1] : "counter") : "no") : "";
+    html += node("s:"+nm, nm, done && nm === chosenNp ? "chosen" : sub, (r ? r.kind : "quiet") + (done && nm === chosenNp ? " chosen" : "")); });
+  driverNames.forEach(nm => { const b = bids[nm]; const price = b ? ((b.text.match(/\$\d+(\.\d+)?|[Ff]ree/) || ["bid"])[0]).toLowerCase() : "";
+    html += node("d:"+nm, nm, done && nm === chosenDr ? "chosen" : price, (b ? "bid" : "quiet") + (done && nm === chosenDr ? " chosen" : "")); });
+  html += `<g class="node hub" transform="translate(790,150)"><circle r="5"/></g>`;
+  ["Speed","Cost","Need"].forEach(a => { const pid = R && R.proposals[a]; const vetoed = R && Object.values(R.votes||{}).some(v => v[a] && !v[a].accept && /^Veto/.test(v[a].reason));
+    const wants = pid ? "wants " + short((S.nonprofits.find(x => x.id === pid.split("|")[0]) || {}).name || "", 16) : "";
+    html += node(a, a, vetoed ? "veto" : wants, "coord " + a + (vetoed ? " vetoed" : "")); });
+  if(done){ const o = (OUTCOME[n.outcome] || {}).t || n.outcome; html += `<text x="790" y="290" text-anchor="middle" class="w-outcome ${n.outcome}">${esc(o)}</text>`; }
+  if(svg._h !== html){ svg._h = html; svg.innerHTML = html; edges.forEach(e => wireSeen.add(n.seq + e.key)); }
+
+  // the message log: network messages, then the debate lines as they're revealed
+  const log = msgs.map(m => ({t:m.time, from:m.from, to:m.to === "network" ? "all shelters" : m.to, kind:m.kind, text:m.text}))
+    .concat(lines.slice(0, shown).map(l => ({t:n.time, from:l.agent, to:"team", kind:l.type === "objection" ? (/Veto/.test(l.text) ? "veto" : "object") : "propose", text:l.text.replace(/^R\d+ · /, "")})));
+  if(done && n.plan) log.push({t:n.time, from:"Team", to:n.plan.np_name, kind:"decide", text:((OUTCOME[n.outcome]||{}).t || n.outcome) + ". " + n.plan.np_name + " via " + n.plan.driver_name});
+  setHTML("wire-log", log.slice(-40).map(l => `<li class="k-${esc(l.kind)}"><span class="t">${esc(l.t||"")}</span><span class="r">${esc(short(l.from, 18))} → ${esc(short(l.to, 18))}</span><span class="kd">${esc(l.kind)}</span><span class="tx">${esc(l.text)}</span></li>`).join(""));
+  const wl = $("wire-log"); wl.scrollTop = wl.scrollHeight;
+  stat.className = "wire-stat" + (playing || S.busy ? " live" : "");
+  stat.innerHTML = `<i class="dot"></i>${playing || S.busy ? "live" : "done"} · ${esc(n.donation)}`;
+}
+
+// light / dark (light can read better on a projector in a bright room)
+(function(){
+  const b = $("theme"); if(!b) return;
+  const sync = () => { b.textContent = document.documentElement.dataset.theme === "dark" ? "Light mode" : "Dark mode"; };
+  b.onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; try{ localStorage.setItem("uplink_theme", t); }catch(e){} sync(); };
+  sync();
+})();
+
