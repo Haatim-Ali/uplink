@@ -122,12 +122,36 @@ function resetSchedule(full){
   $("sch-pick").hidden = false; $("sch-confirm").hidden = true; setStep(1);
   if(full){ photo = null; $("file").value = ""; $("preview").style.display = "none"; $("dropText").textContent = "Take or choose a photo"; $("analyze").disabled = true; }
 }
+const isVideo = f => f && /^video\//.test(f.type);
 $("file").onchange = e => {
   photo = e.target.files[0]; if(!photo) return;
-  $("preview").src = URL.createObjectURL(photo); $("preview").style.display = "block";
-  $("dropText").textContent = "Photo added. Tap to change it";
+  const url = URL.createObjectURL(photo), vid = isVideo(photo);
+  $("preview").style.display = vid ? "none" : "block"; if(!vid) $("preview").src = url;
+  $("previewVid").hidden = !vid; if(vid) $("previewVid").src = url;
+  $("dropText").textContent = vid ? "Video added. Tap to change it" : "Photo added. Tap to change it";
   $("analyze").disabled = false;
 };
+// A video becomes one image: four frames spread across it, tiled 2x2. The vision model is told they are
+// views of the same food, so it counts each item once.
+function videoSheet(file, frames = 4){
+  return new Promise((resolve, reject) => {
+    const v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto";
+    v.src = URL.createObjectURL(file);
+    v.onerror = () => reject(new Error("This browser can't read that video. Try an MP4, or take a photo."));
+    v.onloadedmetadata = async () => {
+      const W = 784, k = W / Math.max(v.videoWidth, v.videoHeight), w = Math.round(v.videoWidth * k), h = Math.round(v.videoHeight * k);
+      const c = document.createElement("canvas"); c.width = w * 2; c.height = h * 2;
+      const g = c.getContext("2d"); g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height);
+      const dur = isFinite(v.duration) && v.duration > 0 ? v.duration : 1;
+      for(let i = 0; i < frames; i++){
+        await new Promise(ok => { v.onseeked = ok; v.currentTime = Math.min(dur - 0.05, dur * (0.1 + 0.8 * i / (frames - 1))); });
+        g.drawImage(v, (i % 2) * w, Math.floor(i / 2) * h, w, h);
+      }
+      URL.revokeObjectURL(v.src);
+      c.toBlob(b => b ? resolve(b) : reject(new Error("Couldn't read frames from the video.")), "image/jpeg", 0.88);
+    };
+  });
+}
 // Shrink the photo in the browser before upload: faster, and keeps it within the model's limits.
 // If the browser can't decode it (e.g. HEIC in Chrome), send the original; the server converts it.
 function shrink(file, maxEdge = 1568){
@@ -191,8 +215,12 @@ function fill(f){
   $("sch-pick").hidden = true; $("sch-confirm").hidden = false; setStep(2); window.scrollTo(0, 0);
 }
 $("analyze").onclick = async () => {
-  $("analyze").disabled = true; $("analyze").textContent = "Reading your photo…";
-  const fd = new FormData(); fd.append("photo", await shrink(photo), "photo.jpg"); fd.append("business", $("biz").value);
+  $("analyze").disabled = true; $("analyze").textContent = isVideo(photo) ? "Reading your video…" : "Reading your photo…";
+  const fd = new FormData(); fd.append("business", $("biz").value);
+  if(isVideo(photo)){
+    try{ fd.append("photo", await videoSheet(photo), "frames.jpg"); fd.append("frames", "4"); }
+    catch(e){ $("analyze").textContent = "Continue"; $("analyze").disabled = false; $("dropText").textContent = e.message; return; }
+  } else fd.append("photo", await shrink(photo), "photo.jpg");
   let r;
   try { r = await (await fetch("/api/vision", {method:"POST", body:fd})).json(); if(!r.food) throw new Error(); }
   catch(e){ r = {source:"fallback", food:{items:[],servings:1,safe_minutes:120,weight_lbs:[1,2],category:"hot prepared",allergens:[],needs_cold:false}}; }

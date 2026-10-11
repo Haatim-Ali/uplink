@@ -176,7 +176,10 @@ def api_vision():
         foods, source = vision.analyze_many(f.read(), f.mimetype or "image/jpeg", request.form.get("hint", ""))
         return jsonify(foods=foods, source=source)
     biz = request.form.get("business", "")
-    food, source = vision.analyze(f.read(), f.mimetype or "image/jpeg", menu.hint(biz))
+    extra = menu.hint(biz)
+    if request.form.get("frames"):   # a video, sent as a 2x2 grid of frames
+        extra = vision.VIDEO_NOTE + extra
+    food, source = vision.analyze(f.read(), f.mimetype or "image/jpeg", extra)
     if source not in ("demo", "fallback"):
         food = menu.enrich(food, biz)   # menu items bring their known allergens and category
     return jsonify(food=food, source=source)

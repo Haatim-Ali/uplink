@@ -233,3 +233,5 @@ input,select{font-size:1.05rem;min-height:3.2rem;border-radius:14px;border-color
 .say-status{text-align:center;color:var(--muted);margin-top:1rem;min-height:1.5em}
 .say-credit{text-align:center;color:var(--faint);font-size:.82rem;margin-top:.5rem}
 @media (max-width:420px){.segmented button{font-size:.9rem}}
+
+#previewVid{width:100%;max-height:18rem;border-radius:var(--r3);margin-top:1rem;background:#000}

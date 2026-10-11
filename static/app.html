@@ -103,13 +103,14 @@
   </div>
 
   <div id="sch-photo" role="tabpanel" aria-labelledby="tab-photo" hidden>
-    <p class="lead">Show everything in one shot. We match what we see to your menu.</p>
+    <p class="lead">Show everything in one shot, or pan slowly across it in a short video. We match what we see to your menu.</p>
     <label class="drop" for="file" id="dropLabel">
       <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-      <span id="dropText">Take or choose a photo</span>
+      <span id="dropText">Take or choose a photo or a short video</span>
     </label>
-    <input id="file" type="file" accept="image/*" capture="environment" class="sr-only">
+    <input id="file" type="file" accept="image/*,video/*" class="sr-only">
     <img id="preview" alt="Preview of your food photo">
+    <video id="previewVid" muted playsinline controls hidden></video>
     <button class="btn primary xl" id="analyze" type="button" disabled>Continue</button>
     <button class="linkbtn" id="skip" type="button">No photo? Type it in instead</button>
   </div>
