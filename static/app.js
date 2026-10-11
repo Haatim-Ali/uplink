@@ -279,7 +279,7 @@ function drawTrack(){
       <button class="btn primary" type="button" id="q-yes">Yes, that's everything</button><button class="btn" type="button" id="q-no">Not sure</button></div>`;
   }
   setIn("trackTop", `<div class="trk-title"><h1>${esc(st.head)}</h1><span class="id">#${esc(d.id)}</span></div>${st.sub ? `<p class="trk-sub">${esc(st.sub)}</p>` : ""}
-    <div class="seg" aria-hidden="true">${segs}</div><div class="seg-lbl"><span>Received</span><span>${esc(st.fail ? "Not delivered" : STEPS[Math.max(0, st.step - 1)])}</span><span>Delivered</span></div>${question}`);
+    <div class="seg" aria-hidden="true">${segs}</div><div class="seg-lbl"><span>Received</span><span>${esc(st.fail ? "Not delivered" : st.step > 1 && st.step < STEPS.length ? STEPS[st.step - 1] : "")}</span><span>Delivered</span></div>${question}`);
   if(question){ $("q-yes").onclick = () => answer(d, true); $("q-no").onclick = () => answer(d, false); }
 
   const rec = done && S.records.find(r => r.donation === d.id);
