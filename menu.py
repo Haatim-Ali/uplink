@@ -116,3 +116,97 @@ def enrich(food, biz):
             food["allergens_unverified"] = False   # every item is on the menu: its recipes are known
     food["menu_matches"] = len(hits)
     return food
+
+
+# ---------- spoken donations: "we've got twenty turkey sandwiches and two pizzas" ----------
+
+_STOP = {"of", "the", "a", "an", "and", "with", "in", "on", "for", "fresh", "plain", "mixed", "whole", "mini", "1", "gallon"}
+_UNITWORDS = {"tray", "trays", "pan", "pans", "box", "boxes", "bag", "bags", "half", "case", "cases", "crate", "crates",
+              "dozen", "loaf", "loaves", "bunch", "bunches", "cup", "cups", "carton", "cartons", "container", "containers"}
+
+
+def _sing(w):
+    """Crude singular, applied the same way to the menu and to what was said."""
+    w = w.lower().strip(".,!?'\"")
+    w = {"loaves": "loaf", "halves": "half", "dozens": "dozen"}.get(w, w)
+    if len(w) > 4 and w.endswith(("ches", "shes", "sses", "xes", "oes")):
+        return w[:-2]
+    if len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
+        return w[:-1]
+    return w
+
+
+_BREAK = {"and", "plus", "also", "with", "then", "some", "few", "couple"}
+
+
+def _qty_before(words, heads, i):
+    """The amount said just before word i, without crossing into the previous item ("3 bananas and some salads")."""
+    import voice   # number words ("twenty five") live with the voice code
+    span = []
+    for j in range(i - 1, max(-1, i - 6), -1):
+        w = words[j]
+        if w in _BREAK or _sing(w) in heads:
+            break
+        span.insert(0, w)
+    t = " ".join(span)
+    nums = [n for n in voice._numbers(t.replace("dozen", "")) if n > 0]
+    q = nums[-1] if nums else (1 if "dozen" not in t else 0)
+    if "dozen" in t:
+        q = (q or 1) * 12
+    return q or 1
+
+
+def parse_speech_rules(biz, text):
+    """No AI: find menu items named in the sentence and the amount said just before each one."""
+    words = [w for w in re.split(r"[\s,.;!?]+", text.lower()) if w]
+    sing = [_sing(w) for w in words]
+    ms = items(biz)
+    # "Chicken curry with rice" is a curry: the food is named before "with"
+    name_words = {m["id"]: [_sing(w) for w in re.findall(r"[a-z]+", re.split(r"\bwith\b|,", m["name"].lower())[0]) if w not in _STOP] for m in ms}
+    heads = {ws[-1] for ws in name_words.values() if ws}
+    lines, used = [], set()
+    for m in ms:
+        keys = name_words[m["id"]]
+        if not keys:
+            continue
+        head = keys[-1]   # "turkey sandwich" -> "sandwich": the last word names the food
+        # skip a word used as a modifier of another food ("vegetable" in "vegetable lasagna")
+        hits = [i for i, w in enumerate(sing) if w == head and i not in used and not (i + 1 < len(sing) and sing[i + 1] in heads)]
+        if not hits:
+            continue
+        near = lambda i: sum(k in sing[max(0, i - 4):i] for k in keys[:-1])
+        best = max(hits, key=near)
+        same_head = [o for o in ms if name_words[o["id"]] and name_words[o["id"]][-1] == head]
+        if len(same_head) > 1 and len(keys) > 1 and not near(best):
+            continue   # "sandwich" with two sandwiches on the menu: let the person pick
+        used.add(best)
+        lines.append({"id": m["id"], "name": m["name"], "qty": max(1, min(500, _qty_before(words, heads, best))), "serves": m["serves"]})
+    return lines
+
+
+def parse_speech(biz, text):
+    """Spoken leftovers -> menu lines. Claude when a key is set (handles 'a couple', 'half a tray', items not
+    on the menu); the word-matching rules otherwise. Returns (lines, extras, source)."""
+    import llm
+    ms = items(biz)
+    if llm.available() and ms:
+        try:
+            menu_txt = "\n".join(f'{m["id"]}: {m["name"]} (unit: {m["unit"]})' for m in ms)
+            out = llm.chat_json(
+                "You turn what a restaurant worker says about leftover food into an order against their menu. "
+                "Reply with JSON only.",
+                f"Menu (id: name):\n{menu_txt}\n\nThey said: \"{text}\"\n\n"
+                'Return {"lines": [{"id": "<menu id>", "qty": <number of units>}], '
+                '"extras": [{"name": "<food not on the menu>", "qty": <number>}]}. '
+                "Count in the menu's units. Only use ids from the menu. Leave out anything that isn't food.",
+                max_tokens=800, effort="low", model=os.getenv("AGENT_MODEL"))
+            by_id = {m["id"]: m for m in ms}
+            lines = [{"id": ln["id"], "name": by_id[ln["id"]]["name"], "qty": max(1, int(float(ln.get("qty") or 1))),
+                      "serves": by_id[ln["id"]]["serves"]} for ln in out.get("lines", []) if ln.get("id") in by_id]
+            extras = [{"name": str(e.get("name", ""))[:60], "qty": max(1, int(float(e.get("qty") or 1)))}
+                      for e in out.get("extras", []) if e.get("name")]
+            if lines or extras:
+                return lines, extras, llm.provider()
+        except Exception:  # noqa: BLE001 - fall back to the rules
+            pass
+    return parse_speech_rules(biz, text), [], "rules"

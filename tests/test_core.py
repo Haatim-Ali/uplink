@@ -410,6 +410,25 @@ def test_each_demo_scenario_shows_the_outcome_in_its_title():
         assert w.outcomes.get(outcome), (name, w.outcomes)
 
 
+def test_spoken_leftovers_fill_in_the_menu():
+    import app
+    import llm
+    saved = llm.available
+    llm.available = lambda: False   # the word-matching path, no AI needed
+    try:
+        c = app.app.test_client()
+        r = c.post("/api/voice/donation", data={"business": "corner-bakery",
+                   "text": "we have two dozen plain bagels and 12 sesame bagels and 4 sourdough loaves"}).get_json()
+        got = {ln["name"]: ln["qty"] for ln in r["lines"]}
+        assert got == {"Plain bagel": 24, "Sesame bagel": 12, "Sourdough loaf": 4}, got
+        r = c.post("/api/voice/donation", data={"business": "lakeside-hotel",
+                   "text": "two trays of chicken curry with rice and one vegetable lasagna"}).get_json()
+        assert {ln["name"]: ln["qty"] for ln in r["lines"]} == {"Chicken curry with rice": 2, "Vegetable lasagna": 1}
+        assert c.post("/api/voice/donation", data={"business": "campus-cafe"}).status_code == 400
+    finally:
+        llm.available = saved
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

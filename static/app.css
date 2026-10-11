@@ -195,7 +195,7 @@ input,select{font-size:1.05rem;min-height:3.2rem;border-radius:14px;border-color
 .who-row{display:flex;align-items:center;gap:.75rem;margin-top:1rem;background:var(--panel);border-radius:var(--r2);box-shadow:var(--shadow);padding:.4rem .5rem .4rem 1rem}
 .who-row label{margin:0;color:var(--muted);font-weight:600;white-space:nowrap}
 .who-row select{border:none;min-height:2.8rem;font-weight:700;background:transparent;padding-left:.25rem}
-.segmented{display:grid;grid-template-columns:1fr 1fr;gap:.25rem;margin-top:1rem;padding:.3rem;background:#e6e6e9;border-radius:16px}
+.segmented{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.25rem;margin-top:1rem;padding:.3rem;background:#e6e6e9;border-radius:16px}
 .segmented button{font:600 1rem var(--font);min-height:2.9rem;border:none;border-radius:12px;background:transparent;color:var(--muted);cursor:pointer}
 .segmented button[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 3px rgba(20,20,24,.1)}
 #sch-menu .lead,#sch-photo .lead{margin-top:1rem;font-size:.98rem}
@@ -221,3 +221,15 @@ input,select{font-size:1.05rem;min-height:3.2rem;border-radius:14px;border-color
 .menu-total .btn{min-height:3.2rem;border-radius:14px;padding:.6rem 1.3rem;font-size:1.05rem}
 
 .foot .powered{color:var(--faint);font-size:.82rem;margin-bottom:.4rem}
+
+/* say it */
+#sch-say .lead{margin-top:1rem}
+.mic-big{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;width:11rem;height:11rem;margin:1.75rem auto 0;border-radius:50%;border:none;background:var(--brand);color:#fff;font:700 1rem var(--font);cursor:pointer;box-shadow:0 10px 30px rgba(240,90,34,.35);transition:transform .15s}
+.mic-big:hover{transform:scale(1.03)}
+.mic-big:disabled{opacity:.6;cursor:wait}
+.mic-big.rec{background:var(--bad);animation:micring 1.2s ease-out infinite}
+@keyframes micring{0%{box-shadow:0 0 0 0 rgba(214,58,47,.45)}100%{box-shadow:0 0 0 1.5rem rgba(214,58,47,0)}}
+@media (prefers-reduced-motion:reduce){.mic-big.rec{animation:none}}
+.say-status{text-align:center;color:var(--muted);margin-top:1rem;min-height:1.5em}
+.say-credit{text-align:center;color:var(--faint);font-size:.82rem;margin-top:.5rem}
+@media (max-width:420px){.segmented button{font-size:.9rem}}

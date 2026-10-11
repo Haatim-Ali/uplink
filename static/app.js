@@ -391,11 +391,10 @@ if(closingBtn) closingBtn.onclick = () => { location.hash = "#/schedule"; showTa
 let menuItems = [], menuFor = null, qty = {};
 const KIND = {"hot prepared":"Hot", "cold prepared":"Cold", packaged:"Packaged", produce:"Produce"};
 function showTab(which){
-  const m = which === "menu";
-  $("tab-menu").setAttribute("aria-selected", String(m)); $("tab-photo").setAttribute("aria-selected", String(!m));
-  $("sch-menu").hidden = !m; $("sch-photo").hidden = m;
+  ["menu","say","photo"].forEach(t => { $("tab-" + t).setAttribute("aria-selected", String(t === which)); $("sch-" + t).hidden = t !== which; });
 }
 $("tab-menu").onclick = () => showTab("menu");
+$("tab-say").onclick = () => showTab("say");
 $("tab-photo").onclick = () => showTab("photo");
 async function loadMenu(){
   const biz = $("biz").value; if(!biz) return;
@@ -448,5 +447,53 @@ $("menuConfirm").onclick = async () => {
     refresh();
   }catch(e){ $("menuErr").textContent = "We couldn't schedule this. Check your connection and try again."; $("menuErr").hidden = false; }
   $("menuConfirm").disabled = false; $("menuConfirm").textContent = "Schedule pickup";
+};
+
+// ---------- say it: record -> ElevenLabs Scribe -> Claude matches it to the menu -> filled-in menu ----------
+let sayRec = null;
+function sayState(label, status, on){ $("sayLabel").textContent = label; $("sayStatus").textContent = status || ""; $("sayBtn").classList.toggle("rec", !!on); }
+async function sendSaid(form){
+  form.append("business", $("biz").value);
+  sayState("Matching to your menu…", "", false); $("sayBtn").disabled = true;
+  let r, j;
+  try{ r = await fetch("/api/voice/donation", {method:"POST", body:form}); j = await r.json(); }
+  catch(e){ j = {error:"Couldn't reach Uplink. Check the connection and try again."}; }
+  $("sayBtn").disabled = false;
+  if(!r || !r.ok){ sayState("Tap to talk", j.error || "Try again.", false); return; }
+  if(!j.lines.length && !j.extras.length){ sayState("Tap to talk", `Heard "${j.heard}", but nothing on your menu matched. Try naming the items, or tap them on the menu.`, false); return; }
+  j.lines.forEach(l => qty[l.id] = (qty[l.id] || 0) + l.qty);
+  const extra = j.extras.length ? ` Not on your menu: ${j.extras.map(e => `${e.name} ×${e.qty}`).join(", ")}. Add ${j.extras.length > 1 ? "them" : "it"} below.` : "";
+  $("sayNotice").textContent = `Heard: "${j.heard}". We filled in ${j.lines.length === 1 ? "1 item" : j.lines.length + " items"} from your menu. Check the amounts, then schedule.${extra}`;
+  $("sayNotice").hidden = false;
+  if(j.extras.length){ $("addForm").hidden = false; $("addToggle").setAttribute("aria-expanded","true"); $("newName").value = j.extras[0].name; }
+  sayState("Tap to talk", "", false);
+  showTab("menu"); drawMenu(); window.scrollTo(0, 0);
+}
+$("sayBtn").onclick = async () => {
+  if(sayRec && sayRec.state === "recording"){ sayRec.stop(); return; }
+  const eleven = S && S.mode && S.mode.voice === "elevenlabs";
+  if(!eleven){   // no ElevenLabs key on the server: the browser's own speech recognition, if it has one
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SR){ sayState("Tap to talk", "Voice needs an ElevenLabs key on the server, or Chrome. You can tap items on the menu instead.", false); return; }
+    const sr = new SR(); sr.lang = "en-US"; sayState("Listening… tap to stop", "", true);
+    sr.onresult = e => { const f = new FormData(); f.append("text", e.results[0][0].transcript); sendSaid(f); };
+    sr.onerror = () => sayState("Tap to talk", "Didn't catch that. Try again.", false);
+    sr.onend = () => { if($("sayBtn").classList.contains("rec")) sayState("Tap to talk", "", false); };
+    sr.start(); return;
+  }
+  let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ sayState("Tap to talk", "Microphone blocked. Allow it in the browser (works on localhost or https).", false); return; }
+  const chunks = [];
+  sayRec = new MediaRecorder(stream);
+  sayRec.ondataavailable = e => chunks.push(e.data);
+  sayRec.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    const type = sayRec.mimeType || "audio/webm";
+    const f = new FormData(); f.append("audio", new Blob(chunks, {type}), type.includes("mp4") ? "say.mp4" : "say.webm");
+    sendSaid(f);
+  };
+  sayRec.start(); sayState("Listening… tap when done", "Recording stops by itself after 15 seconds.", true);
+  setTimeout(() => { if(sayRec && sayRec.state === "recording") sayRec.stop(); }, 15000);
 };
 

@@ -198,6 +198,26 @@ def api_menu_add(biz):
         return jsonify(error=str(e)), 400
 
 
+@app.post("/api/voice/donation")
+def api_voice_donation():
+    """Hands-free donation: the business says what's left. ElevenLabs Scribe transcribes it (or the browser
+    sends its own transcript as 'text'), then Claude (or word matching) maps it onto the business's menu."""
+    biz = request.form.get("business", "")
+    text = (request.form.get("text") or "").strip()
+    f = request.files.get("audio")
+    stt = "browser"
+    if f and voice.available():
+        try:
+            text = voice.transcribe(f.read(), f.filename or "say.webm", f.mimetype or "audio/webm")
+            stt = "elevenlabs"
+        except Exception as e:  # noqa: BLE001
+            return jsonify(error=f"Couldn't transcribe that ({type(e).__name__}). Try again or tap items instead."), 502
+    if not text:
+        return jsonify(error="Didn't catch anything. Tap the mic and say what's left, like 'twenty turkey sandwiches'."), 400
+    lines, extras, parser = menu.parse_speech(biz, text)
+    return jsonify(heard=text, lines=lines, extras=extras, stt=stt, parser=parser)
+
+
 @app.post("/api/donate/menu")
 def api_donate_menu():
     """Donate items picked from the menu. Different kinds of food (hot, cold, packaged, produce) have
