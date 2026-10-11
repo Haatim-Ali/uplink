@@ -123,11 +123,11 @@ def planner_loop():
                 d["status"] = "new"  # driver was taken meanwhile; renegotiate
                 continue
             w.finish(d, plans, result)
-            # With the ops dashboard open, the first driver sets off only after it has played the dispatcher's call
-            # (it says when; HOLD_MAX is a backstop), so the map moves after the story is told, not during it
-            # (the first call of each scenario only: busy scenarios with many donations keep moving)
+            # With the ops dashboard open, the world waits while it replays the debate and plays the dispatcher's call
+            # (it says when; HOLD_MAX is a backstop), so things happen in order: decide, call, then the driver moves.
+            # Every decision at 1x and 2x; at 4x and up (city mode, many donations) only the first, so it keeps moving
             if plan and w.negotiation and time.time() - state.get("ops_seen", 0) < 5 \
-                    and state.get("held_world") != w.world_id:
+                    and (state["speed"] < 4 or state.get("held_world") != w.world_id):
                 state["held_world"] = w.world_id
                 state["hold_until"] = time.time() + HOLD_MAX
                 state["hold_seq"] = w.negotiation["seq"]
