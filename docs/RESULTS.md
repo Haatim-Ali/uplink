@@ -181,3 +181,29 @@ Team outcomes: irreconcilable 1
 
 Team outcomes: insufficient evidence 2, consensus 2
 
+
+## Photo reading accuracy
+
+17 photos of countable food from Wikimedia Commons (`eval_photos/`, licenses and links in `sources.json`),
+each counted by hand. Photos where we couldn't be sure of the true count ourselves (overlapping croissants,
+a tiered cupcake stand) were left out. Two full runs with Claude:
+
+| | Run 1 | Run 2 |
+| --- | --- | --- |
+| Named the right food | 16/17 (94%) | 17/17 (100%) |
+| True count inside the model's range | 16/17 (94%) | 16/17 (94%) |
+| Count within 10% | 16/17 (94%) | 17/17 (100%) |
+| Average counting error | 1% | 1% |
+| Average time per photo | 8.8 s | 8.7 s |
+
+The same count came back in both runs for 15 of 17 photos. The two that changed: wrapped burritos
+read as "mole tamales" once (count unmatched) and correctly as 3 burritos the other time; a 20-piece
+sushi plate came back as 20, then 21.
+
+What this does and doesn't show: on photos where the items can be told apart, counting is close to
+exact, and the remaining errors are small run-to-run slips on ambiguous photos. It does not measure
+food that has to be estimated rather than counted (a tray of curry, a pan of pasta); there, servings
+come from the unit table and the business confirms them.
+
+Re-run: `python scripts/vision_eval.py eval_photos/ eval_results/run.csv`
+(per-photo results for both runs are in `eval_results/`).
