@@ -361,7 +361,7 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 
 /* ---------- Agent network diagram (live) ---------- */
 .wire{margin-bottom:1.25rem}
-.wire-body{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:1rem;align-items:stretch}
+.wire-body{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:1rem;align-items:start}
 #wire{width:100%;height:auto;min-height:15rem;display:block;background:radial-gradient(circle,var(--line) 1px,transparent 1px) 0 0/22px 22px;border-radius:var(--r2)}
 .wire-stat{display:inline-flex;align-items:center;gap:.45rem;font:600 var(--t-xs)/1 var(--mono);color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
 .wire-stat .dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--faint)}
@@ -477,3 +477,38 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 @media (prefers-reduced-motion:reduce){.thinking i{animation:none;opacity:.6}}
 /* the 3-line quote: bottom space is a transparent border, so a 4th line can't peek through the padding */
 .agent .says{padding-bottom:0;border-bottom:.5rem solid transparent}
+/* agent network: coordinators still deliberating */
+.node.coord.thinking circle{animation:wthink 1.2s ease-in-out infinite}
+@keyframes wthink{0%,100%{stroke-width:2.5;stroke-opacity:1}50%{stroke-width:6;stroke-opacity:.45}}
+.w-step{font:600 12px var(--mono);fill:var(--muted)}
+@media (prefers-reduced-motion:reduce){.node.coord.thinking circle{animation:none;stroke-width:4}}
+
+
+/* ---------- Live view layout for the demo ----------
+   left: the negotiation (the main act); right: the agent network and the phone call that follows it */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.25rem;align-items:start;margin-bottom:1.25rem}
+.stage-left,.stage-right{display:grid;gap:1.25rem;min-width:0;align-content:start}
+.stage-left .hero{margin:0}
+.hero-empty{display:none}
+.stage-left:has(#hero-panel[hidden]) .hero-empty{display:block}
+.agents.ghost .agent{opacity:.55;min-height:6.5rem}
+.agents.ghost h3{margin-bottom:.2rem}
+.empty-note{margin:.9rem 0 0}
+.stage .wire .panel-head{flex-wrap:wrap;row-gap:.4rem}
+.stage #wire{min-height:0}
+.stage .callp{margin:0}
+.stage .call-badges{display:flex;flex-wrap:wrap;gap:.4rem;margin:-.35rem 0 .8rem}
+.stage .call-body{grid-template-columns:1fr}
+.stage .call-tx{max-height:15rem;overflow:auto}
+@media (max-width:1100px){.stage{grid-template-columns:1fr}}
+/* the graph renders at about 2/3 scale in its column: larger type keeps it readable from the back of a room */
+.stage .node text{font-size:17px}
+.stage .node text.sub{font-size:13.5px}
+.stage .w-cols text{font-size:14px}
+.stage .w-empty{font-size:22px}
+.stage .w-step,.stage .w-outcome{font-size:18px}
+.stage .wire{margin:0}
+/* bottom row: the message log runs the full height of the map */
+.live-grid:has(.log-panel){align-items:stretch}
+.log-panel{display:flex;flex-direction:column}
+.log-panel .wire-log{flex:1 1 0;min-height:16rem;max-height:none}

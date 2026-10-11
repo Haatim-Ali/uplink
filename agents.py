@@ -450,7 +450,8 @@ def negotiate(world, d, plans, council=None):
             messages.append({"agent": a, "type": "propose", "text": f"{verb} {short(p)}. " + reasons[a]})
         live = getattr(world, "live_rounds", None)   # the live demo shows each step while the next is still thinking
         if live is not None:
-            live.append({"round": r + 1, "messages": list(messages), "voting": True})
+            live.append({"round": r + 1, "messages": list(messages), "voting": True,
+                         "proposals": dict(proposals)})   # the agent network draws who wants what right away
 
         cast = _each(lambda a: council.vote(a, proposed, S, V, r, mode), parallel)
         llm_ok = llm_ok or any(cast[a][1] for a in AGENTS)
@@ -463,7 +464,8 @@ def negotiate(world, d, plans, council=None):
                     messages.append({"agent": a, "type": "objection", "text": f"On {short(plans_by_id[pid])}: {v['reason']}"})
         rounds.append({"round": r + 1, "proposals": dict(proposals), "votes": votes, "messages": messages})
         if live is not None:
-            live[-1] = {"round": r + 1, "messages": list(messages), "voting": False}
+            live[-1] = {"round": r + 1, "messages": list(messages), "voting": False,
+                        "proposals": dict(proposals), "votes": votes}   # ...and who objected to whom
         history += f"Round {r + 1}: " + "; ".join(f"{a} proposed {proposals[a]}" for a in AGENTS) + "\n"
 
         support = {pid: sum(weights[a] for a in AGENTS if votes[pid][a]["accept"]) for pid in proposed}

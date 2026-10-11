@@ -232,14 +232,14 @@ function drawLiveDebate(){
 }
 
 function pin(seq){ if(S && S.holding) releaseHold(null); pinned = (pinned===seq ? null : seq); lastNegKey=null; drawNegotiation(); }
+const wire = () => { try{ drawWire(); }catch(e){ console.error(e); } };
 function drawNegotiation(){
-  try{ drawWire(); }catch(e){ console.error(e); }
   const hero = $("hero-panel");
   const hist = S.negotiations || [];
   const n = currentNeg();
   drawDonationCard(n);
-  if(S.busy && !pinned){ hero.hidden = false; drawLiveDebate(); return; }
-  if(!n){ hero.hidden = true; return; }
+  if(S.busy && !pinned){ wire(); hero.hidden = false; drawLiveDebate(); return; }
+  if(!n){ wire(); hero.hidden = true; return; }
   hero.hidden = false;
   const shownSeq = pinned || n.seq;
   const msgs = n.rounds.flatMap(r => r.messages.map(m => ({...m, round: r.round})));
@@ -251,6 +251,7 @@ function drawNegotiation(){
     play = {key: nkey, seq: n.seq, shown: watched ? msgs.length : 0, total: msgs.length}; callFor = n.seq; liveSeen = {donation: null, count: 0};
   }
   if(play.seq === null || play.seq === undefined){ play = {key: nkey, seq: n.seq, shown: msgs.length, total: msgs.length}; }   // old news
+  wire();   // after the playback is set up for a new decision, so the diagram never flashes the final result first
   const shown = play.seq === n.seq ? play.shown : msgs.length;
   const playing = shown < msgs.length;
   const key = n.seq + "|" + n.donation + "|" + n.rounds.length + "|" + n.outcome + "|" + (n.plan?n.plan.id:"");
@@ -543,8 +544,10 @@ async function refresh(){
     }
     $("speed").value = String(S.speed);
     render();
+    if(S.busy && !fastTimer) fastTimer = setTimeout(() => { fastTimer = null; refresh(); }, 400);
   }catch(e){ console.error(e); }
 }
+let fastTimer = null;
 
 function resetLocal(){ lastNegKey=null; pinned=null; play={seq:0,shown:0,total:0}; lastSeq=0; }
 $("start").onclick = async()=>{ closeMenus(); await post("/api/reset",{scenario:$("scenario").value}); resetLocal(); if(location.hash!=="#/live") location.hash = "#/live"; refresh(); };
@@ -661,33 +664,45 @@ const W_NS = "http://www.w3.org/2000/svg";
 const wireSeen = new Set();
 const short = (t, k=22) => { t = String(t||""); return t.length > k ? t.slice(0, k-1) + "…" : t; };
 function wireCurve(x1, y1, x2, y2, bend){ const mx = (x1+x2)/2, my = (y1+y2)/2 + (bend||0); return `M${x1},${y1} Q${mx},${my} ${x2},${y2}`; }
+// While the agents deliberate, the diagram follows the debate as it happens (S.deliberating), round by round.
+// Its seq is the one the finished negotiation will get, so edges already drawn don't animate again at the end.
+function liveNeg(){
+  const L = S.deliberating;
+  if(!S.busy || pinned || !L || !L.donation) return null;
+  const last = S.negotiation && S.negotiation.seq || 0;
+  return {live: true, donation: L.donation, seq: last + 1, time: S.now,
+          rounds: L.rounds.map(r => ({round: r.round, messages: r.messages, voting: r.voting,
+                                      proposals: r.proposals || {}, votes: r.voting ? {} : (r.votes || {})}))};
+}
 function drawWire(){
   const svg = $("wire"); if(!svg || !S) return;
-  const n = currentNeg();
+  const n = liveNeg() || currentNeg();
   const stat = $("wire-stat");
-  if(!n){ svg.innerHTML = `<text x="500" y="150" text-anchor="middle" class="w-empty">${S.busy ? "Agents are deliberating on the first donation…" : "Waiting for a donation. Run a scenario under Demo controls."}</text>`; setHTML("wire-log", ""); stat.className = "wire-stat"; stat.innerHTML = `<i class="dot"></i>idle`; return; }
+  if(!n){ svg.innerHTML = `<text x="500" y="195" text-anchor="middle" class="w-empty">${S.busy ? "Agents are deliberating on the first donation…" : "Waiting for a donation. Run a scenario under Demo controls."}</text>`; setHTML("wire-log", ""); stat.className = "wire-stat"; stat.innerHTML = `<i class="dot"></i>idle`; return; }
   const all = (S.network||[]).filter(m => m.donation === n.donation);
   let start = 0; all.forEach((m,i) => { if(m.kind === "announce") start = i; });
   const msgs = all.slice(start);
   const d = S.donations.find(x => x.id === n.donation) || {};
   // the debate, revealed in step with the playback
   const lines = n.rounds.flatMap(r => r.messages.map(m => ({...m, round:r.round})));
-  const shown = play.seq === n.seq ? play.shown : lines.length;
-  const playing = shown < lines.length;
-  const rIdx = playing ? Math.max(0, (shown ? lines[shown-1].round : 1) - 1) : n.rounds.length - 1;
+  const shown = n.live ? lines.length : play.seq === n.seq ? play.shown : lines.length;
+  const playing = n.live || shown < lines.length;
+  const rIdx = n.live ? n.rounds.length - 1 : playing ? Math.max(0, (shown ? lines[shown-1].round : 1) - 1) : n.rounds.length - 1;
   const R = n.rounds[rIdx];
+  const cur = n.live ? n.rounds[n.rounds.length - 1] : null;
+  const step = !n.live ? "" : !cur ? "choosing first proposals" : cur.voting ? `round ${cur.round} · voting` : `round ${cur.round + 1} · revising`;
 
   // nodes
   const replies = {}; msgs.filter(m => ["accept","counter","decline"].includes(m.kind)).forEach(m => replies[m.from] = m);
   const bids = {}; msgs.filter(m => m.kind === "bid").forEach(m => bids[m.from] = m);
   const shelterNames = Object.keys(replies).concat((S.nonprofits||[]).map(x => x.name).filter(nm => !replies[nm])).slice(0, 7);
   const driverNames = Object.keys(bids).concat((S.drivers||[]).map(x => x.name).filter(nm => !bids[nm])).slice(0, 6);
-  const spread = (k, i, top=34, bot=266) => k <= 1 ? 150 : top + (bot - top) * i / (k - 1);
+  const spread = (k, i, top=50, bot=340) => k <= 1 ? 195 : top + (bot - top) * i / (k - 1);
   const pos = {};
-  pos.biz = {x:70, y:150};
-  shelterNames.forEach((nm, i) => pos["s:"+nm] = {x:330, y:spread(shelterNames.length, i)});
-  driverNames.forEach((nm, i) => pos["d:"+nm] = {x:600, y:spread(driverNames.length, i, 50, 250)});
-  pos.Speed = {x:850, y:70}; pos.Cost = {x:850, y:150}; pos.Need = {x:850, y:230}; pos.hub = {x:790, y:150};
+  pos.biz = {x:40, y:195};
+  shelterNames.forEach((nm, i) => pos["s:"+nm] = {x:290, y:spread(shelterNames.length, i)});
+  driverNames.forEach((nm, i) => pos["d:"+nm] = {x:560, y:spread(driverNames.length, i, 66, 324)});
+  pos.Speed = {x:820, y:95}; pos.Cost = {x:820, y:195}; pos.Need = {x:820, y:295}; pos.hub = {x:770, y:195};
   const chosenNp = n.plan && n.plan.np_name, chosenDr = n.plan && n.plan.driver_name;
   const done = !playing;
 
@@ -709,22 +724,23 @@ function drawWire(){
   }
   if(done && chosenNp && pos["s:"+chosenNp]) add("award:"+n.seq, "hub", "s:"+chosenNp, "e-award", -70);
 
-  let html = `<g class="w-cols"><text x="70" y="16">Business</text><text x="330" y="16">Shelter agents</text><text x="600" y="16">Driver agents</text><text x="850" y="16">Coordinators</text></g>`;
+  let html = `<g class="w-cols"><text x="30" y="18">Business</text><text x="280" y="18">Shelter agents</text><text x="550" y="18">Driver agents</text><text x="808" y="18">Coordinators</text></g>`;
   html += edges.map(e => { const A = pos[e.a], B = pos[e.b], isNew = !wireSeen.has(n.seq + e.key);
     return `<path class="edge ${e.cls}${isNew ? " new" : ""}" d="${wireCurve(A.x, A.y, B.x, B.y, e.bend)}"/>`; }).join("");
-  const node = (k, label, sub, cls) => { const P = pos[k]; return `<g class="node ${cls||""}" transform="translate(${P.x},${P.y})"><circle r="9"/><text x="15" y="-1">${esc(short(label))}</text>${sub ? `<text x="15" y="12" class="sub">${esc(sub)}</text>` : ""}</g>`; };
+  const node = (k, label, sub, cls) => { const P = pos[k]; return `<g class="node ${cls||""}" transform="translate(${P.x},${P.y})"><circle r="9"/><text x="16" y="-2">${esc(short(label, 20))}</text>${sub ? `<text x="16" y="14" class="sub">${esc(sub)}</text>` : ""}</g>`; };
   html += node("biz", d.business_name || "Business", `${d.food ? d.food.servings + " servings" : ""}`, "biz");
   shelterNames.forEach(nm => { const r = replies[nm];
     const sub = r ? (r.kind === "accept" ? "yes" : r.kind === "counter" ? (r.text.match(/take (\d+)/) ? "takes " + r.text.match(/take (\d+)/)[1] : "counter") : "no") : "";
     html += node("s:"+nm, nm, done && nm === chosenNp ? "chosen" : sub, (r ? r.kind : "quiet") + (done && nm === chosenNp ? " chosen" : "")); });
   driverNames.forEach(nm => { const b = bids[nm]; const price = b ? ((b.text.match(/\$\d+(\.\d+)?|[Ff]ree/) || ["bid"])[0]).toLowerCase() : "";
     html += node("d:"+nm, nm, done && nm === chosenDr ? "chosen" : price, (b ? "bid" : "quiet") + (done && nm === chosenDr ? " chosen" : "")); });
-  html += `<g class="node hub" transform="translate(790,150)"><circle r="5"/></g>`;
+  html += `<g class="node hub" transform="translate(770,195)"><circle r="5"/></g>`;
   ["Speed","Cost","Need"].forEach(a => { const pid = R && R.proposals[a]; const vetoed = R && Object.values(R.votes||{}).some(v => v[a] && !v[a].accept && /^Veto/.test(v[a].reason));
-    const wants = pid ? "wants " + short((S.nonprofits.find(x => x.id === pid.split("|")[0]) || {}).name || "", 16) : "";
-    html += node(a, a, vetoed ? "veto" : wants, "coord " + a + (vetoed ? " vetoed" : "")); });
-  if(done){ const o = (OUTCOME[n.outcome] || {}).t || n.outcome; html += `<text x="790" y="290" text-anchor="middle" class="w-outcome ${n.outcome}">${esc(o)}</text>`; }
-  if(svg._h !== html){ svg._h = html; svg.innerHTML = html; edges.forEach(e => wireSeen.add(n.seq + e.key)); }
+    const wants = pid ? "wants " + short((S.nonprofits.find(x => x.id === pid.split("|")[0]) || {}).name || "", 12) : "";
+    html += node(a, a, vetoed ? "veto" : wants, "coord " + a + (vetoed ? " vetoed" : "") + (n.live ? " thinking" : "")); });
+  if(n.live) html += `<text x="770" y="378" text-anchor="middle" class="w-step">Deliberating · ${esc(step)}…</text>`;
+  if(done){ const o = (OUTCOME[n.outcome] || {}).t || n.outcome; html += `<text x="770" y="378" text-anchor="middle" class="w-outcome ${n.outcome}">${esc(o)}</text>`; }
+  if(svg._h !== html){ svg._h = html; svg.innerHTML = html; edges.forEach(e => wireSeen.add(S.world_id + n.seq + e.key)); }
 
   // the message log: network messages, then the debate lines as they're revealed
   const log = msgs.map(m => ({t:m.time, from:m.from, to:m.to === "network" ? "all shelters" : m.to, kind:m.kind, text:m.text}))
@@ -733,7 +749,7 @@ function drawWire(){
   setHTML("wire-log", log.slice(-40).map(l => `<li class="k-${esc(l.kind)}"><span class="t">${esc(l.t||"")}</span><span class="r">${esc(short(l.from, 18))} → ${esc(short(l.to, 18))}</span><span class="kd">${esc(l.kind)}</span><span class="tx">${esc(l.text)}</span></li>`).join(""));
   const wl = $("wire-log"); wl.scrollTop = wl.scrollHeight;
   stat.className = "wire-stat" + (playing || S.busy ? " live" : "");
-  stat.innerHTML = `<i class="dot"></i>${playing || S.busy ? "live" : "done"} · ${esc(n.donation)}`;
+  stat.innerHTML = `<i class="dot"></i>${playing || S.busy ? "live" : "done"} · ${esc(n.donation)}${n.live ? " · " + esc(step) : ""}`;
 }
 
 // light / dark (light can read better on a projector in a bright room)
