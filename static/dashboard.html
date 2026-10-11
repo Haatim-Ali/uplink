@@ -94,14 +94,14 @@
 
   <!-- the donation's journey: one strip of seven steps, then the panels in the same order, top to bottom -->
   <section class="flow-wrap" aria-labelledby="flow-h">
-    <div class="flow-head"><h2 id="flow-h">How this donation is decided</h2><span class="flow-id" id="flow-id"></span></div>
-    <ol class="journey" id="flow"></ol>
+    <div class="flow-head"><h2 id="flow-h">Donations in flight</h2><span class="flow-id">every donation passes the same five stages, several at once</span></div>
+    <ol class="board" id="flow"></ol>
   </section>
 
   <div class="stage story">
     <div class="row r1">
       <div class="col-don">
-        <div class="panel don-panel"><div class="panel-head"><h2><span class="stepno">1</span>Food identified</h2></div><div id="cur-don"></div></div>
+        <div class="panel don-panel"><div class="panel-head"><h2>Current donation</h2></div><div id="cur-don"></div></div>
         <div class="kpis compact" aria-label="Headline numbers">
           <div class="kpi"><b data-k="meals">0</b><span>meals delivered safely</span></div>
           <div class="kpi"><b data-k="orgs">0</b><span>organizations fed</span></div>
@@ -110,14 +110,14 @@
         </div>
       </div>
       <div class="panel wire" aria-labelledby="wire-h">
-        <div class="panel-head"><h2 id="wire-h"><span class="stepno">2–4</span>Agent network <span class="sub-h">shelters answer, drivers bid, the three negotiators decide</span></h2><span class="wire-right"><span class="pill outline xport" id="xport" title="How the shelter and driver agents receive messages">in-process</span><span class="wire-stat" id="wire-stat"><i class="dot"></i>idle</span></span></div>
+        <div class="panel-head"><h2 id="wire-h"><span class="stepno">1</span>Agent network <span class="sub-h">shelters answer, drivers bid, the three negotiators decide</span></h2><span class="wire-right"><span class="pill outline xport" id="xport" title="How the shelter and driver agents receive messages">in-process</span><span class="wire-stat" id="wire-stat"><i class="dot"></i>idle</span></span></div>
         <svg id="wire" viewBox="0 0 1000 390" role="img" aria-label="Diagram of the business, shelter, driver and coordinator agents and the messages between them"></svg>
       </div>
     </div>
     <div class="row r2">
       <div class="stage-left">
       <div class="panel hero" id="hero-panel" hidden>
-        <div class="panel-head"><h2><span class="stepno">5</span>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
+        <div class="panel-head"><h2><span class="stepno">2</span>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
         <div id="neg"></div>
         <details class="more" id="debate-more">
           <summary>See the debate <span class="muted small">transcript, votes by round</span></summary>
@@ -129,7 +129,7 @@
         </details>
       </div>
       <div class="panel hero-empty">
-        <div class="panel-head"><h2><span class="stepno">5</span>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
+        <div class="panel-head"><h2><span class="stepno">2</span>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
         <div class="agents ghost" aria-hidden="true">
           <div class="agent Speed"><h3>Speed</h3><div class="goal">Cares about arrival time and driver reliability</div></div>
           <div class="agent Cost"><h3>Cost</h3><div class="goal">Cares about what the trip costs</div></div>
@@ -139,7 +139,7 @@
       </div>
       </div>
       <div class="panel callp" aria-labelledby="call-h">
-        <div class="panel-head"><h2 id="call-h"><span class="stepno">6</span>Phone line <span class="sub-h">the dispatcher agent calls the chosen shelter</span></h2></div>
+        <div class="panel-head"><h2 id="call-h"><span class="stepno">3</span>Phone line <span class="sub-h">the dispatcher agent calls the chosen shelter</span></h2></div>
         <div class="call-badges"><span class="pill outline">Voices: ElevenLabs Flash v2.5</span><span class="pill outline">Speech to text: ElevenLabs Scribe</span></div>
         <div class="call-body">
           <div class="call-card" id="call-card"><p class="call-idle">No call yet. When the agents choose a shelter, the dispatcher agent calls it here.</p></div>
@@ -153,7 +153,7 @@
         <ol class="wire-log" id="wire-log" aria-label="Message log"></ol>
       </div>
     <div class="panel map-panel">
-      <div class="panel-head"><h2><span class="stepno">7</span>Delivery</h2><span class="muted small">Labeled pins are shelters in play</span></div>
+      <div class="panel-head"><h2><span class="stepno">4–5</span>Delivery</h2><span class="muted small">Labeled pins are shelters in play</span></div>
       <div id="map" role="img" aria-label="Map of businesses, shelters and drivers"></div>
       <ul class="legend" aria-label="Map legend">
         <li><i class="lg-np"></i>Shelter</li>
