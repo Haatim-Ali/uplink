@@ -15,10 +15,11 @@ import requests
 
 API = "https://api.elevenlabs.io/v1"
 TIMEOUT = 30
-WHO = ["Speed", "Cost", "Need", "Dispatch"]
+WHO = ["Speed", "Cost", "Need", "Dispatch", "Shelter"]
 # Preferred premade voices per speaker (picked by name from the account's voice list)
 PREFERRED = {"Speed": ["Josh", "Antoni", "Liam", "Will"], "Cost": ["Adam", "Brian", "George", "Bill"],
-             "Need": ["Rachel", "Sarah", "Matilda", "Lily"], "Dispatch": ["Bella", "Alice", "Charlotte", "Aria"]}
+             "Need": ["Rachel", "Sarah", "Matilda", "Lily"], "Dispatch": ["Bella", "Alice", "Charlotte", "Aria"],
+             "Shelter": ["Daniel", "Callum", "Eric", "Chris", "Arnold"]}
 FALLBACK_ID = "21m00Tcm4TlvDq8ikWAM"   # Rachel, a long-standing ElevenLabs premade voice
 
 _voices = {}

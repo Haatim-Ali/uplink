@@ -1,32 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
+<script>try{var t=localStorage.getItem("uplink_theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Uplink · Edible food recovery records (SB 1383)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="/static/uplink.css">
 <style>
-.rnav{background:#fff;border-bottom:1px solid var(--line)}
-.rnav-in{max-width:76rem;margin:0 auto;padding:.5rem var(--s4);display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap}
+.rnav{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--line)}
+.rnav-in{max-width:90rem;margin:0 auto;padding:.5rem var(--s4);display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap}
 .rnav .brand{color:var(--ink);font-size:1.3rem}
 .rnav nav{display:flex;gap:.15rem;flex-wrap:wrap}
-.rnav nav a{font-weight:600;color:var(--ink-2);text-decoration:none;padding:.6rem .8rem;border-radius:8px}
+.rnav nav a{font-weight:600;color:var(--ink-2);text-decoration:none;padding:.6rem .8rem;border-radius:var(--r2)}
 .rnav nav a:hover{background:var(--bg)}
 .rnav nav a.active{color:var(--brand-ink);background:var(--brand-soft)}
 .page{max-width:76rem;margin:0 auto;padding:var(--s5) var(--s4) var(--s6)}
-.doc-head{display:flex;justify-content:space-between;gap:var(--s4);flex-wrap:wrap;align-items:flex-end;padding-bottom:var(--s4);border-bottom:3px solid var(--ink);margin-bottom:var(--s4)}
+.doc-head{display:flex;justify-content:space-between;gap:var(--s4);flex-wrap:wrap;align-items:flex-end;padding-bottom:var(--s4);border-bottom:1px solid var(--line);margin-bottom:var(--s4)}
 .doc-head .brand{font-size:var(--t-lg);margin-bottom:var(--s3);color:var(--ink)}
-.doc-head h1{font-size:var(--t-2xl);line-height:1.15;letter-spacing:-.02em}
+.doc-head h1{font-size:var(--t-3xl);line-height:1.1;letter-spacing:-.02em;font-weight:800}
 .doc-head p{color:var(--muted);max-width:44rem;margin-top:var(--s2)}
-.doc-meta{font-size:var(--t-sm);color:var(--ink-2);text-align:right;line-height:1.6}
+.doc-meta{font:400 var(--t-xs)/1.8 var(--mono);color:var(--muted);text-align:right}
+.doc-meta b{color:var(--ink)}
 .sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s3);margin-bottom:var(--s4)}
-.sum div{background:#fff;border:1px solid var(--line);border-top:3px solid var(--brand);border-radius:var(--r2);padding:var(--s3) var(--s4)}
-.sum b{display:block;font-size:var(--t-2xl);font-variant-numeric:tabular-nums;line-height:1.1}
+.sum div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r3);padding:var(--s4) var(--s5)}
+.sum b{display:block;font-size:2rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.02em}
 .sum span{font-size:var(--t-sm);color:var(--muted)}
 .actions{display:flex;gap:var(--s2);flex-wrap:wrap;margin-bottom:var(--s3)}
-.table-wrap{max-height:none}
+.table-wrap{max-height:none;border-radius:var(--r3)}
+table.data td{color:var(--ink-2)}
+table.data td.n{font-family:var(--mono);font-size:var(--t-xs)}
 table.data td.tag-t,table.data td.nowrap{white-space:nowrap}
 .empty-rec{text-align:center;padding:var(--s6) var(--s4)!important;color:var(--muted)}
 .empty-rec b{display:block;color:var(--ink);font-size:var(--t-lg);margin-bottom:var(--s1)}
@@ -37,12 +41,13 @@ table.data td.tag-t,table.data td.nowrap{white-space:nowrap}
 
 @media print{
   @page{size:landscape;margin:12mm}
+  :root,:root[data-theme="dark"]{color-scheme:light;--bg:#fff;--panel:#fff;--panel-2:#f6f6f6;--ink:#000;--ink-2:#111;--muted:#444;--line:#999;--line-2:#999}
   body{background:#fff;color:#000;font-size:10pt}
   .page{max-width:none;padding:0}
   .actions,.no-print{display:none!important}
   .doc-head{border-bottom:2px solid #000}
   .doc-head .brand{color:#000}
-  .sum div{border:1px solid #000;border-top:3px solid #000;break-inside:avoid}
+  .sum div{border:1px solid #000;border-radius:4px;break-inside:avoid}
   .table-wrap{border:1px solid #000;overflow:visible}
   table.data{font-size:8.5pt}
   table.data th,table.data td{border-bottom:1px solid #999;padding:3pt 5pt}

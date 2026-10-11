@@ -23,7 +23,7 @@ setInterval(()=>{ if(voiceOn && speaking) return;   // with voices on, the next 
 // ---- Voices: each agent speaks in its own ElevenLabs voice (browser voice if there's no key) ----
 let voiceOn = false, speaking = false, lastSpoken = null, speakTimer = null;
 const audioCache = {};
-const PITCH = {Speed:1.25, Cost:0.8, Need:1.05, Dispatch:1};
+const PITCH = {Speed:1.25, Cost:0.8, Need:1.05, Dispatch:1, Shelter:0.85};
 const plain = html => { const t = document.createElement("div"); t.innerHTML = html; return t.textContent; };
 function audioFor(who, text){
   const url = `/api/tts?who=${encodeURIComponent(who)}&text=${encodeURIComponent(text)}`;
@@ -47,7 +47,7 @@ function speak(who, text, next){
     if(next) audioFor(next.agent in PITCH ? next.agent : "Dispatch", next.text);   // fetch the next line while this one plays
   } else browserSpeak(who, text);
 }
-function replay(){ const n = pinned ? (S.negotiations||[]).find(h=>h.seq===pinned) : S.negotiation; if(!n) return;
+function replay(){ const n = pinned ? (S.negotiations||[]).find(h=>h.seq===pinned) : S.negotiation; if(!n) return; callFor = n.seq;
   play = {seq: n.seq, shown: 0, total: n.rounds.reduce((k,r)=>k+r.messages.length,0)}; drawNegotiation(); }
 const $ = id => document.getElementById(id);
 // Write HTML only when it changed: no flicker, hover and scroll survive the 1-second refresh.
@@ -210,6 +210,7 @@ function drawDonationCard(n){
 
 function pin(seq){ pinned = (pinned===seq ? null : seq); lastNegKey=null; drawNegotiation(); }
 function drawNegotiation(){
+  try{ drawWire(); }catch(e){ console.error(e); }
   const hero = $("hero-panel");
   const hist = S.negotiations || [];
   const n = currentNeg();
@@ -219,7 +220,7 @@ function drawNegotiation(){
   hero.hidden = false;
   const shownSeq = pinned || n.seq;
   const msgs = n.rounds.flatMap(r => r.messages.map(m => ({...m, round: r.round})));
-  if(!pinned && n.seq !== play.seq && play.seq !== null && n.seq > play.seq){ play = {seq: n.seq, shown: 0, total: msgs.length}; }
+  if(!pinned && n.seq !== play.seq && play.seq !== null && n.seq > play.seq){ play = {seq: n.seq, shown: 0, total: msgs.length}; callFor = n.seq; }
   if(play.seq === null){ play = {seq: n.seq, shown: msgs.length, total: msgs.length}; }   // first load: no replay of old news
   const shown = play.seq === n.seq ? play.shown : msgs.length;
   const playing = shown < msgs.length;
@@ -255,6 +256,8 @@ function drawNegotiation(){
       else if(!playing) speak("Dispatch", plain(o.t + ". " + (n.plan ? "Decision: " + planName(n.plan.id) : "")));
     }
   }
+
+  if(!playing && n.plan && callFor === n.seq && !pinned){ callFor = null; startCall(n); }
 
   // ---- detail (inside "See the debate"): only built when opened ----
   if(!$("debate-more").open) return;
@@ -577,9 +580,167 @@ function drawEvidence(r){
 route(); refresh(); setInterval(refresh, 1000);
 
 $("voice").onclick = ()=>{
-  voiceOn = !voiceOn;
+  voiceOn = !voiceOn; ringCtx();
   const b = $("voice"); b.textContent = voiceOn ? "Voices on" : "Voices off";
   b.classList.toggle("primary", voiceOn); b.setAttribute("aria-pressed", voiceOn);
   if(voiceOn){ toast(S && S.mode.voice==="elevenlabs" ? "Voices on (ElevenLabs). Replaying the debate." : "Voices on (browser voice; add an ElevenLabs key for real voices)", "info"); lastSpoken = null; if(S) replay(); }
   else { endSpeak(); if(window.speechSynthesis) speechSynthesis.cancel(); Object.values(audioCache).forEach(a=>a.pause()); }
 };
+
+// ---------- Agent network: a live diagram of who is talking to whom for the current donation ----------
+const W_NS = "http://www.w3.org/2000/svg";
+const wireSeen = new Set();
+const short = (t, k=22) => { t = String(t||""); return t.length > k ? t.slice(0, k-1) + "…" : t; };
+function wireCurve(x1, y1, x2, y2, bend){ const mx = (x1+x2)/2, my = (y1+y2)/2 + (bend||0); return `M${x1},${y1} Q${mx},${my} ${x2},${y2}`; }
+function drawWire(){
+  const svg = $("wire"); if(!svg || !S) return;
+  const n = currentNeg();
+  const stat = $("wire-stat");
+  if(!n){ svg.innerHTML = `<text x="500" y="150" text-anchor="middle" class="w-empty">Waiting for a donation. Run a scenario under Demo controls.</text>`; setHTML("wire-log", ""); stat.className = "wire-stat"; stat.innerHTML = `<i class="dot"></i>idle`; return; }
+  const all = (S.network||[]).filter(m => m.donation === n.donation);
+  let start = 0; all.forEach((m,i) => { if(m.kind === "announce") start = i; });
+  const msgs = all.slice(start);
+  const d = S.donations.find(x => x.id === n.donation) || {};
+  // the debate, revealed in step with the playback
+  const lines = n.rounds.flatMap(r => r.messages.map(m => ({...m, round:r.round})));
+  const shown = play.seq === n.seq ? play.shown : lines.length;
+  const playing = shown < lines.length;
+  const rIdx = playing ? Math.max(0, (shown ? lines[shown-1].round : 1) - 1) : n.rounds.length - 1;
+  const R = n.rounds[rIdx];
+
+  // nodes
+  const replies = {}; msgs.filter(m => ["accept","counter","decline"].includes(m.kind)).forEach(m => replies[m.from] = m);
+  const bids = {}; msgs.filter(m => m.kind === "bid").forEach(m => bids[m.from] = m);
+  const shelterNames = Object.keys(replies).concat((S.nonprofits||[]).map(x => x.name).filter(nm => !replies[nm])).slice(0, 7);
+  const driverNames = Object.keys(bids).concat((S.drivers||[]).map(x => x.name).filter(nm => !bids[nm])).slice(0, 6);
+  const spread = (k, i, top=34, bot=266) => k <= 1 ? 150 : top + (bot - top) * i / (k - 1);
+  const pos = {};
+  pos.biz = {x:70, y:150};
+  shelterNames.forEach((nm, i) => pos["s:"+nm] = {x:330, y:spread(shelterNames.length, i)});
+  driverNames.forEach((nm, i) => pos["d:"+nm] = {x:600, y:spread(driverNames.length, i, 50, 250)});
+  pos.Speed = {x:850, y:70}; pos.Cost = {x:850, y:150}; pos.Need = {x:850, y:230}; pos.hub = {x:790, y:150};
+  const chosenNp = n.plan && n.plan.np_name, chosenDr = n.plan && n.plan.driver_name;
+  const done = !playing;
+
+  const edges = [];
+  const add = (key, a, b, cls, bend) => { if(pos[a] && pos[b]) edges.push({key, a, b, cls, bend}); };
+  if(msgs.some(m => m.kind === "announce")) shelterNames.forEach(nm => add("ann:"+nm, "biz", "s:"+nm, "e-ann", 0));
+  Object.values(replies).forEach(m => add("rep:"+m.from+m.kind, "s:"+m.from, "biz", "e-"+m.kind, 26));
+  Object.values(bids).forEach(m => add("bid:"+m.from, "d:"+m.from, "hub", "e-bid", 0));
+  // the debate: an objection draws an arc from the objector to whoever proposed that plan
+  if(R && shown){
+    const said = new Set(lines.slice(0, shown).filter(l => l.round === R.round).map(l => l.agent));
+    ["Speed","Cost","Need"].forEach(a => {
+      if(!said.has(a)) return;
+      Object.entries(R.votes||{}).forEach(([pid, v]) => {
+        if(!v[a] || v[a].accept) return;
+        ["Speed","Cost","Need"].filter(b => b !== a && R.proposals[b] === pid).forEach(b => add(`obj:${R.round}:${a}>${b}`, a, b, "e-obj " + a, a === "Cost" ? 60 : -60));
+      });
+    });
+  }
+  if(done && chosenNp && pos["s:"+chosenNp]) add("award:"+n.seq, "hub", "s:"+chosenNp, "e-award", -70);
+
+  let html = `<g class="w-cols"><text x="70" y="16">Business</text><text x="330" y="16">Shelter agents</text><text x="600" y="16">Driver agents</text><text x="850" y="16">Coordinators</text></g>`;
+  html += edges.map(e => { const A = pos[e.a], B = pos[e.b], isNew = !wireSeen.has(n.seq + e.key);
+    return `<path class="edge ${e.cls}${isNew ? " new" : ""}" d="${wireCurve(A.x, A.y, B.x, B.y, e.bend)}"/>`; }).join("");
+  const node = (k, label, sub, cls) => { const P = pos[k]; return `<g class="node ${cls||""}" transform="translate(${P.x},${P.y})"><circle r="9"/><text x="15" y="-1">${esc(short(label))}</text>${sub ? `<text x="15" y="12" class="sub">${esc(sub)}</text>` : ""}</g>`; };
+  html += node("biz", d.business_name || "Business", `${d.food ? d.food.servings + " servings" : ""}`, "biz");
+  shelterNames.forEach(nm => { const r = replies[nm];
+    const sub = r ? (r.kind === "accept" ? "yes" : r.kind === "counter" ? (r.text.match(/take (\d+)/) ? "takes " + r.text.match(/take (\d+)/)[1] : "counter") : "no") : "";
+    html += node("s:"+nm, nm, done && nm === chosenNp ? "chosen" : sub, (r ? r.kind : "quiet") + (done && nm === chosenNp ? " chosen" : "")); });
+  driverNames.forEach(nm => { const b = bids[nm]; const price = b ? ((b.text.match(/\$\d+(\.\d+)?|[Ff]ree/) || ["bid"])[0]).toLowerCase() : "";
+    html += node("d:"+nm, nm, done && nm === chosenDr ? "chosen" : price, (b ? "bid" : "quiet") + (done && nm === chosenDr ? " chosen" : "")); });
+  html += `<g class="node hub" transform="translate(790,150)"><circle r="5"/></g>`;
+  ["Speed","Cost","Need"].forEach(a => { const pid = R && R.proposals[a]; const vetoed = R && Object.values(R.votes||{}).some(v => v[a] && !v[a].accept && /^Veto/.test(v[a].reason));
+    const wants = pid ? "wants " + short((S.nonprofits.find(x => x.id === pid.split("|")[0]) || {}).name || "", 16) : "";
+    html += node(a, a, vetoed ? "veto" : wants, "coord " + a + (vetoed ? " vetoed" : "")); });
+  if(done){ const o = (OUTCOME[n.outcome] || {}).t || n.outcome; html += `<text x="790" y="290" text-anchor="middle" class="w-outcome ${n.outcome}">${esc(o)}</text>`; }
+  if(svg._h !== html){ svg._h = html; svg.innerHTML = html; edges.forEach(e => wireSeen.add(n.seq + e.key)); }
+
+  // the message log: network messages, then the debate lines as they're revealed
+  const log = msgs.map(m => ({t:m.time, from:m.from, to:m.to === "network" ? "all shelters" : m.to, kind:m.kind, text:m.text}))
+    .concat(lines.slice(0, shown).map(l => ({t:n.time, from:l.agent, to:"team", kind:l.type === "objection" ? (/Veto/.test(l.text) ? "veto" : "object") : "propose", text:l.text.replace(/^R\d+ · /, "")})));
+  if(done && n.plan) log.push({t:n.time, from:"Team", to:n.plan.np_name, kind:"decide", text:((OUTCOME[n.outcome]||{}).t || n.outcome) + ". " + n.plan.np_name + " via " + n.plan.driver_name});
+  setHTML("wire-log", log.slice(-40).map(l => `<li class="k-${esc(l.kind)}"><span class="t">${esc(l.t||"")}</span><span class="r">${esc(short(l.from, 18))} → ${esc(short(l.to, 18))}</span><span class="kd">${esc(l.kind)}</span><span class="tx">${esc(l.text)}</span></li>`).join(""));
+  const wl = $("wire-log"); wl.scrollTop = wl.scrollHeight;
+  stat.className = "wire-stat" + (playing || S.busy ? " live" : "");
+  stat.innerHTML = `<i class="dot"></i>${playing || S.busy ? "live" : "done"} · ${esc(n.donation)}`;
+}
+
+// light / dark (light can read better on a projector in a bright room)
+(function(){
+  const b = $("theme"); if(!b) return;
+  const sync = () => { b.textContent = document.documentElement.dataset.theme === "dark" ? "Light mode" : "Dark mode"; };
+  b.onclick = () => { const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t; try{ localStorage.setItem("uplink_theme", t); }catch(e){} sync(); };
+  sync();
+})();
+
+// ---------- Phone line: after the agents decide, the dispatcher agent calls the shelter agent ----------
+// Both sides speak with ElevenLabs voices (Dispatch and Shelter); a staff member's spoken answer on the
+// shelter phone shows up here too, transcribed by ElevenLabs Scribe.
+let callFor = null, call = null, actx = null;
+function ringCtx(){ try{ actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); }catch(e){} }
+function ringTone(){
+  if(!voiceOn || !actx) return;
+  [0, .5].forEach(t => [440, 480].forEach(f => { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = f;
+    g.gain.setValueAtTime(.06, actx.currentTime + t); g.gain.setValueAtTime(0, actx.currentTime + t + .38);
+    o.connect(g).connect(actx.destination); o.start(actx.currentTime + t); o.stop(actx.currentTime + t + .4); }));
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function callSay(who, text){
+  return new Promise(resolve => {
+    const done = () => { clearTimeout(t); resolve(); };
+    const t = setTimeout(resolve, Math.max(2500, text.length * 75));   // never hang the call
+    if(!voiceOn){ clearTimeout(t); setTimeout(resolve, Math.max(1600, text.length * 45)); return; }
+    if(S && S.mode && S.mode.voice === "elevenlabs"){
+      const a = audioFor(who, text); a.currentTime = 0; a.onended = done;
+      a.onerror = () => { if(window.speechSynthesis){ const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.onend = done; speechSynthesis.speak(u); } else done(); };
+      a.play().catch(a.onerror);
+    } else if(window.speechSynthesis){ const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.rate = 1.05; u.onend = done; speechSynthesis.speak(u); }
+    else done();
+  });
+}
+function callScript(n){
+  const d = S.donations.find(x => x.id === n.donation) || {food:{items:[], servings:0}};
+  const np = n.plan.np_name, drv = String(n.plan.driver_name || "").split(" (")[0];
+  const reply = (S.network || []).filter(m => m.donation === n.donation && m.from === np && ["accept","counter","decline"].includes(m.kind)).pop();
+  const items = (d.food.items || []).join(", ");
+  const ask = `Hi ${np}, this is the Uplink dispatcher. ${d.business_name || "A business"} has ${d.food.servings} servings of ${items}${d.food.needs_cold ? ", and it has to stay cold" : ""}. ${drv} can bring it by ${n.plan.arrive_hhmm}. Can you take it?`;
+  const ans = reply ? reply.text : "Yes, please send it over.";
+  const close = !reply || reply.kind === "accept" ? `Great. ${drv} is on the way. Thank you!` : reply.kind === "counter" ? "Got it. We'll send you that much and find a home for the rest." : "Understood. We'll try another shelter.";
+  return {np, lines:[{who:"Dispatch", side:"a", name:"Uplink dispatcher", text:ask}, {who:"Shelter", side:"b", name:np, text:ans}, {who:"Dispatch", side:"a", name:"Uplink dispatcher", text:close}]};
+}
+async function startCall(n){
+  const sc = callScript(n);
+  const me = call = {seq:n.seq, donation:n.donation, np:sc.np, phase:"ringing", said:[], talking:null, t0:Date.now(), voiced:[]};
+  drawCall();
+  for(let i = 0; i < 40 && speaking; i++) await wait(250);   // let the spoken outcome finish first
+  ringTone(); await wait(1300); ringTone(); await wait(1100);
+  if(call !== me) return;
+  me.phase = "talk"; me.t0 = Date.now();
+  for(const ln of sc.lines){
+    if(call !== me) return;
+    me.talking = ln.side; me.said.push(ln); drawCall();
+    await callSay(ln.who, ln.text);
+    me.talking = null; drawCall(); await wait(350);
+  }
+  me.phase = "ended"; me.secs = Math.round((Date.now() - me.t0) / 1000); drawCall();
+}
+const WAVE = "<i></i>".repeat(14);
+function drawCall(){
+  const card = $("call-card"); if(!card) return;
+  if(!call){ setHTML("call-card", `<p class="call-idle">No call yet. When the agents choose a shelter, the dispatcher agent calls it here.</p>`); setHTML("call-tx", ""); return; }
+  // a staff member who answered on the shelter phone by voice (ElevenLabs Scribe transcribed it)
+  const human = (S && S.feed || []).filter(f => f.donation === call.donation && /^\(by voice\)/.test(f.text));
+  const secs = call.phase === "ended" ? call.secs : Math.round((Date.now() - call.t0) / 1000);
+  const state = call.phase === "ringing" ? "Ringing…" : call.phase === "talk" ? `On the call · ${Math.floor(secs/60)}:${String(secs%60).padStart(2,"0")}` : `Call ended · ${Math.floor(secs/60)}:${String(secs%60).padStart(2,"0")}`;
+  const side = (k, name, role, letter) => `<div class="caller ${k}${call.talking === k ? " talking" : ""}"><span class="av">${esc(letter)}</span><b>${esc(name)}</b><small>${esc(role)}</small><div class="wave" aria-hidden="true">${WAVE}</div></div>`;
+  setHTML("call-card", `${side("a", "Uplink dispatcher", "agent · ElevenLabs voice", "U")}
+    <div class="line ${call.phase}"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg><span>${esc(state)}</span></div>
+    ${side("b", call.np, human.length ? "shelter staff · answered by voice" : "shelter agent · ElevenLabs voice", (call.np || "S").charAt(0))}`);
+  setHTML("call-tx", call.said.map(l => `<li class="${l.side}"><b>${esc(l.name)}</b><span>${esc(l.text)}</span><small>${l.who === "Dispatch" ? "spoken with ElevenLabs (dispatcher voice)" : "spoken with ElevenLabs (shelter voice)"}</small></li>`).join("")
+    + human.map(f => `<li class="b human"><b>${esc(f.agent)} staff</b><span>${esc(f.text.replace(/^\(by voice\)\s*/, ""))}</span><small>said out loud on the shelter phone · transcribed by ElevenLabs Scribe</small></li>`).join(""));
+  const tx = $("call-tx"); tx.scrollTop = tx.scrollHeight;
+}
+setInterval(() => { if(call && call.phase === "talk") drawCall(); }, 1000);
+

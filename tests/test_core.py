@@ -399,6 +399,17 @@ def test_add_menu_item_and_donate_from_menu():
             menu.EXTRA = saved
 
 
+def test_each_demo_scenario_shows_the_outcome_in_its_title():
+    """Guards the demo: a scenario named after an outcome must still produce it."""
+    want = {"majority_dissent": "majority", "unacceptable_compromise": "unacceptable", "irreconcilable": "irreconcilable",
+            "insufficient_evidence": "insufficient_evidence", "standoff": "unacceptable"}
+    for name, outcome in want.items():
+        w = World(copy.deepcopy(scenarios.SCENARIOS[name]), live=False)
+        for _ in range(40):
+            w.tick()
+        assert w.outcomes.get(outcome), (name, w.outcomes)
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

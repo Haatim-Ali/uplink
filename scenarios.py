@@ -124,7 +124,7 @@ SCENARIOS = {
             "start": "18:00",
             "note": "18:00. Evening surge pricing on couriers. Sam is the only volunteer left, across town.",
             "drivers_off": ["courier-b", "maria", "jordan", "grace-van"],
-            "drivers": {"courier-a": {"base_usd": 10}, "sam": {"reliability": 0.5, "lat": 37.3405, "lng": -121.9301}},
+            "drivers": {"courier-a": {"base_usd": 10}, "sam": {"reliability": 0.5, "lat": 37.3405, "lng": -121.9301, "max_km": 15}},
         },
         "events": [
             {"at": 0, "type": "donation", "business": "lakeside-hotel", "food": PASTA},
