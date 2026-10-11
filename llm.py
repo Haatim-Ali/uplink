@@ -36,7 +36,11 @@ def _load_env_file(path=os.path.join(HERE, ".env")):
 
 
 # Was the key set in the terminal (or ~/.zshrc) before .env was read? That one wins over .env.
-KEY_FROM_SHELL = "ANTHROPIC_API_KEY" in os.environ
+try:   # app.py reads .env (env.py) before importing this module, so ask env.py what the terminal had
+    import env as _env
+    KEY_FROM_SHELL = "ANTHROPIC_API_KEY" in _env.SHELL_KEYS
+except Exception:  # noqa: BLE001
+    KEY_FROM_SHELL = "ANTHROPIC_API_KEY" in os.environ
 _load_env_file()
 _auth_error = None   # set once a provider rejects the key; then we stop calling it and fall back
 
@@ -52,7 +56,10 @@ def key_hint():
     if not k:
         return "no key"
     src = "from your terminal or ~/.zshrc, which wins over .env" if (os.getenv("ANTHROPIC_API_KEY") and KEY_FROM_SHELL) else "from .env"
-    return f"{k[:7]}…{k[-4:]} ({src})"
+    hint = f"{k[:7]}…{k[-4:]} ({src})"
+    if not k.startswith(("sk-ant-", "sk-")) and os.getenv("ANTHROPIC_API_KEY"):
+        hint += f"; Claude keys start with 'sk-ant-', this one starts with '{k[:7]}'"
+    return hint
 
 
 def auth_error():
