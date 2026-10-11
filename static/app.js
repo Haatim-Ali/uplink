@@ -253,7 +253,8 @@ function addTiles(m){
   // Standard OpenStreetMap tiles; app.css desaturates and lightens them so markers stand out.
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:18, attribution:"© OpenStreetMap contributors"}).addTo(m);
 }
-function mkIcon(cls){ return L.divIcon({className:"", iconSize:[24,24], iconAnchor:[12,12], html:`<div class="mk ${cls}"></div>`}); }
+// small, exact markers: the icon box matches the drawn size, so each one sits right on its spot
+function mkIcon(cls){ return L.divIcon({className:"", iconSize:[16,16], iconAnchor:[8,8], html:`<div class="mk ${cls}"></div>`}); }
 function ensureTrackSkeleton(id){
   if(tFor === id) return;
   destroyMap(); tFor = id;
@@ -278,7 +279,7 @@ function drawTrack(){
       <button class="btn primary" type="button" id="q-yes">Yes, that's everything</button><button class="btn" type="button" id="q-no">Not sure</button></div>`;
   }
   setIn("trackTop", `<div class="trk-title"><h1>${esc(st.head)}</h1><span class="id">#${esc(d.id)}</span></div>${st.sub ? `<p class="trk-sub">${esc(st.sub)}</p>` : ""}
-    <div class="seg" aria-hidden="true">${segs}</div><div class="seg-lbl"><span>Received</span><span>${esc(st.fail ? "Not delivered" : STEPS[Math.max(0, st.step - 1)])}</span><span>Delivered</span></div>${question}`);
+    <div class="seg" aria-hidden="true">${segs}</div><div class="seg-lbl"><span>Received</span><span>${esc(st.fail ? "Not delivered" : st.step > 1 && st.step < STEPS.length ? STEPS[st.step - 1] : "")}</span><span>Delivered</span></div>${question}`);
   if(question){ $("q-yes").onclick = () => answer(d, true); $("q-no").onclick = () => answer(d, false); }
 
   const rec = done && S.records.find(r => r.donation === d.id);
@@ -361,7 +362,7 @@ function drawTrackMap(d){
   if(tlayers.line){ tlayers.line.remove(); delete tlayers.line; }
   if(d.plan && d.dest){
     const pts = showDrv && d.status === "en_route" ? (d.picked ? [[drv.lat,drv.lng],[d.dest.lat,d.dest.lng]] : [[drv.lat,drv.lng],[d.origin.lat,d.origin.lng],[d.dest.lat,d.dest.lng]]) : [[d.origin.lat,d.origin.lng],[d.dest.lat,d.dest.lng]];
-    tlayers.line = L.polyline(pts, {color:"#2563eb", weight:4, opacity:.8}).addTo(tmap);
+    tlayers.line = L.polyline(pts, {color:"#2563eb", weight:3, opacity:.85, lineCap:"round", lineJoin:"round"}).addTo(tmap);
   }
   const all = ["pickup","dest","drv"].filter(k => tlayers[k]).map(k => tlayers[k].getLatLng());
   const key = all.length + "|" + (showDrv ? 1 : 0);
@@ -409,7 +410,7 @@ function drawReceipt(){
     <div class="acts"><button class="btn primary" type="button" onclick="window.print()">Print receipt</button><a class="btn" href="#/donations">Back</a></div></div>`);
 }
 
-route(); refresh(); setInterval(refresh, 1500;
+route(); refresh(); setInterval(refresh, 1500);
 
 // "Closing up": straight to the camera, the way a register's end-of-day button goes straight to the count
 const closingBtn = document.getElementById("closing-up");
