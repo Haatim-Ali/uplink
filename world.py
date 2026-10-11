@@ -79,6 +79,8 @@ class World:
         self.impact = {"meals": 0, "lbs": 0.0, "cost": 0.0, "spoiled": 0, "escalations": 0, "orgs": set()}
         self.outcomes = {}         # how each negotiation ended (consensus, majority, urgent, ...)
         self.negotiation = None
+        self.live_rounds = None   # the debate so far, while agents are still deliberating (live demo only)
+        self.live_donation = None
         self.negotiations = []
         self.phones = {}              # nonprofit id -> last time its phone page checked in (real seconds)
         self.network = []             # agent-to-agent messages: announce, offers, bids, awards
@@ -919,6 +921,8 @@ class World:
             "drivers": drivers, "donations": dons,
             "feed": self.feed[-120:], "decisions": self.decisions[-60:], "records": self.records,
             "negotiation": self.negotiation, "negotiations": self.negotiations, "weights": self.weights,
+            "deliberating": None if self.live_rounds is None else {
+                "donation": self.live_donation, "rounds": [dict(r, messages=list(r["messages"])) for r in list(self.live_rounds)]},
             "outcomes": self.outcomes,
             "network": self.network[-200:],
             "agents_online": {"businesses": len(self.businesses), "shelters": len(self.nonprofits),

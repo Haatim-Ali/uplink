@@ -208,6 +208,29 @@ function drawDonationCard(n){
     ${live?`<div class="timer ${d.minutes_left<30?"low":""}">${d.minutes_left} min until unsafe (${esc(d.safe_until)})</div><div class="tbar" aria-hidden="true"><i style="width:${pct}%"></i></div>`:""}</div>`);
 }
 
+// While the agents are still deliberating: each step appears as soon as it's said, the next one shows who's thinking.
+let liveSeen = {donation: null, count: 0};
+function drawLiveDebate(){
+  const L = S.deliberating || {donation: null, rounds: []};
+  const msgs = L.rounds.flatMap(r => r.messages.map(m => ({...m, round: r.round})));
+  const fresh = msgs.length > (liveSeen.donation === L.donation ? liveSeen.count : 0);
+  liveSeen = {donation: L.donation, count: msgs.length};
+  const cur = L.rounds[L.rounds.length - 1];
+  const step = !cur ? "Each agent is choosing its first proposal"
+    : cur.voting ? `Round ${cur.round}: each agent is voting on the others' proposals`
+    : `Round ${cur.round + 1}: each agent decides whether to stand firm or revise`;
+  const d = (S.donations || []).find(x => x.id === L.donation);
+  const cards = AGENTS.map(a => {
+    const last = msgs.filter(m => m.agent === a).pop();
+    return `<div class="agent ${a}"><div class="agent-top"><h3><span class="a-name">${a}</span></h3><span class="thinking" aria-hidden="true"><i></i><i></i><i></i></span></div><div class="goal">${GOALS[a]}</div>${last ? `<div class="says ${last.type}">“${esc(last.text)}”</div>` : `<div class="says waiting">Thinking…</div>`}</div>`;
+  }).join("");
+  const bubbles = msgs.map((m, i) => `<div class="bubble ${m.agent} ${m.type}${fresh && i >= msgs.length - 6 ? " new" : ""}"><span class="b-who">${esc(m.agent)}</span><span class="b-r">R${m.round}</span>${esc(m.text)}</div>`).join("");
+  setHTML("neg", `<div class="status-banner debating" role="status"><div><div class="t">Agents are deliberating${d ? ` on ${esc(d.id)}: ${d.food.servings} servings from ${esc(d.business_name)}` : ""}…</div><div class="d">${step}. The simulated clock waits for them, so no food-safety time is lost.</div></div></div>
+    <div class="agents">${cards}</div>
+    <div class="debate live" role="log" aria-live="polite" aria-label="Debate so far">${bubbles || '<span class="muted">The agents are reading the plans…</span>'}</div>`);
+  const box = document.querySelector("#neg .debate"); if(box) box.scrollTop = box.scrollHeight;
+}
+
 function pin(seq){ pinned = (pinned===seq ? null : seq); lastNegKey=null; drawNegotiation(); }
 function drawNegotiation(){
   try{ drawWire(); }catch(e){ console.error(e); }
@@ -215,12 +238,16 @@ function drawNegotiation(){
   const hist = S.negotiations || [];
   const n = currentNeg();
   drawDonationCard(n);
-  if(S.busy && !pinned){ hero.hidden = false; setHTML("neg", `<div class="status-banner debating" role="status"><div><div class="t">Agents are deliberating…</div><div class="d">The simulated clock is paused until they finish.</div></div></div>`); return; }
+  if(S.busy && !pinned){ hero.hidden = false; drawLiveDebate(); return; }
   if(!n){ hero.hidden = true; return; }
   hero.hidden = false;
   const shownSeq = pinned || n.seq;
   const msgs = n.rounds.flatMap(r => r.messages.map(m => ({...m, round: r.round})));
-  if(!pinned && n.seq !== play.seq && play.seq !== null && n.seq > play.seq){ play = {seq: n.seq, shown: 0, total: msgs.length}; callFor = n.seq; }
+  if(!pinned && n.seq !== play.seq && play.seq !== null && n.seq > play.seq){
+    // already watched live as the agents spoke: no replay, straight to the result
+    const watched = liveSeen.donation === n.donation && liveSeen.count > 0;
+    play = {seq: n.seq, shown: watched ? msgs.length : 0, total: msgs.length}; callFor = n.seq; liveSeen = {donation: null, count: 0};
+  }
   if(play.seq === null){ play = {seq: n.seq, shown: msgs.length, total: msgs.length}; }   // first load: no replay of old news
   const shown = play.seq === n.seq ? play.shown : msgs.length;
   const playing = shown < msgs.length;
@@ -632,7 +659,7 @@ function drawWire(){
   const svg = $("wire"); if(!svg || !S) return;
   const n = currentNeg();
   const stat = $("wire-stat");
-  if(!n){ svg.innerHTML = `<text x="500" y="150" text-anchor="middle" class="w-empty">Waiting for a donation. Run a scenario under Demo controls.</text>`; setHTML("wire-log", ""); stat.className = "wire-stat"; stat.innerHTML = `<i class="dot"></i>idle`; return; }
+  if(!n){ svg.innerHTML = `<text x="500" y="150" text-anchor="middle" class="w-empty">${S.busy ? "Agents are deliberating on the first donation…" : "Waiting for a donation. Run a scenario under Demo controls."}</text>`; setHTML("wire-log", ""); stat.className = "wire-stat"; stat.innerHTML = `<i class="dot"></i>idle`; return; }
   const all = (S.network||[]).filter(m => m.donation === n.donation);
   let start = 0; all.forEach((m,i) => { if(m.kind === "announce") start = i; });
   const msgs = all.slice(start);

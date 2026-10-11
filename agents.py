@@ -435,10 +435,6 @@ def negotiate(world, d, plans, council=None):
         llm_ok = llm_ok or any(props[a][2] for a in AGENTS)
         proposed = list(dict.fromkeys(proposals[a] for a in AGENTS))
 
-        cast = _each(lambda a: council.vote(a, proposed, S, V, r, mode), parallel)
-        llm_ok = llm_ok or any(cast[a][1] for a in AGENTS)
-        votes = {pid: {a: cast[a][0][pid] for a in AGENTS} for pid in proposed}
-
         messages = []
         for a in AGENTS:
             p = plans_by_id[proposals[a]]
@@ -449,12 +445,22 @@ def negotiate(world, d, plans, council=None):
             else:
                 verb = "Revises to"
             messages.append({"agent": a, "type": "propose", "text": f"{verb} {short(p)}. " + reasons[a]})
+        live = getattr(world, "live_rounds", None)   # the live demo shows each step while the next is still thinking
+        if live is not None:
+            live.append({"round": r + 1, "messages": list(messages), "voting": True})
+
+        cast = _each(lambda a: council.vote(a, proposed, S, V, r, mode), parallel)
+        llm_ok = llm_ok or any(cast[a][1] for a in AGENTS)
+        votes = {pid: {a: cast[a][0][pid] for a in AGENTS} for pid in proposed}
+
         for pid in proposed:
             for a in AGENTS:
                 v = votes[pid][a]
                 if not v["accept"] and proposals[a] != pid:
                     messages.append({"agent": a, "type": "objection", "text": f"On {short(plans_by_id[pid])}: {v['reason']}"})
         rounds.append({"round": r + 1, "proposals": dict(proposals), "votes": votes, "messages": messages})
+        if live is not None:
+            live[-1] = {"round": r + 1, "messages": list(messages), "voting": False}
         history += f"Round {r + 1}: " + "; ".join(f"{a} proposed {proposals[a]}" for a in AGENTS) + "\n"
 
         support = {pid: sum(weights[a] for a in AGENTS if votes[pid][a]["accept"]) for pid in proposed}

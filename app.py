@@ -93,17 +93,20 @@ def planner_loop():
             if plans is None:
                 continue
             w.busy = True
+            w.live_rounds, w.live_donation = [], d["id"]
         try:
             result = w.decide_plan(d, plans)
         except Exception as e:  # noqa: BLE001
             with lock:
                 w.busy = False
+                w.live_rounds = None
                 w.say("System", f"Negotiation error: {e}", "event")
             continue
         with lock:
             if W() is not w:
                 continue  # reset happened mid-negotiation
             w.busy = False
+            w.live_rounds = None
             plan = result.get("plan")
             if plan and not plan.get("join") and w.drivers[plan["driver"]]["status"] != "free" \
                     and d.get("locked_driver") != plan["driver"] \
