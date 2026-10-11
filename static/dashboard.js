@@ -1,5 +1,5 @@
 const AGENTS = ["Speed","Cost","Need"];
-const GOALS = {Speed:"Fast, reliable, big safety margin", Cost:"Spend as little as possible", Need:"Feed whoever needs it most"};
+const GOALS = {Speed:"Cares about arrival time and driver reliability", Cost:"Cares about what the trip costs", Need:"Cares about which shelter: whoever has waited longest"};
 const COLORS = {Speed:"var(--speed)",Cost:"var(--cost)",Need:"var(--need)"};
 const ICON = {Speed:"",Cost:"",Need:""};   // agents are identified by name; color only reinforces it
 const OUTCOME = {
