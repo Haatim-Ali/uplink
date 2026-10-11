@@ -203,3 +203,54 @@ Team outcomes: irreconcilable 1
 
 Team outcomes: insufficient evidence 2, consensus 2
 
+
+## Photo reading accuracy
+
+17 photos of countable food from Wikimedia Commons (`eval_photos/`, licenses and links in `sources.json`),
+each counted by hand. Photos where we couldn't be sure of the true count ourselves (overlapping croissants,
+a tiered cupcake stand) were left out. Two full runs with Claude:
+
+| | Run 1 | Run 2 |
+| --- | --- | --- |
+| Named the right food | 16/17 (94%) | 17/17 (100%) |
+| True count inside the model's range | 16/17 (94%) | 16/17 (94%) |
+| Count within 10% | 16/17 (94%) | 17/17 (100%) |
+| Average counting error | 1% | 1% |
+| Average time per photo | 8.8 s | 8.7 s |
+
+The same count came back in both runs for 15 of 17 photos. The two that changed: wrapped burritos
+read as "mole tamales" once (count unmatched) and correctly as 3 burritos the other time; a 20-piece
+sushi plate came back as 20, then 21.
+
+What this does and doesn't show: on photos where the items can be told apart, counting is close to
+exact, and the remaining errors are small run-to-run slips on ambiguous photos. It does not measure
+food that has to be estimated rather than counted (a tray of curry, a pan of pasta); there, servings
+come from the unit table and the business confirms them.
+
+Re-run: `python scripts/vision_eval.py eval_photos/ eval_results/run.csv`
+(per-photo results for both runs are in `eval_results/`).
+
+### Re-reading only when unsure (and big spreads in halves)
+
+`vision.analyze` reads each photo once. Only when that first reading isn't "high" confidence, fails, or
+finds 20+ items (`VISION_SPLIT_MIN`) does it read the photo again, up to `VISION_READS` (3) times in total.
+The middle reading is the best estimate; the range widens to cover readings that are close; a far-off
+reading is treated as an outlier (lower confidence, range unchanged); allergens and "keep cold" are
+combined on the safe side. Big spreads are also counted as two halves of the full-size photo, at the same
+time as the re-reads.
+
+Measured on the same 17 photos, two runs each:
+
+| | 1 reading | Always 3 readings | Re-read only when unsure |
+| --- | --- | --- | --- |
+| Misses (true count outside the range or food not named) | 2/34 | 1/34 | both of the single-reading misses would be re-read |
+| Model calls per photo | 1 | 3 (5 for big spreads) | 1.65 on average |
+| Photos that get extra readings | none | all | 9/34 |
+| Time per photo | ~9 s | ~11 s | ~9 s; 35 s for a big spread |
+
+The "re-read only when unsure" numbers come from replaying the decision on the 34 single readings
+we already had (no new paid runs), plus two live spot checks: a clear donut box took 1 call
+(12, correct, high confidence); a 20-piece sushi plate took 5 calls (best estimate 21, flagged
+medium confidence with "please check the count").
+
+`VISION_READS=1` turns re-reading off entirely.
