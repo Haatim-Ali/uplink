@@ -47,14 +47,19 @@ def start_mesh():
         return
     try:
         from mesh.client import MeshClient
-        from mesh.launcher import Launcher
-        launcher = Launcher(int(os.getenv("MESH_PORT", "7300")))
-        listed = launcher.start(wait=15)
-        MESH = MeshClient(launcher.directory_url, launcher=launcher)
+        from mesh.launcher import Launcher, agntcy_available
+        # AGNTCY on whenever its SDK is installed (AGNTCY=0 turns it off): every agent process is then also
+        # an A2A agent over NATS, and each step of a donation is one A2A broadcast
+        use_agntcy = os.getenv("AGNTCY", "").strip().lower() not in ("0", "off", "false", "no") and agntcy_available()
+        nats_url = os.getenv("NATS_URL", "nats://localhost:4222") if use_agntcy else None
+        launcher = Launcher(int(os.getenv("MESH_PORT", "7300")), nats_url=nats_url)
+        listed = launcher.start(wait=20)
+        MESH = MeshClient(launcher.directory_url, launcher=launcher, nats_url=launcher.nats_url)
         with lock:
             state["world"].mesh = MESH
         n = len(MESH.agents(fresh=True))
-        print(f"Agent mesh: {n} agents, each its own process, directory at {launcher.directory_url}"
+        how = (f"AGNTCY A2A over NATS ({launcher.nats_url})" if MESH.transport == "a2a" else "HTTP")
+        print(f"Agent network: {n} agents, each its own process, talking over {how}; directory at {launcher.directory_url}"
               + ("" if listed else " (some still starting)"))
     except Exception as e:  # noqa: BLE001
         MESH = None
@@ -170,7 +175,8 @@ def api_state():
                  # which models are actually answering, so the dashboard can credit them
                  "agents_model": (os.getenv("AGENT_MODEL") or (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL if claude else os.getenv("OPENAI_MODEL", ""))) if agents.use_llm() else "",
                  "vision_model": (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL) if claude else (os.getenv("OPENAI_MODEL", "") if prov else ""),
-                 "mesh": len(MESH.agents()) if MESH else 0}   # agents running as separate services
+                 "mesh": len(MESH.agents()) if MESH else 0,   # agents running as separate services
+                 "mesh_transport": MESH.transport if MESH else None}
     s["scenarios"] = [{"name": k, "title": v["title"]} for k, v in scenarios.SCENARIOS.items()]
     s["agntcy"] = dict(agntcy_bridge.state)
     s["cameras"] = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
@@ -469,12 +475,9 @@ if __name__ == "__main__":
     start_mesh()
     threading.Thread(target=clock_loop, daemon=True).start()
     threading.Thread(target=planner_loop, daemon=True).start()
-    st = agntcy_bridge.start(lambda: state["world"])   # shelter and driver agents on AGNTCY, if AGNTCY=1
-    if st["on"]:
-        print(f"Shelter and driver agents: {st['transport']} ({st['agents']} agents); negotiators "
-              + ("as separate services (agent mesh)" if MESH else "in-process"))
-    else:
-        print(f"Agent network: {'agent mesh (separate processes)' if MESH else 'in-process'} · {st['reason']}")
+    if not MESH:   # without separate agent processes, the AGNTCY bridge serves the agents inside this app
+        st = agntcy_bridge.start(lambda: state["world"])
+        print(f"Agent network: {st['transport']}" + (f" ({st['agents']} agents)" if st["on"] else f" · {st['reason']}"))
     threading.Thread(target=compare_results, daemon=True).start()   # warm the Evidence page in the background
     port = int(os.getenv("PORT", "5050"))   # 5000 is taken by AirPlay on Macs
     print("Uplink · food rescue agents")

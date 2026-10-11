@@ -2,6 +2,9 @@
 
 Run:  python tests/test_mesh.py      (starts ~17 local processes on ports 7600+, stops them at the end)
 
+Runs twice: agents talking over HTTP, then (if the AGNTCY app-sdk and nats-server are installed) every
+agent also served as an AGNTCY A2A agent over NATS, with each step one A2A broadcast.
+
 Checks that the distributed agents decide exactly as the in-process ones, every scenario, every
 negotiation; that a stopped agent drops out of the directory and is simply not consulted; that it can
 rejoin; and that every message is traced.
@@ -15,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import scenarios  # noqa: E402
 from mesh.client import MeshClient  # noqa: E402
-from mesh.launcher import Launcher  # noqa: E402
+from mesh.launcher import Launcher, agntcy_available  # noqa: E402
 from world import World  # noqa: E402
 
 
@@ -35,10 +38,14 @@ def transcript(w):
               for r in n["rounds"]]) for n in w.negotiations]
 
 
-def main():
-    L = Launcher(base_port=7600)
-    assert L.start(wait=15), "not every agent registered in the directory"
-    mesh = MeshClient(L.directory_url, launcher=L)
+def main(nats_url=None):
+    L = Launcher(base_port=7600, nats_url=nats_url)
+    assert L.start(wait=25), "not every agent registered in the directory"
+    mesh = MeshClient(L.directory_url, launcher=L, nats_url=L.nats_url)
+    print(f"\n=== transport: {mesh.transport}" + (f" ({L.nats_url})" if mesh.transport == "a2a" else ""))
+    if nats_url:
+        assert mesh.transport == "a2a", "AGNTCY requested but the A2A client didn't start"
+        assert all("a2a/nats" in r.get("protocols", []) for r in mesh.agents(fresh=True)), "an agent isn't on A2A"
     try:
         listed = mesh.agents(fresh=True)
         kinds = {k: sum(r["kind"] == k for r in listed) for k in ("shelter", "driver", "negotiator")}
@@ -51,9 +58,13 @@ def main():
             assert a.metrics() == b.metrics(), (name, a.metrics(), b.metrics())
             assert transcript(a) == transcript(b), name
             print(f"ok  {name}: identical metrics and negotiations ({len(b.negotiations)} negotiations)")
-        sent = mesh.status()["messages"]
-        assert sent > 100 and mesh.status()["failed"] == 0
-        print(f"ok  {sent} messages traced, 0 failed")
+        st = mesh.status()
+        sent = st["messages"]
+        assert sent > 100 and st["failed"] == 0
+        vias = {t.get("via") for t in st["trace"]}
+        if nats_url:
+            assert vias == {"A2A/NATS"}, f"some messages didn't go over A2A: {vias}"
+        print(f"ok  {sent} messages traced, 0 failed, via {', '.join(sorted(v for v in vias if v))}")
 
         # 2. a stopped shelter agent leaves the directory and is not consulted; the donation still gets a plan
         L.stop("shelter:northside-youth")
@@ -76,10 +87,15 @@ def main():
         assert w.metrics()["meals_delivered_safely"] > 0
         assert L.restart("negotiator:Cost")
         print("ok  stopped negotiator: negotiation still completes (fallback stand-in)")
-        print("\nmesh tests passed")
+        print("mesh tests passed" + (" (AGNTCY A2A over NATS)" if nats_url else " (HTTP)"))
     finally:
         L.shutdown()
+        time.sleep(1)
 
 
 if __name__ == "__main__":
     main()
+    if agntcy_available():
+        main(os.getenv("NATS_URL", "nats://localhost:4222"))
+    else:
+        print("\n(AGNTCY app-sdk not installed: skipped the A2A-over-NATS run)")

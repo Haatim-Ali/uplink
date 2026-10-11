@@ -9,14 +9,20 @@ JSON messages on POST /a2a:  {"id", "type", "from", "to", "payload"}  ->  {"id",
 
   shelter     offer.request   -> accept / counter-offer / decline, with a reason   (network.shelter_offer)
   driver      bid.request     -> a bid for the trip, or a refusal                   (network.driver_bid)
+  driver      bid.batch       -> bids for every trip addressed to it in one broadcast
   negotiator  plan.evaluate   -> its scores and vetoes for every safe plan          (agents.agent_evaluate)
               plan.propose    -> its proposal for this round, with a reason         (agents.agent_propose)
               plan.vote       -> accept / object / veto on each proposed plan       (agents.agent_vote)
 
 The world simulator sends the facts (what was delivered, what is on its way, the clock); the agent
 brings its own policy. Same functions as in-process, so the decisions are identical.
+
+With --nats, the agent is also an AGNTCY A2A agent: it serves an A2A AgentCard over NATS with the
+AGNTCY app-sdk and answers the same messages there (one A2A broadcast reaches every shelter, every
+driver or all three negotiators). It joins the directory only once it is reachable over AGNTCY.
 """
 import argparse
+import asyncio
 import json
 import os
 import signal
@@ -80,6 +86,12 @@ def handle(kind, agent_id, prof, msg):
     if kind == "driver" and t == "bid.request":
         dr = dict(prof, **p["driver"])
         return "bid.response", network.driver_bid(None, dr, p["donation"], p["shelter"], p["plan"])
+    if kind == "driver" and t == "bid.batch":   # one broadcast to every driver: answer only the trips addressed to me
+        out = {}
+        for trip in p["trips"].get(agent_id, []):
+            dr = dict(prof, **trip["driver"])
+            out[trip["key"]] = network.driver_bid(None, dr, p["donation"], trip["shelter"], trip["plan"])
+        return "bid.batch.response", {"bids": out}
     if kind == "negotiator":
         view = WorldView(p["facts"])
         d, plans = p["donation"], p["plans"]
@@ -93,6 +105,68 @@ def handle(kind, agent_id, prof, msg):
             votes, used = agents.agent_vote(agent_id, view, d, plans, p["proposed"], p["S"], p["V"], p["r"], p["mode"])
             return "plan.votes", {"votes": votes, "llm": used}
     raise ValueError(f"{kind} agent can't handle {t}")
+
+
+# ---------------- AGNTCY: A2A over NATS ----------------
+PLURAL = {"shelter": "shelters", "driver": "drivers", "negotiator": "negotiators"}
+
+
+def a2a_name(kind, agent_id):
+    return f"uplink/{PLURAL[kind]}/{agent_id}"
+
+
+def a2a_card(kind, agent_id, rec, nats_url):
+    """This agent's A2A AgentCard (same shape as agntcy_bridge.card_dict)."""
+    nm = a2a_name(kind, agent_id)
+    skills = [{"id": sk, "name": sk, "description": rec["description"], "tags": ["food-rescue", kind]} for sk in rec["skills"]]
+    return {"name": nm, "description": f"{rec['name']}: {rec['description']}", "url": f"{nats_url}/{nm}", "version": "1.0.0",
+            "defaultInputModes": ["text"], "defaultOutputModes": ["text"], "capabilities": {"streaming": False},
+            "provider": {"organization": "Uplink (UCSC AI Hackathon)", "url": "https://github.com/saraxjain/uplink"},
+            "preferredTransport": "natspatterns",
+            "additionalInterfaces": [{"transport": "natspatterns", "url": f"{nats_url}/{nm}"}], "skills": skills}
+
+
+def serve_a2a(kind, agent_id, prof, rec, nats_url, ready, failed):
+    """Serve this agent's A2A card over NATS on its own event loop (a background thread)."""
+    async def boot():
+        from a2a.server.agent_execution import AgentExecutor
+        from a2a.server.request_handlers import DefaultRequestHandler
+        from a2a.server.tasks import InMemoryTaskStore
+        from a2a.types import AgentCard
+        from a2a.utils import new_agent_text_message
+        from agntcy_app_sdk.factory import AgntcyFactory
+
+        class Executor(AgentExecutor):
+            async def execute(self, context, event_queue):
+                try:
+                    msg = json.loads(context.get_user_input())
+                    # the decision runs off the event loop (a model call can take seconds)
+                    rtype, payload = await asyncio.get_running_loop().run_in_executor(None, handle, kind, agent_id, prof, msg)
+                    reply = {"id": msg.get("id"), "type": rtype, "payload": payload}
+                except Exception as e:  # noqa: BLE001 - report the failure instead of hanging the broadcast
+                    reply = {"type": "error", "error": f"{type(e).__name__}: {e}"}
+                reply["from"] = rec["id"]
+                await event_queue.enqueue_event(new_agent_text_message(json.dumps(reply)))
+
+            async def cancel(self, context, event_queue):
+                pass
+
+        factory = AgntcyFactory()
+        session = factory.create_app_session(max_sessions=4)
+        card = AgentCard.model_validate(a2a_card(kind, agent_id, rec, nats_url))
+        await session.add_a2a_card(card, DefaultRequestHandler(agent_executor=Executor(), task_store=InMemoryTaskStore())) \
+            .with_factory(factory).start(keep_alive=False)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(asyncio.wait_for(boot(), 15))
+    except Exception as e:  # noqa: BLE001 - stay reachable over HTTP; say why
+        failed.append(f"{type(e).__name__}: {e}")
+        ready.set()
+        return
+    ready.set()
+    loop.run_forever()
 
 
 def make_handler(kind, agent_id, prof, rec):
@@ -152,10 +226,21 @@ def _keep_registered(directory, rec, stop, parent=None):
         stop.wait(HEARTBEAT if registered else 0.5)
 
 
-def serve(kind, agent_id, port, directory, background=False, name=None):
-    """Run the agent. background=True runs it in threads (tests) and returns (server, stop_event)."""
+def serve(kind, agent_id, port, directory, background=False, name=None, nats=None):
+    """Run the agent. background=True runs it in threads (tests) and returns (server, stop_event).
+    nats: also serve it as an AGNTCY A2A agent over NATS at this URL."""
     prof = profile(kind, agent_id, name)
     rec = record(kind, agent_id, port, prof)
+    rec["protocols"] = ["http"]
+    if nats:
+        ready, failed = threading.Event(), []
+        threading.Thread(target=serve_a2a, args=(kind, agent_id, prof, rec, nats, ready, failed), daemon=True).start()
+        ready.wait(20)
+        if not failed:
+            rec["protocols"] = ["a2a/nats", "http"]
+            rec["a2a"] = {"name": a2a_name(kind, agent_id), "transport": "natspatterns", "url": f"{nats}/{a2a_name(kind, agent_id)}"}
+        else:
+            print(f"A2A over NATS unavailable for {rec['id']}: {failed[0]}", file=sys.stderr)
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(kind, agent_id, prof, rec))
     srv.daemon_threads = True
     stop = threading.Event()
@@ -184,5 +269,6 @@ if __name__ == "__main__":
     ap.add_argument("--port", type=int, required=True)
     ap.add_argument("--directory", default="http://127.0.0.1:7300")
     ap.add_argument("--name", help="display name, for agents not in the data files (e.g. a driver who just joined)")
+    ap.add_argument("--nats", help="also serve as an AGNTCY A2A agent over NATS at this URL, e.g. nats://localhost:4222")
     a = ap.parse_args()
-    serve(a.kind, a.id, a.port, a.directory, name=a.name)
+    serve(a.kind, a.id, a.port, a.directory, name=a.name, nats=a.nats)

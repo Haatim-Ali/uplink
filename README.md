@@ -106,15 +106,21 @@ Click any past negotiation (D1, D2...) and **Replay debate** to walk judges thro
 
 ## Agents as separate services (the agent mesh)
 
-When you run `python app.py`, every agent starts as **its own process**: 7 shelter agents, 6 driver agents and the 3 negotiators (Speed, Cost, Need), plus any pantry or driver that joins mid-run. They find each other through an **agent directory** and talk over HTTP.
+When you run `python app.py`, every agent starts as **its own process**: 7 shelter agents, 6 driver agents and the 3 negotiators (Speed, Cost, Need), plus any pantry or driver that joins mid-run. They find each other through an **agent directory** and talk over **AGNTCY: each agent process serves an A2A AgentCard over NATS** with the AGNTCY app-sdk, and each step of a donation is one A2A broadcast (to every shelter, every driver, or the three negotiators). Without the SDK or `nats-server` they talk over HTTP instead.
+
+```bash
+brew install nats-server                 # once; the app starts it for you
+pip install -r requirements-agntcy.txt   # once (agntcy-app-sdk)
+python app.py                            # prints: ...talking over AGNTCY A2A over NATS
+```
 
 - **Directory** (`mesh/directory.py`): each agent publishes a record of who it is, its skills (`food.receive`, `trip.bid`, `plan.vote`…), what it can do and where to reach it, modeled on AGNTCY's Agent Directory and OASF agent records. Agents heartbeat every 2 s; one that stops drops out within 6 s, or at once when it shuts down cleanly.
-- **Messages** (`mesh/agent.py`): A2A-style JSON over HTTP. Shelters answer `offer.request`, drivers answer `bid.request`, and the negotiators answer `plan.evaluate`, `plan.propose` and `plan.vote`. The negotiation table only relays messages and counts votes.
-- **Same decisions**: each agent service runs the same functions as the in-process version. `tests/test_mesh.py` replays all 9 scenarios through the real processes (about 1,700 messages) and checks every metric and every negotiation is identical.
+- **Messages** (`mesh/agent.py`): A2A messages over NATS (AGNTCY app-sdk), with HTTP as the fallback. Shelters answer `offer.request`, drivers answer `bid.batch`, and the negotiators answer `plan.evaluate`, `plan.propose` and `plan.vote`. The negotiation table only relays messages and counts votes.
+- **Same decisions**: each agent service runs the same functions as the in-process version. `tests/test_mesh.py` replays all 9 scenarios through the real processes twice, over HTTP (about 1,700 messages) and over AGNTCY A2A/NATS (about 1,100 messages, all over A2A), and checks every metric and every negotiation is identical.
 - **Resilience**: stop an agent and it is no longer consulted; the food still gets delivered. A stopped negotiator is stood in for by the same logic, and that's logged. Agents exit when the app exits, even after a crash.
 - **On the dashboard**: Ops → Activity → **Agent services** lists every agent's process, port, skills, message count and reply time, with **Stop / Restart** buttons, plus a live trace of the messages between agents.
 
-`MESH=0 python app.py` keeps everything in one process (the scenarios and `test_core.py` always do). We built the directory and messaging ourselves in the AGNTCY style; Cisco's own SLIM and directory servers can replace them without changing the agents.
+`AGNTCY=0` keeps the separate processes on HTTP; `MESH=0 python app.py` keeps everything in one process (then `AGNTCY=1` serves shelters and drivers over AGNTCY inside the app, via `agntcy_bridge.py`). The scenarios and `test_core.py` always run in-process. The directory and heartbeats are ours; the messaging, A2A cards and NATS transport are AGNTCY's.
 
 ## How it works
 

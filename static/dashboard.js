@@ -383,7 +383,9 @@ function drawGlobal(){
   $("clock").textContent = S.now + (S.paused?" (paused)":"");
   $("mode").textContent = modeText(S.mode);
   const ax = S.agntcy || {}, xp = $("xport");
-  if(xp){ xp.textContent = ax.on ? `AGNTCY · A2A over NATS · ${ax.agents} agents${ax.last_ms != null ? " · " + ax.last_ms + " ms" : ""}` : S.mode.mesh ? `Agent mesh · ${S.mode.mesh} agent services` : "in-process";
+  if(xp){ xp.textContent = S.mode.mesh && S.mode.mesh_transport === "a2a" ? `AGNTCY · A2A over NATS · ${S.mode.mesh} agent processes`
+      : ax.on ? `AGNTCY · A2A over NATS · ${ax.agents} agents${ax.last_ms != null ? " · " + ax.last_ms + " ms" : ""}`
+      : S.mode.mesh ? `${S.mode.mesh} agent processes · HTTP` : "in-process";
     xp.title = ax.on ? `${ax.broadcasts} broadcasts, ${ax.messages} A2A messages so far` : (ax.reason || ""); xp.classList.toggle("on", !!(ax.on || S.mode.mesh)); }
   $("pause").textContent = S.paused ? "Resume" : "Pause";
   drawCamera();
@@ -430,21 +432,21 @@ async function drawMesh(){
     <div class="kpi"><b>${m.messages.toLocaleString()}</b><span>messages sent</span></div>
     <div class="kpi"><b>${m.failed}</b><span>messages that got no answer</span></div>
     <div class="kpi"><b>${avg} ms</b><span>average reply time (recent)</span></div></div>
-    <p class="muted small">Agent directory: <code>${esc(m.directory)}</code></p>`);
+    <p class="muted small">Agent directory: <code>${esc(m.directory)}</code> · Messages: ${m.transport === "a2a" ? `<b>AGNTCY A2A over NATS</b> (<code>${esc(m.nats)}</code>), one broadcast per step` : "HTTP"}</p>`);
   const port = a => ((a.locator||{}).url||"").replace(/^https?:\/\/[^:]+:(\d+).*$/, ":$1");
   const groups = ["negotiator","shelter","driver"].map(k => {
     const rows = m.agents.filter(a=>a.kind===k).map(a => {
       const on = a.status==="online";
       const st = on ? `<span class="pill ok">● Online</span>` : a.status==="starting" ? `<span class="pill warn">Starting</span>` : `<span class="pill bad">✕ Stopped</span>`;
       const btn = on ? `<button class="btn sm" onclick="meshAct('stop','${esc(a.id)}')">Stop</button>` : `<button class="btn sm" onclick="meshAct('start','${esc(a.id)}')">Restart</button>`;
-      return `<tr><td><b>${esc(a.agent)}</b><div class="muted small">${esc((a.skills||[]).join(" · "))}</div></td><td><code>${esc(port(a))}</code></td><td class="n">${a.pid||"–"}</td><td>${st}</td><td class="n">${a.sent??0}</td><td class="n">${a.avg_ms??"–"}</td><td>${btn}</td></tr>`;
+      return `<tr><td><b>${esc(a.agent)}</b><div class="muted small">${esc((a.skills||[]).join(" · "))}${(a.protocols||[]).includes("a2a/nats") ? ` · <b>A2A card</b> <code>${esc(a.a2a.name)}</code>` : ""}</div></td><td><code>${esc(port(a))}</code></td><td class="n">${a.pid||"–"}</td><td>${st}</td><td class="n">${a.sent??0}</td><td class="n">${a.avg_ms??"–"}</td><td>${btn}</td></tr>`;
     }).join("");
     return rows ? `<h3 class="mesh-h">${KIND_LABEL[k]}</h3><table class="data"><thead><tr><th>Agent · skills</th><th>Port</th><th class="n">PID</th><th>Status</th><th class="n">Messages</th><th class="n">Avg ms</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : "";
   }).join("");
   if(!meshHover) setHTML("mesh-agents", groups);   // hold still while the pointer is over the buttons
   const now = Date.now()/1000;
   setHTML("mesh-trace", m.trace.length ? `<table class="data"><thead><tr><th>When</th><th>From → to</th><th>Message → reply</th><th class="n">ms</th><th>Donation</th></tr></thead><tbody>${
-    m.trace.slice(0, 60).map(t => `<tr><td class="muted">${Math.max(0, Math.round(now - t.t))}s ago</td><td><code>${esc(t.from)}</code> → <code>${esc(t.to)}</code></td><td>${esc(t.type)} → ${t.ok ? esc(t.reply) : `<span class="pill bad">${esc(t.error||"no answer")}</span>`}</td><td class="n">${t.ms}</td><td>${esc(t.donation||"")}</td></tr>`).join("")
+    m.trace.slice(0, 60).map(t => `<tr><td class="muted">${Math.max(0, Math.round(now - t.t))}s ago</td><td><code>${esc(t.from)}</code> → <code>${esc(t.to)}</code></td><td>${esc(t.type)} → ${t.ok ? esc(t.reply) : `<span class="pill bad">${esc(t.error||"no answer")}</span>`} <span class="muted small">${esc(t.via||"")}</span></td><td class="n">${t.ms}</td><td>${esc(t.donation||"")}</td></tr>`).join("")
   }</tbody></table>` : `<p class="empty">No messages yet. Run a scenario from Demo controls.</p>`);
 }
 async function meshAct(action, id){

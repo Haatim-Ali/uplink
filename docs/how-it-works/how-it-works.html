@@ -144,9 +144,9 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <!-- ============ 4 ============ -->
 <div class="section newpage">
 <h2><span class="num">4</span>System architecture</h2>
-<p>Uplink is a Python web server (Flask) that simulates the city, plus <b>one separate process per agent</b>. The agents find each other through an agent directory and exchange messages over HTTP. The agents' decisions are real; the city around them (shelters' locations, drivers moving, the clock) is simulated.</p>
+<p>Uplink is a Python web server (Flask) that simulates the city, plus <b>one separate process per agent</b>. Each agent is also an <b>AGNTCY A2A agent over NATS</b> (Cisco's open agent stack): the agents find each other through an agent directory and exchange A2A messages, one broadcast per step. The agents' decisions are real; the city around them (shelters' locations, drivers moving, the clock) is simulated.</p>
 <figure>
-<svg viewBox="0 0 760 640" width="82%" style="display:block;margin:0 auto" role="img" aria-label="Uplink architecture">
+<svg viewBox="0 0 760 640" width="76%" style="display:block;margin:0 auto" role="img" aria-label="Uplink architecture">
 <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>
 <text x="20" y="20" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">IN THE BROWSER</text>
 <g font-size="12">
@@ -186,8 +186,8 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <g stroke="#64748b" stroke-width="1.3" fill="none">
 <path d="M476 316V366" marker-end="url(#ar)"/><path d="M644 316V366" marker-end="url(#ar)" stroke-dasharray="4 3"/>
 </g>
-<text x="468" y="346" text-anchor="end" font-size="10.5" fill="#64748b">A2A-style JSON messages over HTTP</text>
-<text x="652" y="346" font-size="10.5" fill="#64748b">starts them</text>
+<text x="484" y="338" font-size="10.5" fill="#0f766e" font-weight="700">AGNTCY A2A over NATS</text><text x="484" y="352" font-size="10" fill="#64748b">(HTTP fallback)</text>
+<text x="652" y="338" font-size="10.5" fill="#64748b">starts them</text>
 <text x="20" y="560" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">OUTSIDE SERVICES (OPTIONAL)</text>
 <g font-size="12">
 <rect x="150" y="570" width="210" height="56" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/><text x="255" y="593" text-anchor="middle" font-weight="700" fill="#0f172a">Anthropic Claude API</text><text x="255" y="610" text-anchor="middle" font-size="10.5" fill="#334155">reads photos; optional agent reasoning</text>
@@ -199,7 +199,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 </figure>
 <div class="grid2">
 <div class="plain"><span class="tag">In plain words</span>Each shelter, driver and negotiator is its own little program, like separate people with their own phones. A directory works like a phone book: agents list themselves there, and anyone can look up who can take food or drive a trip. If one agent goes offline, it drops out of the phone book and the others carry on.</div>
-<div class="tech"><span class="tag">Technical detail</span>The <b>clock thread</b> advances simulated time (1 simulated minute per real second at 1×). The <b>planner thread</b> runs each negotiation outside the shared lock, so a slow agent never freezes the dashboard. Each agent process is a small HTTP server; the launcher starts about 16 of them on ports 7300 and up, and they exit when the app exits.</div>
+<div class="tech"><span class="tag">Technical detail</span>The <b>clock thread</b> advances simulated time (1 simulated minute per real second at 1×). The <b>planner thread</b> runs each negotiation outside the shared lock, so a slow agent never freezes the dashboard. Each agent process serves an A2A AgentCard over NATS with the AGNTCY app-sdk (and an HTTP fallback); the launcher starts about 16 of them, plus the NATS server if needed, and they all exit when the app exits.</div>
 </div>
 </div>
 
@@ -327,11 +327,11 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <tr><th>Piece</th><th>How it works</th></tr>
 <tr><td><b>Agent directory</b></td><td>Each agent publishes a record: its id, name, skills (for example <code>food.receive</code>, <code>trip.bid</code>, <code>plan.vote</code>), what it can do (food types, fridge, range) and its address. Modeled on AGNTCY's Agent Directory and OASF agent records.</td></tr>
 <tr><td><b>Heartbeats</b></td><td>Every agent checks in every 2 seconds. One that goes silent for 6 seconds, or shuts down, drops out and is no longer discovered.</td></tr>
-<tr><td><b>Messages</b></td><td>A2A-style JSON over HTTP: <code>offer.request</code> to shelters, <code>bid.request</code> to drivers, <code>plan.evaluate</code>, <code>plan.propose</code> and <code>plan.vote</code> to the negotiators. Every message is traced with sender, receiver, type and reply time (about 1 to 12 ms locally).</td></tr>
+<tr><td><b>Messages</b></td><td><b>AGNTCY A2A over NATS</b>, one broadcast per step: <code>offer.request</code> to every shelter, <code>bid.batch</code> to every driver, <code>plan.evaluate</code>, <code>plan.propose</code> and <code>plan.vote</code> to the three negotiators. HTTP is the automatic fallback. Every message is traced with sender, receiver, type and reply time (a few ms locally).</td></tr>
 <tr><td><b>Resilience</b></td><td>Stop a shelter's agent and it isn't consulted; the food goes elsewhere. A pantry or driver that joins mid-run gets its own agent, which registers itself. If a negotiator is down, the same logic stands in for it and that is logged.</td></tr>
-<tr><td><b>Proof it's the same</b></td><td><code>tests/test_mesh.py</code> replays all 9 scenarios through the real processes (about 1,700 messages, 0 failures) and checks every number and every negotiation matches the in-process version exactly.</td></tr>
+<tr><td><b>Proof it's the same</b></td><td><code>tests/test_mesh.py</code> replays all 9 scenarios through the real processes twice, over AGNTCY A2A/NATS (about 1,100 messages, all over A2A) and over HTTP (about 1,700), with 0 failures, and checks every number and every negotiation matches the in-process version exactly.</td></tr>
 </table>
-<div class="tech"><span class="tag">Honest note</span>We built the directory and messaging ourselves, in the style of Cisco's AGNTCY project. AGNTCY's own SLIM messaging and directory servers need Docker, which wasn't available; they could replace ours without changing the agents.</div>
+<div class="tech"><span class="tag">What's AGNTCY and what's ours</span>From AGNTCY: the A2A protocol, the AgentCards, the NATS transport and the broadcast pattern (via the AGNTCY app-sdk, as in Cisco's coffeeAGNTCY demo), and OASF records. Ours: the agents and their decisions, the safety rules, the negotiation, and the agent directory with heartbeats (modeled on AGNTCY's Agent Directory).</div>
 </div>
 
 <!-- ============ 9 ============ -->
@@ -528,7 +528,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <div><b>Is the AI deciding whether food is safe?</b>No. Safety is fixed rules in code (time, refrigeration, allergens, capacity, hours) that remove unsafe plans before any agent sees them.</div>
 <div><b>How do you know this beats a simple approach?</b>We ran the same scenarios against a nearest-shelter baseline and against each agent alone. See section 12, including where the team costs more.</div>
 <div><b>How do you know the amount from a photo?</b>The model counts what it can see and gives a range and a confidence level. Code computes servings and weight, and the business confirms or corrects every number.</div>
-<div><b>Are these really separate agents?</b>Yes. Each shelter, driver and negotiator runs as its own process, registers in an agent directory, and answers messages over HTTP. You can stop one live and watch the others carry on. A test proves the distributed agents decide exactly as the in-process ones.</div>
+<div><b>Are these really separate agents?</b>Yes. Each shelter, driver and negotiator runs as its own process and is an AGNTCY A2A agent over NATS, registered in an agent directory. You can stop one live and watch the others carry on. A test proves the distributed agents decide exactly as the in-process ones.</div>
 <div><b>Is this real?</b>The agents, photo reading, safety rules and records are real. The city, drivers and clock are simulated for the demo.</div>
 <div><b>How is this different from Copia?</b>Copia makes businesses enter details and coordinate. Uplink cuts it to one photo, and the agents handle matching, failures, tradeoffs and paperwork.</div>
 </div>
@@ -553,7 +553,8 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <tr><td>Counter-offer</td><td>A shelter offering to take only part of a donation; the rest is re-announced</td></tr>
 <tr><td>Agent directory</td><td>A registry where agents list who they are, what they can do and where to reach them, so others can find them</td></tr>
 <tr><td>Heartbeat</td><td>A regular "still here" signal; an agent that stops sending it drops out of the directory</td></tr>
-<tr><td>A2A message</td><td>An agent-to-agent message: a small JSON request and reply sent over HTTP</td></tr>
+<tr><td>A2A message</td><td>Agent-to-agent protocol message (used by AGNTCY); here sent over NATS, a fast message server</td></tr>
+<tr><td>NATS</td><td>A lightweight message server; the agents' A2A messages travel through it</td></tr>
 <tr><td>OASF record</td><td>AGNTCY's standard format for describing an agent; our directory records are modeled on it</td></tr>
 <tr><td>Vision model</td><td>AI that understands images; here, it identifies and counts food</td></tr>
 <tr><td>vLLM / Brev</td><td>Software that serves an open AI model; Brev rents the NVIDIA GPU it runs on</td></tr>

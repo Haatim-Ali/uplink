@@ -183,7 +183,7 @@
     <div class="panel"><div class="dons" id="dons"></div></div>
   </div>
   <div class="tabpanel" data-tabpanel="mesh" hidden>
-    <p class="helper">Every shelter, driver and negotiator runs as its own process. Each one registers in the agent directory, sends a heartbeat every 2 s, and answers messages over HTTP. Stop one and it drops out of the directory; the rest carry on without it.</p>
+    <p class="helper">Every shelter, driver and negotiator runs as its own process and is an AGNTCY A2A agent over NATS (HTTP if NATS isn't available). Each one registers in the agent directory and sends a heartbeat every 2 s. Stop one and it drops out of the directory; the rest carry on without it.</p>
     <div id="mesh-sum" class="mesh-sum"></div>
     <div class="panel"><div id="mesh-agents"></div></div>
     <h2 class="sec-h">Messages between agents <span class="muted small">(newest first)</span></h2>
