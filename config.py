@@ -33,5 +33,5 @@ MIN_LOT = 5              # smallest split a shelter will counter-offer, in servi
 VOLUNTEER_MAX_KM = 12    # default farthest trip a volunteer driver agrees to (drivers can set their own max_km)
 
 # --- photo reading ---
-VISION_READS = int(os.getenv("VISION_READS", "3"))      # read each photo this many times at once; disagreement lowers confidence
+VISION_READS = int(os.getenv("VISION_READS", "3"))      # most readings per photo; extra ones only when the first is unsure
 VISION_SPLIT_MIN = int(os.getenv("VISION_SPLIT_MIN", "20"))  # with this many items or more, also count each half up close

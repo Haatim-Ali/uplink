@@ -319,7 +319,17 @@ def analyze(image_bytes, media_type="image/jpeg", menu_hint=""):
     if media_type not in SUPPORTED_TYPES:
         return failed(f"{media_type} photos aren't supported; use JPEG or PNG")
     prompt = PROMPT + (menu_hint or "")
-    answers = _read_all([(image_bytes, prompt)] * max(1, VISION_READS))
+    # One reading first. Only if it's unsure (or a big spread, or it failed) is the photo read again,
+    # so most photos cost a single model call and the extra calls go where they can change the answer.
+    answers = _read_all([(image_bytes, prompt)])
+    first = answers[0]
+    big = isinstance(first, dict) and _total(from_counts(first)) >= VISION_SPLIT_MIN
+    sure = isinstance(first, dict) and (first.get("is_food") is False or (first.get("confidence") == "high" and not big))
+    extra = [(image_bytes, prompt)] * (VISION_READS - 1) if not sure and VISION_READS > 1 else []
+    parts = halves(original) if big else []
+    got = _read_all(extra + [(img, prompt + HALF_NOTE.format(side=side)) for side, img in parts]) if extra or parts else []
+    answers += got[:len(extra)]
+    half_answers = got[len(extra):]   # re-reads and the halves run at the same time
     ok = [a for a in answers if isinstance(a, dict)]
     if not ok:  # any failure becomes a clear message, never fake food
         return failed(f"the vision model call failed: {type(answers[0]).__name__}")
@@ -330,9 +340,6 @@ def analyze(image_bytes, media_type="image/jpeg", menu_hint=""):
     if not readings:
         return failed("the model didn't find anything to count")
     split_total = None
-    if max(_total(r) for r in readings) >= VISION_SPLIT_MIN:  # a big spread: count each half up close too
-        parts = halves(original)
-        got = _read_all([(img, prompt + HALF_NOTE.format(side=side)) for side, img in parts]) if parts else []
-        if got and all(isinstance(a, dict) for a in got):
-            split_total = sum(_total(from_counts(a)) for a in got)
+    if half_answers and all(isinstance(a, dict) for a in half_answers):  # a big spread, counted up close
+        split_total = sum(_total(from_counts(a)) for a in half_answers)
     return normalize(combine(readings, split_total)), llm.provider()
