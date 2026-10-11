@@ -15,7 +15,7 @@ const OUTCOME = {
 let view = "live", sub = null;
 let S = null, roundSel = null, lastNegKey = null, pinned = null;
 // Debate playback: a new negotiation is revealed one message at a time, then the outcome lands.
-const PLAY_MS = 1600;   // one debate line every 1.6 s, slow enough to follow on a demo video
+const PLAY_MS = 1200;   // one debate line every 1.2 s, slow enough to follow on a demo video
 let play = {seq: null, shown: 0, total: 0};
 setInterval(()=>{ if(voiceOn && speaking) return;   // with voices on, the next line waits for the current one
   if(play.seq !== null && play.shown < play.total){ play.shown++; if(S && view==="live") drawNegotiation(); } }, PLAY_MS);
@@ -124,6 +124,13 @@ function core(points){   // drop far-away outliers so the view fits the area tha
   const dist = p => Math.hypot(p[0]-c[0], p[1]-c[1]), lim = 2.5 * median(points.map(dist)) + 0.01;
   return points.filter(p => dist(p) <= lim);
 }
+function callPending(){
+  const n = S.negotiation; if(!n || !n.plan || pinned) return null;
+  const lines = n.rounds.reduce((t, r) => t + r.messages.length, 0);
+  const playing = play.seq === n.seq && play.shown < lines;
+  const calling = callFor === n.seq || (call && call.seq === n.seq && call.phase !== "ended");
+  return playing || calling ? n.donation : null;
+}
 function drawMap(){
   if(!map) return;
   const live = new Set(), F = focusSets();
@@ -152,7 +159,9 @@ function drawMap(){
 
   // routes: bold solid lines with an arrow near the destination
   layers.route.clearLayers();
-  const active = S.donations.filter(d=>d.status==="en_route" && d.plan);
+  // in order: a decision's route appears only once its debate replay and the dispatcher's call are over
+  const pend = callPending();
+  const active = S.donations.filter(d=>d.status==="en_route" && d.plan && d.id !== pend);
   const focus = [];
   active.forEach(d=>{
     const dr = S.drivers.find(x=>x.id===d.plan.driver); if(!dr) return;
@@ -732,9 +741,9 @@ function drawWire(){
   const stage = {"e-acc": 0, "e-cou": 0, "e-dec": 0, "e-bid": 1, "e-obj": 2, "e-awa": 2}, nth = [0, 0, 0];
   const now = performance.now() / 1000;
   html += edges.map(e => { const A = e.A, B = e.B, k = S.world_id + n.seq + e.key, g = stage[e.cls.split(" ")[0].slice(0, 5)] ?? 0;
-    if(!wireSeen.has(k)) wireSeen.set(k, {t: now, delay: (g === 1 ? 1.4 : 0) + 0.35 * nth[g]++});
+    if(!wireSeen.has(k)) wireSeen.set(k, {t: now, delay: (g === 1 ? 1.0 : 0) + 0.25 * nth[g]++});
     const w = wireSeen.get(k), left = w.delay - (now - w.t);   // a redraw continues the animation where it was
-    const drawing = left > -1.4;
+    const drawing = left > -1.0;
     return `<path class="edge ${e.cls}${drawing ? " new" : ""}"${drawing ? ` style="animation-delay:${left.toFixed(2)}s"` : ""} d="${wireCurve(A.x, A.y, B.x, B.y, e.bend)}"/>`; }).join("");
   const node = (k, label, sub, cls) => { const P = pos[k]; return `<g class="node ${cls||""}" transform="translate(${P.x},${P.y})"><circle r="9"/><text x="16" y="-2">${esc(short(label, 20))}</text>${sub ? `<text x="16" y="14" class="sub">${esc(sub)}</text>` : ""}</g>`; };
   html += node("biz", d.business_name || "Business", `${d.food ? d.food.servings + " servings" : ""}`, "biz");

@@ -371,7 +371,7 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .w-cols text{font:600 11px var(--mono);fill:var(--faint);text-anchor:start;letter-spacing:.04em}
 .w-empty{font:500 14px var(--font);fill:var(--muted)}
 .edge{fill:none;stroke-width:1.6;opacity:.75}
-.edge.new{stroke-dasharray:600;stroke-dashoffset:600;animation:wdraw 1.4s ease-in-out forwards}
+.edge.new{stroke-dasharray:600;stroke-dashoffset:600;animation:wdraw 1s ease-in-out forwards}
 @keyframes wdraw{to{stroke-dashoffset:0}}
 .e-ann{stroke:var(--line-2);stroke-dasharray:3 4;opacity:.9}
 .e-ann.new{stroke-dasharray:3 4;animation:none}
