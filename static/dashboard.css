@@ -351,3 +351,8 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .agent.Speed .says.now{outline-color:var(--speed)}.agent.Cost .says.now{outline-color:var(--cost)}.agent.Need .says.now{outline-color:var(--need)}
 @keyframes saysIn{from{transform:translateY(4px);opacity:.3}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.agent .says.now{animation:none}}
+
+/* agent services (mesh) */
+.mesh-h{font-size:.95rem;margin:1rem 0 .4rem}
+.mesh-h:first-child{margin-top:0}
+#mesh-trace code,#mesh-agents code{font-size:.8rem}

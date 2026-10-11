@@ -378,7 +378,7 @@ function drawGlobal(){
   const vals = {meals:i.meals, lbs:i.lbs, orgs:i.orgs, lost:i.spoiled, cost:"$"+i.cost.toFixed(2), esc:i.escalations};
   document.querySelectorAll("[data-k]").forEach(el=>{ el.textContent = vals[el.dataset.k]; if(el.hasAttribute("data-bad")) el.classList.toggle("nonzero", i.spoiled>0); });
   $("clock").textContent = S.now + (S.paused?" (paused)":"");
-  $("mode").textContent = `${S.mode.agents} agents · ${S.mode.vision} vision · ${S.mode.voice||"browser"} voice`;
+  $("mode").textContent = `${S.mode.agents} agents · ${S.mode.vision} vision · ${S.mode.voice||"browser"} voice` + (S.mode.mesh ? ` · ${S.mode.mesh} agent services` : "");
   $("pause").textContent = S.paused ? "Resume" : "Pause";
   drawCamera();
   const pend = pendingList(), c = $("dec-count");
@@ -403,8 +403,52 @@ function drawLive(){
   drawNegotiation(); drawMap();
 }
 
+// ---------- agent services (the mesh) ----------
+const KIND_LABEL = {negotiator:"Negotiators", shelter:"Shelter agents", driver:"Driver agents"};
+let meshBusy = false, meshHover = false;
+$("mesh-agents").addEventListener("pointerenter", () => meshHover = true);
+$("mesh-agents").addEventListener("pointerleave", () => meshHover = false);
+async function drawMesh(){
+  if(meshBusy) return; meshBusy = true;
+  let m;
+  try{ m = await (await fetch("/api/mesh")).json(); } catch(e){ meshBusy = false; return; }
+  meshBusy = false;
+  if(!m.enabled){
+    setHTML("mesh-sum", `<div class="panel muted">The agents are running in-process right now. Start the app without <code>MESH=0</code> to run each agent as its own service.</div>`);
+    setHTML("mesh-agents", ""); setHTML("mesh-trace", ""); return;
+  }
+  const online = m.agents.filter(a=>a.status==="online");
+  const ms = m.trace.filter(t=>t.ok).map(t=>t.ms);
+  const avg = ms.length ? (ms.reduce((a,b)=>a+b,0)/ms.length).toFixed(1) : "–";
+  setHTML("mesh-sum", `<div class="kpis"><div class="kpi"><b>${online.length}</b><span>agents online, each its own process</span></div>
+    <div class="kpi"><b>${m.messages.toLocaleString()}</b><span>messages sent</span></div>
+    <div class="kpi"><b>${m.failed}</b><span>messages that got no answer</span></div>
+    <div class="kpi"><b>${avg} ms</b><span>average reply time (recent)</span></div></div>
+    <p class="muted small">Agent directory: <code>${esc(m.directory)}</code></p>`);
+  const port = a => ((a.locator||{}).url||"").replace(/^https?:\/\/[^:]+:(\d+).*$/, ":$1");
+  const groups = ["negotiator","shelter","driver"].map(k => {
+    const rows = m.agents.filter(a=>a.kind===k).map(a => {
+      const on = a.status==="online";
+      const st = on ? `<span class="pill ok">● Online</span>` : a.status==="starting" ? `<span class="pill warn">Starting</span>` : `<span class="pill bad">✕ Stopped</span>`;
+      const btn = on ? `<button class="btn sm" onclick="meshAct('stop','${esc(a.id)}')">Stop</button>` : `<button class="btn sm" onclick="meshAct('start','${esc(a.id)}')">Restart</button>`;
+      return `<tr><td><b>${esc(a.agent)}</b><div class="muted small">${esc((a.skills||[]).join(" · "))}</div></td><td><code>${esc(port(a))}</code></td><td class="n">${a.pid||"–"}</td><td>${st}</td><td class="n">${a.sent??0}</td><td class="n">${a.avg_ms??"–"}</td><td>${btn}</td></tr>`;
+    }).join("");
+    return rows ? `<h3 class="mesh-h">${KIND_LABEL[k]}</h3><table class="data"><thead><tr><th>Agent · skills</th><th>Port</th><th class="n">PID</th><th>Status</th><th class="n">Messages</th><th class="n">Avg ms</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : "";
+  }).join("");
+  if(!meshHover) setHTML("mesh-agents", groups);   // hold still while the pointer is over the buttons
+  const now = Date.now()/1000;
+  setHTML("mesh-trace", m.trace.length ? `<table class="data"><thead><tr><th>When</th><th>From → to</th><th>Message → reply</th><th class="n">ms</th><th>Donation</th></tr></thead><tbody>${
+    m.trace.slice(0, 60).map(t => `<tr><td class="muted">${Math.max(0, Math.round(now - t.t))}s ago</td><td><code>${esc(t.from)}</code> → <code>${esc(t.to)}</code></td><td>${esc(t.type)} → ${t.ok ? esc(t.reply) : `<span class="pill bad">${esc(t.error||"no answer")}</span>`}</td><td class="n">${t.ms}</td><td>${esc(t.donation||"")}</td></tr>`).join("")
+  }</tbody></table>` : `<p class="empty">No messages yet. Run a scenario from Demo controls.</p>`);
+}
+async function meshAct(action, id){
+  const r = await post("/api/mesh/" + action, {id});
+  toast(r.ok ? (action==="stop" ? `Stopped ${id}. It drops out of the agent directory.` : `Restarted ${id}.`) : `Couldn't ${action} ${id}.`, r.ok ? "info" : "bad");
+  setTimeout(drawMesh, 300);
+}
+
 // ---------- routing ----------
-const VIEWS = ["live","decisions","activity","evidence","how"], TABS = ["network","feed","safety","donations"];
+const VIEWS = ["live","decisions","activity","evidence","how"], TABS = ["network","feed","safety","donations","mesh"];
 function route(){
   const h = (location.hash || "#/live").replace(/^#\/?/, "").split("/");
   view = VIEWS.includes(h[0]) ? h[0] : "live";
@@ -425,7 +469,7 @@ function render(){
   if(view==="live") drawLive();
   else if(view==="decisions") drawHuman();
   else if(view==="activity"){
-    if(sub==="network") drawNetwork(); else if(sub==="feed") drawFeed(); else if(sub==="safety") drawLog(); else drawDons();
+    if(sub==="network") drawNetwork(); else if(sub==="feed") drawFeed(); else if(sub==="safety") drawLog(); else if(sub==="mesh") drawMesh(); else drawDons();
   }
   toastNewEvents();
 }

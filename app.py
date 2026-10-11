@@ -33,6 +33,33 @@ def W():
     return state["world"]
 
 
+# ---------------- agent mesh: every agent as its own service ----------------
+MESH = None   # a mesh.client.MeshClient once the agents are running as separate processes
+
+
+def start_mesh():
+    """Start the agent directory and one process per agent (MESH=0 keeps everything in-process).
+    If anything fails, Uplink runs in-process exactly as before."""
+    global MESH
+    if os.getenv("MESH", "1") != "1":
+        print("Agents: in-process (MESH=0)")
+        return
+    try:
+        from mesh.client import MeshClient
+        from mesh.launcher import Launcher
+        launcher = Launcher(int(os.getenv("MESH_PORT", "7300")))
+        listed = launcher.start(wait=15)
+        MESH = MeshClient(launcher.directory_url, launcher=launcher)
+        with lock:
+            state["world"].mesh = MESH
+        n = len(MESH.agents(fresh=True))
+        print(f"Agent mesh: {n} agents, each its own process, directory at {launcher.directory_url}"
+              + ("" if listed else " (some still starting)"))
+    except Exception as e:  # noqa: BLE001
+        MESH = None
+        print(f"Agent mesh unavailable ({type(e).__name__}: {e}); agents run in-process.")
+
+
 # ---------------- background loops ----------------
 
 def clock_loop():
@@ -136,7 +163,8 @@ def api_state():
     s["speed"] = state["speed"]
     s["paused"] = state["paused"]
     s["mode"] = {"agents": "llm" if agents.use_llm() else "rules", "vision": llm.provider() or "demo",
-                 "voice": "elevenlabs" if voice.available() else "browser"}
+                 "voice": "elevenlabs" if voice.available() else "browser",
+                 "mesh": len(MESH.agents()) if MESH else 0}   # agents running as separate services
     s["scenarios"] = [{"name": k, "title": v["title"]} for k, v in scenarios.SCENARIOS.items()]
     s["cameras"] = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
     return jsonify(s)
@@ -148,8 +176,37 @@ def api_reset():
     sc = copy.deepcopy(scenarios.SCENARIOS[name]) if name in scenarios.SCENARIOS else None
     with lock:
         state["world"] = World(sc, live=True)
+        state["world"].mesh = MESH
         state["paused"] = False
+    if MESH:
+        MESH.launcher.reset_extras()   # agents that joined mid-run (a new pantry, new drivers) leave with it
     return jsonify(ok=True)
+
+
+@app.get("/api/mesh")
+def api_mesh():
+    if not MESH:
+        return jsonify(enabled=False)
+    return jsonify(enabled=True, **MESH.status())
+
+
+@app.post("/api/mesh/<action>")
+def api_mesh_action(action):
+    """Stop or restart one agent's process: {"id": "shelter:grace-kitchen"}."""
+    if not MESH:
+        return jsonify(error="the agent mesh isn't running"), 400
+    rid = (request.get_json(silent=True) or {}).get("id", "")
+    if action == "stop":
+        ok = MESH.launcher.stop(rid)
+    elif action == "start":
+        ok = MESH.launcher.restart(rid)
+    else:
+        return jsonify(error="unknown action"), 400
+    if ok:
+        with lock:
+            verb = "stopped: it leaves the agent directory" if action == "stop" else "restarted and re-registered"
+            W().say("Directory", f"Agent {rid} {verb}.", "event")
+    return jsonify(ok=ok)
 
 
 @app.post("/api/control")
@@ -351,6 +408,10 @@ def api_compare():
 
 
 if __name__ == "__main__":
+    import signal
+    import sys
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))   # runs atexit: the agent processes stop too
+    start_mesh()
     threading.Thread(target=clock_loop, daemon=True).start()
     threading.Thread(target=planner_loop, daemon=True).start()
     port = int(os.getenv("PORT", "5000"))
