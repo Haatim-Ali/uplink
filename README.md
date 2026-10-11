@@ -98,7 +98,7 @@ Trigger closing time with **C** in the camera window or **Closing time (camera)*
    - **Irreconcilable goals**: no plan wins a majority after 3 rounds. A human picks from the agents' top two.
    - **Insufficient evidence**: the agents ask the business "is this free of peanuts?" before committing. Answer with the buttons, or wait and watch them act on what they know.
 7. Run **Standoff** to show the agents asking a coordinator to approve an over-budget plan.
-8. Run **City mode** (set speed to 4×): 18 donations from 8 businesses, volunteers starting shifts, a no-show, a full shelter and a new pantry. Point out a combined trip, and the food hall moment where Cost wanted to combine trips but Need objected that Grace Kitchen was already getting food, so they compromised.
+8. Run **City mode** (set speed to 4×): 18 donations from 8 Santa Cruz businesses, volunteers starting shifts, a no-show, a full shelter and a new pantry. Point out the combined trip: two donations from the UCSC dining hall ride in one vehicle.
 9. Send a real photo from the Business view on a phone (tick "Not sure about allergens" to trigger the question).
 10. Click **Evidence** for the 50-run comparison chart, and open the scripted table for team vs each agent alone.
 
@@ -189,27 +189,27 @@ python3 tests/test_mesh.py      # starts the real agent processes on ports 7600+
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
 |---|---:|---:|---:|---:|---:|
-| Meals delivered safely | 763 | 934 | 934 | 934 | 934 |
-| Servings lost | 171 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 186.47 | 259.99 | 99.38 | 200.24 | 228.59 |
-| Shelters fed | 17 | 20 | 20 | 22 | 23 |
-| Avg minutes to spare (perishable food) | 76 | 73 | 69 | 66 | 68 |
-| Asked a human | 0 | 1 | 1 | 1 | 6 |
+| Meals delivered safely | 859 | 914 | 934 | 934 | 934 |
+| Servings lost | 75 | 20 | 0 | 0 | 0 |
+| Money spent ($) | 147.05 | 235.79 | 93.18 | 171.41 | 188.8 |
+| Shelters fed | 18 | 20 | 20 | 22 | 23 |
+| Avg minutes to spare (perishable food) | 78 | 73 | 71 | 72 | 75 |
+| Asked a human | 0 | 2 | 0 | 0 | 7 |
 
-**How the team's negotiations ended:** consensus 40, unacceptable 4, insufficient evidence 2, majority 1, irreconcilable 1
+**How the team's negotiations ended:** consensus 42, majority 5, unacceptable 3, insufficient evidence 2, irreconcilable 1
 
-With shelter and driver agents, the team fed the most shelters (23) and lost no food, but it is no longer the cheapest policy on these scripted cases ($228.59 vs $99.38 for Cost alone). The difference is mostly *Standoff*: Need and Speed wanted to send produce to the pantry that had waited 6 days, Cost vetoed the $35 courier as over its $20 red line, and the scripted stand-in coordinator chose the agents' top-ranked option, which split the food and needed a second paid trip. On the 100 random runs below, the team is still 28% cheaper than the baseline.
+With shelter and driver agents, the team fed the most shelters (23) and lost no food, but it is not the cheapest policy on these scripted cases ($188.80 vs $93.18 for Cost alone). Part of the difference is *Standoff*: with weekend surge pricing every courier trip crosses Cost's red line, so the agents ask a coordinator, and the stand-in coordinator's choice splits the produce across two paid trips. On the 100 random runs below, the team spends about the same as the baseline.
 
 **100 random lunch rushes the rules were never tuned on** (`python3 -c "import scenarios; print(scenarios.compare_random(100, 1001)['totals'])"`):
 
 | Metric | Baseline | Agent network | Change |
 | --- | --- | --- | --- |
-| Meals delivered safely | 13,620 | 16,778 | +23% |
-| Servings lost | 3,834 | 676 | −82% |
-| Money spent on paid drivers | $2,927 | $2,115 | −28% (−41% per meal) |
-| Runs where agents lost more food | | 0 of 100 | |
+| Meals delivered safely | 15,039 | 17,290 | +15% |
+| Servings lost | 2,415 | 164 | −93% |
+| Money spent on paid drivers | $719 | $704 | −2% (−15% per meal) |
+| Runs where agents lost more food | | 1 of 100 | |
 
-The dashboard's **Evidence** button shows the same comparison on 50 runs (seeds 1–50): −77% food lost, +22% meals, −14% cost, never worse.
+The dashboard's **Evidence** button shows the same comparison on 50 runs (seeds 1–50): −92% food lost, +20% meals, −1% cost, never worse.
 
 **Lessons learned (for Devpost).** Testing on random runs surfaced two failures we fixed. (1) A baseline that retried the same closed shelter forever made us look better than we were; we made the baseline fair. (2) The agents trusted an 80%-reliable volunteer with sandwiches that had 10 minutes of margin; he cancelled and the food spoiled. Speed now objects to anything below 90% reliable when the margin is under 20 minutes. A third bug: a nonprofit's van couldn't deliver elsewhere after its own shelter filled up. (3) When drivers became agents that refuse trips beyond their range, the baseline was still allowed to send volunteers anywhere; we made it respect the same refusals. Counter-offers were the biggest single gain: food that used to be stranded because no shelter had room for all of it now gets split across shelters.
 

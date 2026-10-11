@@ -100,7 +100,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <tr><th>Agent</th><th>What it wants</th><th>A typical argument</th></tr>
 <tr><td class="agent speed">Speed</td><td>Food delivered fast and reliably, long before it spoils</td><td>"Hot food can't wait. The paid courier is 8 minutes away."</td></tr>
 <tr><td class="agent cost">Cost</td><td>Spend as little as possible on drivers</td><td>"Use the volunteer. She's free."</td></tr>
-<tr><td class="agent need">Need</td><td>Food goes to whoever has waited longest</td><td>"Grace Kitchen hasn't had a donation in 4 days."</td></tr>
+<tr><td class="agent need">Need</td><td>Food goes to whoever has waited longest</td><td>"St. Francis Catholic Kitchen hasn't had a donation in 4 days."</td></tr>
 </table>
 <p>No agent is the boss. They propose plans, vote, and give ground until they agree. <b>Safety rules written in plain code</b> remove every unsafe option before the debate starts, so the agents can never argue their way into an unsafe delivery. When they truly can't agree, or agreeing would cross a line one of them refuses to cross, they <b>stop and ask a person</b> instead of forcing a bad decision.</p>
 <p>Every agent runs as <b>its own service</b>: shelters, drivers and the three negotiators find each other through an agent directory and talk over the network, like a small marketplace. When the food arrives, Uplink writes the donation record that California's SB 1383 law requires.</p>
@@ -126,17 +126,17 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <!-- ============ 3 ============ -->
 <div class="section">
 <h2><span class="num">3</span>A donation's journey, step by step</h2>
-<p>At 2:00 PM a hotel kitchen has 30 servings of chicken curry left over. Here is everything that happens next, in plain words, with the technical name of each step and the file that does it.</p>
+<p>At 2:00 PM India Gourmet, in Abbott Square Market, has 30 servings of chicken tikka masala left over. Here is everything that happens next, in plain words, with the technical name of each step and the file that does it.</p>
 <ol>
-<li><b>The manager takes a photo</b> on the customer site. <span class="small">(vision · <code>vision.py</code>)</span><br>The photo goes to an AI vision model, which names the food, counts it, and says how sure it is. Uplink's own code, not the AI, turns the count into servings, weight and how long the food stays safe.</li>
+<li><b>The manager takes a photo</b> (or a short video, or just says what's left) on the customer site. <span class="small">(vision · <code>vision.py</code>)</span><br>The photo goes to an AI vision model, which names the food, counts it, and says how sure it is. Uplink's own code, not the AI, turns the count into servings, weight and how long the food stays safe.</li>
 <li><b>The manager checks and confirms.</b> If the AI got something wrong, they fix it. If they aren't sure about allergens, they tick "Not sure".</li>
 <li><b>The food is announced to the network.</b> <span class="small">(agent network · <code>network.py</code>)</span><br>Every shelter's agent answers from its own point of view: "Yes, we can take all 30", "We can take 12 of the 30", or "Sorry, we're full". Every driver's agent bids on each trip with an arrival time and a price, or says no if it's too far.</li>
 <li><b>Safety rules remove anything unsafe.</b> <span class="small">(safety rules · <code>world.py</code>)</span><br>No fridge for cold food, an allergen the shelter must avoid, closed by arrival time, no room, or arriving too close to when the food spoils. Those options disappear before any agent sees them.</li>
-<li><b>Speed, Cost and Need negotiate.</b> <span class="small">(negotiation · <code>agents.py</code>)</span><br>Each proposes a plan, votes on every plan on the table, and gives ground over up to three rounds. Here they agree: Riverside Family Center, via a paid courier arriving in about 10 minutes.</li>
+<li><b>Speed, Cost and Need negotiate.</b> <span class="small">(negotiation · <code>agents.py</code>)</span><br>Each proposes a plan, votes on every plan on the table, and gives ground over up to three rounds. Here they agree: Beach Flats Community Center, via a paid courier arriving in about 10 minutes.</li>
 <li><b>If they can't or shouldn't agree, a person decides.</b> <span class="small">(escalation)</span><br>The question lands in the coordinator's Decisions inbox with the reason, the agents' top two options, and a "decide by" time.</li>
 <li><b>The shelter confirms.</b> <span class="small">(shelter phone)</span><br>If someone is answering the shelter's phone page, they accept, take part, or decline. Otherwise the plan goes ahead.</li>
-<li><b>The driver picks up and delivers.</b> <span class="small">(simulated world)</span><br>The manager watches on the tracking page: "Driver on the way, arrives 2:19 PM." (times here are an example)</li>
-<li><b>Something may change mid-route.</b> <span class="small">(adaptation)</span><br>A shelter fills up, or a volunteer cancels. The agents re-plan from wherever the food is now.</li>
+<li><b>The driver picks up and delivers.</b> <span class="small">(simulated world)</span><br>The manager watches on the tracking page: "Driver on the way, arrives 2:19 PM." (times here are an example). Its "Updates" list says what happened in plain words; the agents' debate stays on the ops dashboard.</li>
+<li><b>Something may change mid-route.</b> <span class="small">(adaptation)</span><br>A shelter fills up, or a volunteer cancels. The agents re-plan from wherever the food is now, and each says whether the news changed its pick.</li>
 <li><b>Delivered, and the record is written.</b> <span class="small">(SB 1383 record)</span><br>Donor, recipient, items, weight, pickup and delivery times and transport type are logged automatically, ready to print or download.</li>
 </ol>
 </div>
@@ -249,6 +249,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <div class="plain"><span class="tag">In plain words</span>Think of three coworkers with different priorities picking a delivery plan. Each suggests their favourite, everyone gives a thumbs up or down with a reason, and if nobody budges, each is willing to accept a slightly worse option for their goal. Each also has one line they will never cross.</div>
 <div class="tech"><span class="tag">Technical detail</span>Each agent scores every safe plan from 0 to 1 against its own goal. It accepts a plan scoring at least 90%, 78% then 65% of its best option in rounds 1, 2 and 3. When proposing in later rounds it blends its own score with the least-happy other agent's (weight 0, 0.45, 0.75). Vote weights start at 1.0; a majority needs 2.0. Before round 1, each negotiator sends the others its scores and vetoes for every plan (<code>plan.evaluate</code>), so every agent argues from shared evidence.</div>
 </div>
+<div class="card"><h4>Each agent argues in its own terms</h4><p>Even when agreeing, each says why in the language of its goal. Speed: "arrives with 34 min to spare and Rapid Courier A is 95% reliable." Cost: "costs nothing." Need: "Beach Flats hasn't had food in 4 days. Any safe driver is fine with me", or "Accept, reluctantly" when the shelter isn't the neediest. Need judges <i>which shelter</i>, not which driver; in 60 random runs its first pick became the decision 232 of 334 times.</p></div>
 <h3>How each agent scores a plan</h3>
 <table>
 <tr><th>Agent</th><th>Score (0 to 1)</th><th>Red line: always vetoes</th></tr>
@@ -256,7 +257,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <tr><td class="agent cost">Cost</td><td>Cheaper is better, weighted by reliability (a no-show means paying a courier to rescue the food)</td><td>Over $20 for one donation</td></tr>
 <tr><td class="agent need">Need</td><td>Days since the shelter's last donation (70%) and room left (30%)</td><td>Feeding a shelter that got food today while another has waited 4+ days</td></tr>
 </table>
-<div class="tech"><span class="tag">Rules or AI reasoning</span>By default the agents reason with these scoring rules, which are fast and repeatable for demos and tests. With <code>LLM_AGENTS=1</code> and a Claude key, each agent's proposals, votes and reasons come from Claude, told its goal and red line. Red lines are still enforced in code, and any failed AI call falls back to the rules for that agent. In testing, Claude-driven agents agreed more readily, so the rules show disagreement more clearly.</div>
+<div class="tech"><span class="tag">Rules or AI reasoning</span>By default the agents reason with these scoring rules, which are fast and repeatable for demos and tests. With <code>LLM_AGENTS=1</code> and a Claude key, each agent's proposals, votes and reasons come from Claude, told its goal and red line. Each Claude agent sees only the facts its own goal is about, and votes against the same per-round bar as the rules; accepting far below that bar is overruled by its rules vote, so it can't just give in. Red lines are still enforced in code, and any failed AI call falls back to the rules for that agent. The Evidence runs always use the rules: fast, free and repeatable.</div>
 </div>
 
 <!-- ============ 6 ============ -->
@@ -281,7 +282,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 
 <!-- ============ 7 ============ -->
 <div class="section">
-<h2><span class="num">7</span>When the agents should not agree</h2>
+<h2 style="break-before:page"><span class="num">7</span>When the agents should not agree</h2>
 <p class="lead">A negotiation can end six ways. Three act on a plan, and three stop and ask a person, because agreeing would be wrong.</p>
 <table>
 <tr><th>Outcome</th><th>When it happens</th><th>What happens next</th></tr>
@@ -317,6 +318,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <tr><th>Behaviour</th><th>How it works</th></tr>
 <tr><td><b>Discovery</b></td><td>Agents search a directory of shelters by capability (food types, fridge, hours, room). A new pantry can join mid-run, and waiting donations are reconsidered.</td></tr>
 <tr><td><b>Re-planning</b></td><td>A shelter saying "full" or a driver cancelling sends the donation back to the agents. If the driver already has the food, they re-plan from the driver's position.</td></tr>
+<tr><td><b>The effect of new information</b></td><td>A re-planned debate opens with "New information: ..." (a cancellation, a full shelter, a new pantry, the business confirming allergens), and each agent says whether it changed its pick: "That changes my pick: I wanted X, now Y" or "Still X; this doesn't change my pick."</td></tr>
 <tr><td><b>Learning who was right</b></td><td>A driver who cancels loses 30 points of reliability, and every agent sees it. An agent that warned about that driver gains +0.25 vote weight for the rest of the run.</td></tr>
 <tr><td><b>Split donations</b></td><td>If the winning plan is a counter-offer, the rest of the food is split off and announced again, so nothing is left behind.</td></tr>
 <tr><td><b>Combined trips</b></td><td>Two donations from the same pickup can ride in one vehicle (up to 150 servings), keeping another driver free. Cost values this.</td></tr>
@@ -344,7 +346,10 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <li><b>Code computes the rest</b> from a unit table: 1 bagel ≈ 1 serving and 0.25 lb, 1 pizza slice ≈ 1 serving, 1 catering tray ≈ 10 servings. Safe time comes from the category (hot prepared about 2 hours, cold about 90 minutes, packaged 24 hours).</li>
 <li><b>The business checks.</b> Low-confidence counts are highlighted, and every field can be edited before confirming.</li>
 <li><b>Never a fake answer.</b> If the call fails or the photo isn't food, the form comes back empty with the reason. With no model connected, a clearly labeled demo result appears instead.</li>
+<li><b>A rejected key is caught.</b> At startup one cheap call checks the Claude key. If Claude rejects it, Uplink stops retrying, behaves as if there were no key (rules agents, demo photo result) and says which key it was, showing only its first and last characters.</li>
 </ol>
+<p><b>Or send a short video.</b> Pan across the food. The browser takes four frames spread across the clip, tiles them into one image and sends that; the model is told these are four views of the same food, so it counts each item once. Nothing extra is needed on the server. (Some iPhone .mov files won't decode in Chrome; MP4 or a photo works.)</p>
+<p><b>Or just say it.</b> On the "Say it" tab, tap the mic and say what's left: "two dozen bagels and 4 country loaves." ElevenLabs Scribe writes it down, Claude matches it to the business's menu in menu units, and items not on the menu are offered for adding. Without Claude, word matching handles amounts ("two dozen"), plurals and near-misses, and won't guess between two similar items. Without ElevenLabs, the browser's own speech recognition is used.</p>
 <p><b>Or pick from your menu.</b> Each business has its own menu. Instead of a photo or typing, staff can pick leftovers straight from it, and after a photo the items are matched to the menu so allergens and category come from the business's own data.</p>
 <h3>Two ways to run the model</h3>
 <table>
@@ -379,8 +384,8 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <table>
 <tr><th>Page</th><th>What it shows</th></tr>
 <tr><td>Home</td><td>"Leftover food? We'll get it picked up." One button: Schedule a pickup.</td></tr>
-<tr><td>Schedule</td><td>3 steps: photo, pick from your menu, or type it in → "Does this look right?" summary → scheduled</td></tr>
-<tr><td>Track</td><td>A status timeline (Received → Finding a place → Driver assigned → Picked up → Delivered), the shelter and arrival time in big text, and a map of only this pickup. If Uplink needs an answer, a simple yes/no question appears here.</td></tr>
+<tr><td>Schedule</td><td>3 steps: photo or video, say it, pick from your menu, or type it in → "Does this look right?" summary → scheduled</td></tr>
+<tr><td>Track</td><td>A status timeline (Received → Finding a place → Driver assigned → Picked up → Delivered), the shelter and arrival time in big text, and a map of only this pickup. If Uplink needs an answer, a simple yes/no question appears here. "Updates" explains in plain words what happened (no agent debate).</td></tr>
 <tr><td>My donations</td><td>Past donations and printable SB 1383 receipts, with CSV download</td></tr>
 <tr><td>Help</td><td>Short answers: what food is accepted, is it safe, what it costs (free), what record you get</td></tr>
 </table>
@@ -404,54 +409,54 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <p>The same 9 scripted scenarios run under five decision policies. <b>Nearest shelter</b> uses no agents and no safety checks. <b>Speed, Cost or Need alone</b> use the same safety rules as the team, but one agent decides by itself.</p>
 <div class="grid2">
 <div class="chart"><h4>Servings lost (lower is better)</h4>
-<div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:100%;display:block"></span></span><span class="val">171</span></div>
-<div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:0%;display:block"></span></span><span class="val">0</span></div>
+<div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:100%;display:block"></span></span><span class="val">75</span></div>
+<div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:26.7%;display:block"></span></span><span class="val">20</span></div>
 <div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:0%;display:block"></span></span><span class="val">0</span></div>
 <div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:0%;display:block"></span></span><span class="val">0</span></div>
 <div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:0%;display:block"></span></span><span class="val">0</span></div>
 </div>
 <div class="chart"><h4>Shelters fed (higher is better)</h4>
-<div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:73.9%;display:block"></span></span><span class="val">17</span></div>
+<div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:78.3%;display:block"></span></span><span class="val">18</span></div>
 <div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:87%;display:block"></span></span><span class="val">20</span></div>
 <div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:87%;display:block"></span></span><span class="val">20</span></div>
 <div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:95.7%;display:block"></span></span><span class="val">22</span></div>
 <div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:100%;display:block"></span></span><span class="val">23</span></div>
 </div>
 <div class="chart"><h4>Money spent on drivers (lower is better)</h4>
-<div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:71.7%;display:block"></span></span><span class="val">$186</span></div>
-<div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:100%;display:block"></span></span><span class="val">$260</span></div>
-<div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:32.5%;display:block"></span></span><span class="val">$84</span></div>
-<div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:71.2%;display:block"></span></span><span class="val">$185</span></div>
-<div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:87.9%;display:block"></span></span><span class="val">$229</span></div>
+<div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:62.4%;display:block"></span></span><span class="val">$147</span></div>
+<div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:100%;display:block"></span></span><span class="val">$236</span></div>
+<div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:39.5%;display:block"></span></span><span class="val">$93</span></div>
+<div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:72.7%;display:block"></span></span><span class="val">$171</span></div>
+<div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:80.1%;display:block"></span></span><span class="val">$189</span></div>
 </div>
 <div class="chart"><h4>Times a human was asked</h4>
 <div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:0%;display:block"></span></span><span class="val">0</span></div>
-<div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:16.7%;display:block"></span></span><span class="val">1</span></div>
-<div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:16.7%;display:block"></span></span><span class="val">1</span></div>
-<div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:16.7%;display:block"></span></span><span class="val">1</span></div>
-<div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:100%;display:block"></span></span><span class="val">6</span></div>
+<div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:28.6%;display:block"></span></span><span class="val">2</span></div>
+<div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:0%;display:block"></span></span><span class="val">0</span></div>
+<div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:0%;display:block"></span></span><span class="val">0</span></div>
+<div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:100%;display:block"></span></span><span class="val">7</span></div>
 </div>
 </div>
-<p class="small">All 9 scripted scenarios combined, rules mode, from <code>python scenarios.py</code> on October 10, 2026. Meals delivered safely: 763 for nearest shelter, 934 for every other policy.</p>
+<p class="small">All 9 scripted scenarios combined, rules mode, from <code>python scenarios.py</code> on October 11, 2026. Meals delivered safely: 859 for nearest shelter, 914 for Speed alone, 934 for the rest.</p>
 <h3>What the numbers say (honestly)</h3>
 <ol>
-<li><b>The safety rules matter most.</b> Nearest shelter lost 171 servings; every policy with the safety rules lost none, including one agent deciding alone.</li>
+<li><b>The safety rules matter most.</b> Nearest shelter lost 75 servings; with the safety rules, only Speed alone lost any (20).</li>
 <li><b>The team spreads food most fairly.</b> It fed 23 shelters, more than any single agent.</li>
-<li><b>The team is not the cheapest.</b> It spent $229, more than Cost alone ($84), because it pays for reliable couriers and fairness. That is the tradeoff, and we say so.</li>
-<li><b>Refusing bad compromises involves people.</b> The team asked a human 6 times, where single agents just acted. That is by design: those are the cases where agreeing would have been wrong.</li>
-<li><b>Real disagreement needs red lines.</b> Before red lines were added, every negotiation in the original scenarios ended in full agreement. Now the team's 48 decisions ended: consensus 39, unacceptable compromise 4, majority 2, insufficient evidence 2, irreconcilable 1.</li>
+<li><b>The team is not the cheapest.</b> It spent $189, more than Cost alone ($93), because it pays for reliable couriers and fairness. That is the tradeoff, and we say so.</li>
+<li><b>Refusing bad compromises involves people.</b> The team asked a human 7 times, where single agents mostly just acted. That is by design: those are the cases where agreeing would have been wrong.</li>
+<li><b>Real disagreement needs red lines.</b> Before red lines were added, every negotiation in the original scenarios ended in full agreement. Now the team's 53 decisions ended: consensus 42, majority 5, unacceptable compromise 3, insufficient evidence 2, irreconcilable 1.</li>
 </ol>
 <h3>The strongest evidence: random scenarios the system had never seen</h3>
 <p>100 random scenarios (3 to 6 donations each, driver no-shows, full shelters, new pantries), not used while building:</p>
 <table>
 <tr><th>Policy</th><th class="n">Servings lost</th><th class="n">Meals delivered</th><th class="n">Shelters fed</th><th class="n">Driver cost</th></tr>
-<tr><td>Nearest shelter</td><td class="n">3,834</td><td class="n">13,620</td><td class="n">254</td><td class="n">$2,927</td></tr>
-<tr><td>Speed alone</td><td class="n">1,336</td><td class="n">16,118</td><td class="n">309</td><td class="n">$3,228</td></tr>
-<tr><td>Cost alone</td><td class="n">1,726</td><td class="n">15,728</td><td class="n">292</td><td class="n"><b>$1,305</b></td></tr>
-<tr><td>Need alone</td><td class="n">1,459</td><td class="n">15,995</td><td class="n">386</td><td class="n">$2,581</td></tr>
-<tr><td><b>Team</b></td><td class="n"><b>676</b></td><td class="n"><b>16,778</b></td><td class="n"><b>440</b></td><td class="n">$2,115</td></tr>
+<tr><td>Nearest shelter</td><td class="n">2,415</td><td class="n">15,039</td><td class="n">292</td><td class="n">$719</td></tr>
+<tr><td>Speed alone</td><td class="n">494</td><td class="n">16,960</td><td class="n">325</td><td class="n">$2,298</td></tr>
+<tr><td>Cost alone</td><td class="n">610</td><td class="n">16,844</td><td class="n">315</td><td class="n"><b>$374</b></td></tr>
+<tr><td>Need alone</td><td class="n">843</td><td class="n">16,611</td><td class="n">407</td><td class="n">$1,154</td></tr>
+<tr><td><b>Team</b></td><td class="n"><b>164</b></td><td class="n"><b>17,290</b></td><td class="n"><b>459</b></td><td class="n">$704</td></tr>
 </table>
-<div class="plain"><span class="tag">In plain words</span>Working together, the agents lost <b>half as much food as the best agent working alone</b> (49% less) and 82% less than the simple approach, delivered the most meals and reached the most shelters. They were never worse than the simple approach in any run. The trade-off: the cost-minimizing agent alone is cheaper.</div>
+<div class="plain"><span class="tag">In plain words</span>Working together, the agents lost <b>a third as much food as the best agent working alone</b> (67% less) and 93% less than the simple approach, delivered the most meals and reached the most shelters. They lost the least food, or tied, in 99 of 100 runs. The trade-off: the cost-minimizing agent alone is cheaper.</div>
 </div>
 
 <!-- ============ 13 ============ -->
@@ -459,8 +464,8 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <h2><span class="num">13</span>What's real and what's simulated</h2>
 <p class="lead">The agents and their decisions are real. The world around them is simulated, which judges expect at a hackathon.</p>
 <div class="grid2">
-<div class="card"><h4>Real</h4><p>• Photo reading by a vision model (Claude, or Qwen on a GPU)<br>• The agent loop: offers, bids, proposals, votes, red lines, outcomes<br>• Re-planning when a shelter declines or a driver cancels<br>• Safety rules and fallback rules<br>• Human approvals, business answers, shelter replies (tap or voice)<br>• Generated donation records<br>• Voices and speech recognition (with keys)<br>• Each agent as its own process, the agent directory, and the messages between them</p></div>
-<div class="card"><h4>Simulated</h4><p>• Shelters, drivers and businesses: fictional, placed near Santa Clara<br>• The clock: 1 simulated minute = 1 real second at 1× speed<br>• Driver movement along straight lines<br>• Events like a full shelter, a no-show or a new pantry, triggered from Demo controls or scripted scenarios<br>• The Phone line is voiced in the browser, not a real phone call (the shelter's words are its agent's real reply)</p></div>
+<div class="card"><h4>Real</h4><p>• The places: Santa Cruz businesses with items from their own menus, and Santa Cruz shelters and food programs at their real addresses (<code>data/SOURCES.md</code>)<br>• Photo and video reading by a vision model (Claude, or Qwen on a GPU)<br>• The agent loop: offers, bids, proposals, votes, red lines, outcomes<br>• Re-planning when a shelter declines or a driver cancels<br>• Safety rules and fallback rules<br>• Human approvals, business answers, shelter replies (tap or voice)<br>• Generated donation records<br>• Voices, speech recognition and spoken donations (with keys)<br>• Each agent as its own process, the agent directory, and the messages between them</p></div>
+<div class="card"><h4>Simulated</h4><p>• Shelters' and food programs' capacity, hours, fridges and needs (the places themselves are real Santa Cruz organizations at their real addresses)<br>• Drivers: fictional people<br>• The clock: 1 simulated minute = 1 real second at 1× speed<br>• Driver movement along straight lines<br>• Events like a full shelter, a no-show or a new pantry, triggered from Demo controls or scripted scenarios<br>• The Phone line is voiced in the browser, not a real phone call (the shelter's words are its agent's real reply)</p></div>
 </div>
 <p style="margin-top:10pt">Skipped on purpose: logins and accounts, payments, real traffic routing, and training our own model.</p>
 </div>
@@ -483,8 +488,8 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <tr><td><code>camera.py</code></td><td>The business camera: live food counting, closing-time snapshot</td></tr>
 <tr><td><code>scenarios.py</code></td><td>9 scripted scenarios and the five-policy comparison</td></tr>
 <tr><td><code>static/</code></td><td>Web pages: customer site (<code>app.*</code>), ops dashboard (<code>dashboard.*</code>), shelter phone, records, shared styles</td></tr>
-<tr><td><code>data/</code></td><td>Fictional shelters, drivers and businesses</td></tr>
-<tr><td><code>tests/</code></td><td><code>test_core.py</code>: 34 automated checks, such as cold food never going without a fridge. <code>test_mesh.py</code>: the agent processes decide identically and survive a stopped agent</td></tr>
+<tr><td><code>data/</code></td><td>Real Santa Cruz shelters, food programs and businesses with their real menus (simulated capacities and needs), fictional drivers; sources in <code>data/SOURCES.md</code></td></tr>
+<tr><td><code>tests/</code></td><td><code>test_core.py</code>: 39 automated checks, such as cold food never going without a fridge. <code>test_mesh.py</code>: the agent processes decide identically and survive a stopped agent</td></tr>
 <tr><td><code>scripts/</code></td><td>Brev GPU setup, start and stop scripts; the photo accuracy test</td></tr>
 <tr><td><code>docs/</code></td><td>Architecture, results, Brev setup guide, and this document</td></tr>
 </table>
@@ -497,6 +502,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <code>cd ~/uplink</code><br>
 <code>source .venv/bin/activate</code><br>
 <code>pip install -r requirements.txt</code> (first time only)<br>
+<code>pip install -r requirements-agntcy.txt</code> and <code>brew install nats-server</code> (first time only, for AGNTCY A2A over NATS; without them the agents talk over HTTP)<br>
 <code>python app.py</code> (port 5050 by default; it also starts the agent processes)
 </div>
 <table>
@@ -506,6 +512,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <tr><td>Shelter phone</td><td><code>http://localhost:5050/shelter?id=northside-youth</code></td></tr>
 <tr><td>Records</td><td><code>http://localhost:5050/records</code></td></tr>
 </table>
+<p>No internet needed for the demo itself: the map library and fonts are bundled with the app. Only Claude and ElevenLabs need a connection, and each has an offline fallback.</p>
 <p>On a phone on the same Wi-Fi, replace <code>localhost</code> with the laptop's IP address. Campus Wi-Fi sometimes blocks this; a phone hotspot works.</p>
 <h3>Keys and settings (in <code>.env</code>, never committed)</h3>
 <table>
@@ -513,6 +520,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Claude reads photos (and, with <code>LLM_AGENTS=1</code>, writes the agents' arguments)</td></tr>
 <tr><td><code>ELEVENLABS_API_KEY</code></td><td>Real voices for the debate and shelter phone</td></tr>
 <tr><td><code>LLM_AGENTS=1</code></td><td>Agents reason with Claude instead of rules</td></tr>
+<tr><td><code>AGNTCY=0</code></td><td>Keep the agent processes but talk over plain HTTP instead of A2A over NATS</td></tr>
 <tr><td><code>MESH=0</code></td><td>Run every agent in-process instead of as separate services</td></tr>
 <tr><td>none</td><td>Everything runs: a labeled demo photo result, rules-based agents, the browser's voice</td></tr>
 </table>

@@ -412,9 +412,11 @@ function drawReceipt(){
 
 route(); refresh(); setInterval(refresh, 1500);
 
-// "Closing up": straight to the camera, the way a register's end-of-day button goes straight to the count
+// "Closing up": straight to the camera, the way a register's end-of-day button goes straight to the count.
+// Only on touch devices; on a laptop the picker is a file browser, so just open the photo tab
 const closingBtn = document.getElementById("closing-up");
-if(closingBtn) closingBtn.onclick = () => { location.hash = "#/schedule"; showTab("photo"); $("file").click(); };
+const touchDevice = matchMedia("(pointer: coarse)").matches;
+if(closingBtn) closingBtn.onclick = () => { location.hash = "#/schedule"; showTab("photo"); if(touchDevice) $("file").click(); };
 
 // ---------- your menu: tap + on what's left; allergens come from the recipes ----------
 let menuItems = [], menuFor = null, qty = {};

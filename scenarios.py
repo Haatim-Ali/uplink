@@ -1,49 +1,49 @@
 """Scripted, repeatable scenarios. The same events run against both policies."""
 import copy
 
-PIZZA = {"items": ["pepperoni pizza"], "servings": 12, "weight_lbs": [3, 5], "allergens": ["dairy", "gluten"],
+PIZZA = {"items": ["Old-School Pepperoni pizza"], "servings": 12, "weight_lbs": [3, 5], "allergens": ["dairy", "gluten"],
          "category": "hot prepared", "needs_cold": False, "safe_minutes": 120}
-SANDWICHES = {"items": ["turkey sandwiches"], "servings": 40, "weight_lbs": [12, 16], "allergens": ["gluten"],
+SANDWICHES = {"items": ["Turkey Cranberry sandwiches"], "servings": 40, "weight_lbs": [12, 16], "allergens": ["gluten"],
               "category": "cold prepared", "needs_cold": True, "safe_minutes": 90}
-GRANOLA = {"items": ["granola bars"], "servings": 60, "weight_lbs": [6, 8], "allergens": ["nuts", "gluten"],
+GRANOLA = {"items": ["chocolate chip cookies"], "servings": 60, "weight_lbs": [8, 10], "allergens": ["dairy", "eggs", "gluten"],
            "category": "packaged", "needs_cold": False, "safe_minutes": 1440}
-CURRY = {"items": ["chicken curry", "rice"], "servings": 30, "weight_lbs": [14, 18], "allergens": [],
+CURRY = {"items": ["Chicken Tikka Masala", "basmati rice"], "servings": 30, "weight_lbs": [14, 18], "allergens": ["dairy"],
          "category": "hot prepared", "needs_cold": False, "safe_minutes": 45}
-PASTA = {"items": ["pasta trays"], "servings": 25, "weight_lbs": [10, 14], "allergens": ["gluten", "dairy"],
+PASTA = {"items": ["Campanella Pasta trays"], "servings": 25, "weight_lbs": [10, 14], "allergens": ["gluten", "dairy"],
          "category": "hot prepared", "needs_cold": False, "safe_minutes": 60}
-SALADS = {"items": ["garden salads"], "servings": 20, "weight_lbs": [6, 9], "allergens": [],
+SALADS = {"items": ["green salads"], "servings": 20, "weight_lbs": [6, 9], "allergens": [],
           "category": "cold prepared", "needs_cold": True, "safe_minutes": 75}
-YOGURT = {"items": ["yogurt parfaits"], "servings": 30, "weight_lbs": [8, 10], "allergens": ["dairy", "nuts"],
+YOGURT = {"items": ["yogurt & fruit with granola"], "servings": 30, "weight_lbs": [8, 10], "allergens": ["dairy", "nuts"],
           "category": "cold prepared", "needs_cold": True, "safe_minutes": 90}
-SOUP = {"items": ["vegetable soup"], "servings": 20, "weight_lbs": [10, 12], "allergens": [],
+SOUP = {"items": ["Vegetarian Minestrone"], "servings": 20, "weight_lbs": [10, 12], "allergens": ["gluten"],
         "category": "hot prepared", "needs_cold": False, "safe_minutes": 50}
-PB = {"items": ["peanut butter sandwiches"], "servings": 24, "weight_lbs": [6, 8], "allergens": ["peanuts", "gluten"],
+PB = {"items": ["bagels with peanut butter"], "servings": 24, "weight_lbs": [6, 8], "allergens": ["peanuts", "gluten"],
       "category": "cold prepared", "needs_cold": True, "safe_minutes": 120}
-SALADS_SHORT = dict(SALADS, safe_minutes=35)
-CHILI = {"items": ["homemade chili", "cornbread"], "servings": 30, "weight_lbs": [12, 15], "allergens": ["gluten"],
+SALADS_SHORT = dict(SALADS, items=["Caesar salads"], allergens=["dairy", "eggs", "fish", "gluten"], safe_minutes=32)
+CHILI = {"items": ["Chili con Carne"], "servings": 30, "weight_lbs": [12, 15], "allergens": [],
          "category": "hot prepared", "needs_cold": False, "safe_minutes": 120, "allergens_unverified": True}
-PAD_THAI = {"items": ["pad thai"], "servings": 20, "weight_lbs": [8, 10], "allergens": ["soy", "eggs"],
+PAD_THAI = {"items": ["Chili Crisp Tofu Scramble"], "servings": 20, "weight_lbs": [8, 10], "allergens": ["soy", "eggs"],
             "category": "hot prepared", "needs_cold": False, "safe_minutes": 90, "allergens_unverified": True}
 
-PRODUCE = {"items": ["mixed produce crates"], "servings": 120, "weight_lbs": [60, 80], "allergens": [],
+PRODUCE = {"items": ["apples, pears and persimmons (crates)"], "servings": 120, "weight_lbs": [60, 80], "allergens": [],
            "category": "produce", "needs_cold": False, "safe_minutes": 720}
 
-RICE_BOWLS = {"items": ["teriyaki rice bowls"], "servings": 18, "weight_lbs": [8, 11], "allergens": ["soy", "gluten"],
+RICE_BOWLS = {"items": ["Chicken Tikka Masala rice bowls"], "servings": 18, "weight_lbs": [8, 11], "allergens": ["dairy"],
               "category": "hot prepared", "needs_cold": False, "safe_minutes": 100}
-TACOS = {"items": ["chicken tacos"], "servings": 22, "weight_lbs": [7, 9], "allergens": ["dairy"],
+TACOS = {"items": ["pernil sandwiches"], "servings": 22, "weight_lbs": [9, 12], "allergens": ["gluten"],
          "category": "hot prepared", "needs_cold": False, "safe_minutes": 90}
-DUMPLINGS = {"items": ["vegetable dumplings"], "servings": 15, "weight_lbs": [4, 6], "allergens": ["gluten", "soy"],
+DUMPLINGS = {"items": ["samosas"], "servings": 15, "weight_lbs": [3, 5], "allergens": ["gluten"],
              "category": "hot prepared", "needs_cold": False, "safe_minutes": 90}
 BREAD = {"items": ["day-old bread"], "servings": 40, "weight_lbs": [10, 14], "allergens": ["gluten"],
          "category": "packaged", "needs_cold": False, "safe_minutes": 2880}
-MILK = {"items": ["milk cartons"], "servings": 36, "weight_lbs": [20, 24], "allergens": ["dairy"],
+MILK = {"items": ["organic milk, half gallons"], "servings": 36, "weight_lbs": [20, 24], "allergens": ["dairy"],
         "category": "cold prepared", "needs_cold": True, "safe_minutes": 150}
 
 CITY_DRIVERS = [
-    {"id": "priya", "name": "Priya (volunteer)", "type": "volunteer", "reliability": 0.9, "lat": 37.3601, "lng": -121.9452, "base_usd": 0, "per_km_usd": 0},
-    {"id": "luis", "name": "Luis (volunteer)", "type": "volunteer", "reliability": 0.75, "lat": 37.3452, "lng": -121.9702, "base_usd": 0, "per_km_usd": 0},
-    {"id": "kim", "name": "Kim (volunteer)", "type": "volunteer", "reliability": 0.85, "lat": 37.3952, "lng": -121.9402, "base_usd": 0, "per_km_usd": 0},
-    {"id": "courier-c", "name": "Rapid Courier C (paid)", "type": "paid", "reliability": 0.95, "lat": 37.3402, "lng": -121.9602, "base_usd": 6, "per_km_usd": 1.4},
+    {"id": "priya", "name": "Priya (volunteer)", "type": "volunteer", "reliability": 0.9, "lat": 36.9650, "lng": -122.0150, "base_usd": 0, "per_km_usd": 0},
+    {"id": "luis", "name": "Luis (volunteer)", "type": "volunteer", "reliability": 0.75, "lat": 36.9580, "lng": -122.0350, "base_usd": 0, "per_km_usd": 0},
+    {"id": "kim", "name": "Kim (volunteer)", "type": "volunteer", "reliability": 0.85, "lat": 36.9900, "lng": -121.9950, "base_usd": 0, "per_km_usd": 0},
+    {"id": "courier-c", "name": "Rapid Courier C (paid)", "type": "paid", "reliability": 0.95, "lat": 36.9550, "lng": -122.0050, "base_usd": 6, "per_km_usd": 1.4},
 ]
 
 
@@ -59,7 +59,7 @@ SCENARIOS = {
             {"at": 1, "type": "donation", "business": "tech-cafeteria", "food": SANDWICHES},
             {"at": 2, "type": "donation", "business": "corner-bakery", "food": GRANOLA},
             {"at": 3, "type": "cancel", "driver": "maria"},
-            {"at": 4, "type": "donation", "business": "lakeside-hotel", "food": CURRY},
+            {"at": 4, "type": "donation", "business": "food-hall", "food": CURRY},
             {"at": 6, "type": "decline", "nonprofit": "harbor-house"},
         ],
     },
@@ -68,9 +68,9 @@ SCENARIOS = {
         "events": [
             {"at": 0, "type": "donation", "business": "lakeside-hotel", "food": PASTA},
             {"at": 1, "type": "donation", "business": "tech-cafeteria", "food": SALADS},
-            {"at": 2, "type": "cancel", "driver": "sam"},
+            {"at": 2, "type": "cancel", "driver": "jordan"},
             {"at": 3, "type": "cancel", "driver": "maria"},
-            {"at": 5, "type": "donation", "business": "campus-cafe", "food": PB},
+            {"at": 5, "type": "donation", "business": "caterer", "food": PB},
         ],
     },
     "standoff": {
@@ -81,9 +81,13 @@ SCENARIOS = {
             {"at": 0, "type": "cancel", "driver": "sam"},
             {"at": 1, "type": "donation", "business": "north-market", "food": PRODUCE},
         ],
+        "setup": {
+            "note": "Weekend surge pricing on couriers, and every volunteer has cancelled.",
+            "drivers": {"courier-a": {"base_usd": 18}, "courier-b": {"base_usd": 18}},
+        },
     },
     "city_rush": {
-        "name": "city_rush", "title": "City mode: 18 donations across Santa Clara in 45 minutes",
+        "name": "city_rush", "title": "City mode: 18 donations across Santa Cruz in 45 minutes",
         "events": [{"at": 0, "type": "driver_joins", "driver": d} for d in CITY_DRIVERS] + [
             _d(1, "campus-cafe", PIZZA),
             _d(2, "food-hall", RICE_BOWLS),
@@ -91,29 +95,29 @@ SCENARIOS = {
             _d(4, "food-hall", DUMPLINGS),
             _d(5, "tech-cafeteria", SANDWICHES, servings=30),
             _d(6, "grocer", BREAD),
-            _d(8, "campus-dining", PASTA, servings=20),
-            _d(9, "campus-dining", SALADS, servings=16),
+            _d(8, "campus-dining", PASTA, servings=20, items=["Char Siu Chicken", "Steamed Rice"], allergens=["soy", "gluten"]),
+            _d(8, "campus-dining", SALADS, servings=16, items=["Couscous, Red Grain, and Vegetable Salad"], allergens=["gluten"]),
             {"at": 10, "type": "cancel", "driver": "maria"},
-            _d(11, "lakeside-hotel", CURRY, servings=20, safe_minutes=60),
-            _d(13, "caterer", SOUP),
+            _d(11, "food-hall", CURRY, servings=20, safe_minutes=60),
+            _d(13, "tech-cafeteria", SOUP),
             _d(14, "grocer", MILK),
             {"at": 15, "type": "decline", "nonprofit": "harbor-house"},
             _d(17, "corner-bakery", GRANOLA, servings=40),
-            _d(19, "food-hall", PIZZA, items=["margherita pizza"]),
-            _d(21, "caterer", YOGURT, servings=20),
+            _d(19, "food-hall", PIZZA, items=["Margherita pizza"]),
+            _d(21, "lakeside-hotel", YOGURT, servings=20),
             {"at": 22, "type": "new_pantry"},
-            _d(24, "campus-cafe", PB, servings=18),
+            _d(24, "caterer", PB, servings=18),
             _d(28, "north-market", PRODUCE, servings=60),
             {"at": 30, "type": "cancel", "driver": "luis"},
             _d(33, "tech-cafeteria", SALADS, servings=14),
-            _d(40, "lakeside-hotel", RICE_BOWLS, servings=20),
+            _d(40, "lakeside-hotel", RICE_BOWLS, servings=20, items=["Buddha Bowls"], allergens=["sesame", "soy"]),
         ],
     },
     "new_pantry": {
         "name": "new_pantry", "title": "New information: a pantry joins the directory mid-run",
         "events": [
-            {"at": 0, "type": "donation", "business": "corner-bakery", "food": YOGURT},
-            {"at": 2, "type": "donation", "business": "campus-cafe", "food": SOUP},
+            {"at": 0, "type": "donation", "business": "lakeside-hotel", "food": YOGURT},
+            {"at": 2, "type": "donation", "business": "tech-cafeteria", "food": SOUP},
             {"at": 3, "type": "new_pantry"},
             {"at": 4, "type": "decline", "nonprofit": "grace-kitchen"},
         ],
@@ -124,7 +128,7 @@ SCENARIOS = {
             "start": "18:00",
             "note": "18:00. Evening surge pricing on couriers. Sam is the only volunteer left, across town.",
             "drivers_off": ["courier-b", "maria", "jordan", "grace-van"],
-            "drivers": {"courier-a": {"base_usd": 10}, "sam": {"reliability": 0.5, "lat": 37.3405, "lng": -121.9301, "max_km": 15}},
+            "drivers": {"courier-a": {"base_usd": 10}, "sam": {"reliability": 0.5, "lat": 36.9750, "lng": -121.9300, "max_km": 15}},
         },
         "events": [
             {"at": 0, "type": "donation", "business": "lakeside-hotel", "food": PASTA},
@@ -134,7 +138,7 @@ SCENARIOS = {
         "name": "unacceptable_compromise", "title": "Unacceptable compromise: the majority's plan crosses an agent's red line",
         "setup": {
             "start": "19:30",
-            "note": "19:30. Couriers are offline and most volunteers have gone home. Grace Kitchen got food this morning.",
+            "note": "19:30. Couriers are offline and most volunteers have gone home. St. Francis Catholic Kitchen got food this morning.",
             "drivers_off": ["courier-a", "courier-b", "maria", "jordan"],
             "drivers": {"sam": {"reliability": 0.45}},
             "nonprofits": {"grace-kitchen": {"last_donation_days": 0}},
@@ -149,9 +153,9 @@ SCENARIOS = {
         "setup": {
             "start": "16:00",
             "note": "16:00. Surge pricing on couriers. One courier and one volunteer (Jordan, across town) available. "
-                    "Valley Food Bank hasn't had fresh food in 6 days; Northside is full.",
+                    "Grey Bears hasn't had fresh food in 6 days; the Walnut Avenue center is full.",
             "drivers_off": ["courier-b", "maria", "sam", "grace-van"],
-            "drivers": {"courier-a": {"base_usd": 8}, "jordan": {"lat": 37.3405, "lng": -121.9301}},
+            "drivers": {"courier-a": {"base_usd": 8, "lat": 36.9870, "lng": -122.0400}, "jordan": {"lat": 36.9750, "lng": -121.9400}},
             "nonprofits": {"valley-food-bank": {"last_donation_days": 6}, "grace-kitchen": {"last_donation_days": 0},
                            "northside-youth": {"full": True}},
         },
@@ -162,9 +166,9 @@ SCENARIOS = {
     "insufficient_evidence": {
         "name": "insufficient_evidence", "title": "Insufficient evidence: agents ask the business instead of guessing",
         "events": [
-            {"at": 0, "type": "donation", "business": "corner-bakery", "food": CHILI},
-            {"at": 2, "type": "donation", "business": "campus-cafe", "food": PAD_THAI},
-            {"at": 9, "type": "confirm", "business": "corner-bakery", "allergens": ["gluten"]},
+            {"at": 0, "type": "donation", "business": "tech-cafeteria", "food": CHILI},
+            {"at": 2, "type": "donation", "business": "lakeside-hotel", "food": PAD_THAI},
+            {"at": 9, "type": "confirm", "business": "tech-cafeteria", "allergens": []},
         ],
     },
 }

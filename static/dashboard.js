@@ -89,7 +89,7 @@ function ensureMap(){
   if(mapTried){ if(map) setTimeout(()=>map.invalidateSize(), 0); return; }
   mapTried = true;
   try{
-    map = L.map("map",{zoomControl:true}).setView([37.377,-121.97],13);
+    map = L.map("map",{zoomControl:true}).setView([36.978,-122.03],13);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"© OpenStreetMap contributors"}).addTo(map);
     layers = {route:L.layerGroup().addTo(map), np:L.layerGroup().addTo(map), biz:L.layerGroup().addTo(map), drv:L.layerGroup().addTo(map)};
   }catch(e){ map = null; $("map").innerHTML = "<p class='empty' style='padding:12px'>The map needs internet for its tiles. Everything else still works.</p>"; }

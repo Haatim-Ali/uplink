@@ -49,7 +49,7 @@ If anything misbehaves on stage: `AGNTCY=0 python app.py` (HTTP), or `MESH=0 pyt
 2. **Photo (20 s).** On the customer site, photograph real leftovers. Claude counts them; confirm.
 3. **Agents negotiate (40 s).** On /ops: shelters answer, drivers bid, Speed, Cost and Need argue (voices on), the safety rules remove an unsafe shelter, a plan wins, the Phone line calls the shelter.
 4. **Things change (45 s).** Shelter says full → they reroute. Driver cancels → reliability drops, the agent that warned gains weight. Run *Irreconcilable goals* → they ask a human with a deadline. Activity → Agent services → **stop a shelter's agent** → it drops out, the next donation goes elsewhere.
-5. **Evidence (25 s).** "On 100 scenarios it had never seen, the team lost half as much food as the best agent working alone, and 82% less than the simple approach."
+5. **Evidence (25 s).** "On 100 scenarios it had never seen, the team lost a third as much food as the best agent working alone, and 93% less than the simple approach."
 6. **Close (20 s).** "Every agent is its own service on AGNTCY. They negotiate real tradeoffs with no boss, safety is never up for debate, and they ask a human when they truly can't agree."
 
 ## 4. Backup video shot list (record before 10:30 AM; 2–3 minutes)
