@@ -104,6 +104,7 @@ def chat_json(system, user, image_b64=None, media_type="image/jpeg", max_tokens=
               effort="medium"):
     """Ask the model for a JSON object. Raises on failure (callers fall back).
     effort (Claude only): "low" for quick agent votes, "high" for careful photo counting."""
+    global _auth_error
     if _auth_error:
         raise RuntimeError(_auth_error)
     last = None
@@ -114,7 +115,6 @@ def chat_json(system, user, image_b64=None, media_type="image/jpeg", max_tokens=
         except Exception as e:  # noqa: BLE001 - we retry then re-raise
             last = e
             if _is_auth_error(e):   # a bad key won't fix itself: stop calling, say so once
-                global _auth_error
                 if not _auth_error:
                     _auth_error = f"Claude rejected the key {key_hint()}"
                     print(f"!! {_auth_error}. Falling back to rules agents and demo vision. "
