@@ -1,9 +1,9 @@
 [
  {
   "id": "harbor-house",
-  "name": "Harbor House Shelter",
-  "lat": 37.3762,
-  "lng": -121.9702,
+  "name": "Housing Matters (Coral St)",
+  "lat": 36.9851,
+  "lng": -122.0305,
   "accepts": [
    "hot prepared",
    "cold prepared",
@@ -20,9 +20,9 @@
  },
  {
   "id": "eastside-pantry",
-  "name": "Eastside Pantry",
-  "lat": 37.3832,
-  "lng": -121.9688,
+  "name": "Salvation Army Santa Cruz Corps",
+  "lat": 36.9685,
+  "lng": -122.0306,
   "accepts": [
    "hot prepared",
    "cold prepared",
@@ -37,9 +37,9 @@
  },
  {
   "id": "grace-kitchen",
-  "name": "Grace Community Kitchen",
-  "lat": 37.3552,
-  "lng": -121.9548,
+  "name": "St. Francis Catholic Kitchen",
+  "lat": 36.9798,
+  "lng": -122.0309,
   "accepts": [
    "hot prepared",
    "cold prepared",
@@ -53,9 +53,9 @@
  },
  {
   "id": "riverside-family",
-  "name": "Riverside Family Center",
-  "lat": 37.3991,
-  "lng": -121.9452,
+  "name": "Beach Flats Community Center",
+  "lat": 36.9652,
+  "lng": -122.0161,
   "accepts": [
    "hot prepared",
    "packaged"
@@ -68,9 +68,9 @@
  },
  {
   "id": "northside-youth",
-  "name": "Northside Youth Shelter",
-  "lat": 37.4102,
-  "lng": -121.9898,
+  "name": "Walnut Avenue Family & Women's Center",
+  "lat": 36.9724,
+  "lng": -122.0308,
   "accepts": [
    "hot prepared",
    "cold prepared",
@@ -86,9 +86,9 @@
  },
  {
   "id": "valley-food-bank",
-  "name": "Valley Food Bank",
-  "lat": 37.3401,
-  "lng": -121.9198,
+  "name": "Grey Bears",
+  "lat": 36.9859,
+  "lng": -121.9785,
   "accepts": [
    "cold prepared",
    "packaged",
@@ -102,9 +102,9 @@
  },
  {
   "id": "hope-pantry",
-  "name": "St. Hope Pantry",
-  "lat": 37.3701,
-  "lng": -122.0052,
+  "name": "UCSC SUA Food Pantry",
+  "lat": 36.9943,
+  "lng": -122.0555,
   "accepts": [
    "packaged",
    "produce"

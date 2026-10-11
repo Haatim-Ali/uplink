@@ -1,56 +1,56 @@
 [
  {
   "id": "campus-cafe",
-  "name": "Bowers Ave Caf\u00e9",
-  "lat": 37.3788,
-  "lng": -121.9764
+  "name": "Pizza My Heart (Pacific Ave)",
+  "lat": 36.9723,
+  "lng": -122.0255
  },
  {
   "id": "tech-cafeteria",
-  "name": "Mission Tech Cafeteria",
-  "lat": 37.3881,
-  "lng": -121.9701
+  "name": "Zoccoli's Deli",
+  "lat": 36.9761,
+  "lng": -122.0265
  },
  {
   "id": "corner-bakery",
-  "name": "Scott Blvd Bakery",
-  "lat": 37.3702,
-  "lng": -121.9601
+  "name": "Kelly's French Bakery",
+  "lat": 36.9588,
+  "lng": -122.0481
  },
  {
   "id": "lakeside-hotel",
-  "name": "Lakeside Hotel Kitchen",
-  "lat": 37.3951,
-  "lng": -121.9802
+  "name": "Jack O'Neill Restaurant, Dream Inn",
+  "lat": 36.9622,
+  "lng": -122.0251
  },
  {
   "id": "north-market",
-  "name": "North Valley Farmers Market",
-  "lat": 37.4302,
-  "lng": -121.8801
+  "name": "Downtown Santa Cruz Farmers' Market",
+  "lat": 36.9744,
+  "lng": -122.0277
  },
  {
   "id": "food-hall",
-  "name": "Santa Clara Food Hall",
-  "lat": 37.3542,
-  "lng": -121.9552
+  "name": "Abbott Square Market",
+  "lat": 36.9748,
+  "lng": -122.0256
  },
  {
   "id": "campus-dining",
-  "name": "University Dining Commons",
-  "lat": 37.3496,
-  "lng": -121.9389
+  "name": "UCSC John R. Lewis & College Nine Dining Hall",
+  "lat": 37.0006,
+  "lng": -122.0585
  },
  {
   "id": "grocer",
-  "name": "Homestead Grocery",
-  "lat": 37.3366,
-  "lng": -121.9845
+  "name": "New Leaf Community Market (Westside)",
+  "lat": 36.9591,
+  "lng": -122.0464
  },
  {
   "id": "caterer",
-  "name": "Lafayette Catering",
-  "lat": 37.3905,
-  "lng": -121.9512
+  "name": "The Bagelry (Seabright)",
+  "lat": 36.9795,
+  "lng": -122.0096
  }
 ]

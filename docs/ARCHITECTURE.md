@@ -128,7 +128,7 @@ These are not decision-makers; they exist so the food doesn't spoil while nobody
 | Lunch rush | Four donations, a full shelter, a volunteer no-show |
 | Volunteer no-show | Two volunteers cancel on short-lived hot food |
 | Standoff | Every safe option is expensive, so the agents ask a coordinator |
-| City mode | 18 donations across Santa Clara in 45 minutes; drivers and a pantry join mid-run |
+| City mode | 18 donations across Santa Cruz in 45 minutes; drivers and a pantry join mid-run |
 | New pantry | New information: a pantry joins the directory mid-run |
 | Majority with dissent | Cost is outvoted on a paid courier; its objection is kept on record |
 | Unacceptable compromise | Two agents want a plan that crosses the third's red line |

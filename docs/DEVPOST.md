@@ -15,6 +15,7 @@ California's SB 1383 requires many food businesses to donate edible surplus food
 ## What it does
 
 - **For a business:** take a photo, video, or say what's left (or pick from your menu). Claude identifies and counts the food. Confirm it, and track the pickup until it's delivered, with the SB 1383 donation record generated automatically.
+- **Set in Santa Cruz:** the demo uses real Santa Cruz businesses with items from their real menus (Pizza My Heart, Zoccoli's Deli, Kelly's French Bakery, the Dream Inn, Abbott Square, UCSC dining) and real shelters and food programs (Housing Matters, St. Francis Catholic Kitchen, Grey Bears, the Walnut Avenue center). Their capacities and needs, and the drivers, are simulated.
 - **Behind the scenes:** every shelter and driver has its own agent. Shelters accept, take part, or decline; drivers bid or refuse trips beyond their range. Three negotiators with competing goals, **Speed** (fast and reliable), **Cost** (cheap) and **Need** (whoever waited longest), propose plans, vote, and concede over up to three rounds. No agent has the final say.
 - **Safety is never negotiated:** code removes every plan that breaks a food-safety rule (fridge, allergens, capacity, hours, time to spoil) before any agent sees it.
 - **Consensus is not always right:** each agent has a red line it won't cross. When the agents deadlock, when a majority wants a plan that crosses someone's red line, or when the decision depends on an unconfirmed fact (are there peanuts?), they stop and ask a coordinator or the business, with a "decide by" deadline so the food never spoils waiting.
@@ -38,15 +39,15 @@ California's SB 1383 requires many food businesses to donate edible surplus food
 
 ## Accomplishments that we're proud of
 
-- On **100 random scenarios the system had never seen**, the negotiating team lost **49% less food than the best agent working alone** and **82% less than a nearest-shelter baseline**, delivered the most meals and reached the most shelters, and was never worse than the baseline in any run.
-- The distributed agents on AGNTCY make **identical decisions** to the in-process version in every scenario (about 1,100 A2A messages, 0 failed), and keep working when an agent is stopped live.
+- On **100 random scenarios the system had never seen**, the negotiating team lost **67% less food than the best agent working alone** and **93% less than a nearest-shelter baseline**, delivered the most meals and reached the most shelters, and lost the least food (or tied) in 99 of 100 runs.
+- The distributed agents on AGNTCY make **identical decisions** to the in-process version in every scenario (about 1,080 A2A messages, 0 failed), and keep working when an agent is stopped live.
 - Two products from one system: a customer site a café manager can use in a minute (menu, voice or photo/video), and an ops dashboard that shows every message, vote and veto live, as each agent says it.
 
 ## What we learned
 
 - Safety rules in code do most of the work against a naive approach; negotiation earns its keep under uncertainty (no-shows, scarcity).
 - Each agent is right about something the others ignore. The team's value is that one agent can veto another's blind spot.
-- Refusing to agree has a cost (the team asks a person about once per scenario), and it's the right cost.
+- Refusing to agree has a cost (the team asks a person about once every four scenarios), and it's the right cost.
 - The protocol is separate from the decisions: the same agents decide the same way in one process, over HTTP, or over A2A/NATS.
 - Model-driven agents cave unless you design against it. Our Claude agents first agreed in round 1 and argued each other's goals. Giving each agent only its own facts, and a numeric bar to vote against, turned that into real three-round negotiations that can end in a majority with dissent on record.
 

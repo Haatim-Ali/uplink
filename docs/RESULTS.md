@@ -2,7 +2,7 @@
 
 **The question (from the Cisco challenge):** can independent AI agents make better decisions together than they can individually?
 
-**Short answer: yes, and we can show where and why.** On 100 random scenarios the system had never seen, the negotiating team lost **49% less food than the best agent deciding alone** and **82% less than a simple nearest-shelter baseline**, delivered the most meals and reached the most shelters. It is not the cheapest: the cost-minimizing agent alone spends less, and we say so.
+**Short answer: yes, and we can show where and why.** On 100 random scenarios the system had never seen, the negotiating team lost **67% less food than the best agent deciding alone** and **93% less than a simple nearest-shelter baseline**, delivered the most meals and reached the most shelters. It is not the cheapest: the cost-minimizing agent alone spends less, and we say so.
 
 All results are deterministic (rules mode, seeded scenarios) and reproducible with the commands at the end.
 
@@ -30,19 +30,19 @@ Three test sets:
 
 | Policy | Servings lost | Meals delivered | Shelters fed | Paid-driver cost | Asked a human |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Nearest shelter | 3,834 | 13,620 | 254 | $2,927 | 0 |
-| Speed alone | 1,336 | 16,118 | 309 | $3,228 | 36 |
-| Cost alone | 1,726 | 15,728 | 292 | **$1,305** | 46 |
-| Need alone | 1,459 | 15,995 | 386 | $2,581 | 42 |
-| **Team** | **676** | **16,778** | **440** | $2,115 | 101 |
+| Nearest shelter | 2,415 | 15,039 | 292 | $719 | 0 |
+| Speed alone | 494 | 16,960 | 325 | $2,298 | 10 |
+| Cost alone | 610 | 16,844 | 315 | **$374** | 11 |
+| Need alone | 843 | 16,611 | 407 | $1,154 | 15 |
+| **Team** | **164** | **17,290** | **459** | $704 | 23 |
 
-- **Least food lost:** 49% less than the best single agent (Speed) and 82% less than the baseline.
-- **Most meals and most shelters:** 4% more meals than the best single agent; 14% more shelters reached than Need alone, the agent whose whole goal is fairness.
-- **Consistent, not lucky:** the team lost the least food, or tied, in **95 of 100** runs, and was never worse than the baseline (less food lost in 65 runs, the same in 35, more in 0).
+- **Least food lost:** 67% less than the best single agent (Speed) and 93% less than the baseline.
+- **Most meals and most shelters:** 2% more meals than the best single agent; 13% more shelters reached than Need alone, the agent whose whole goal is fairness.
+- **Consistent, not lucky:** the team lost the least food, or tied, in **99 of 100** runs. Against the baseline it lost less food in 53 runs, the same in 46, and more in 1.
 - **Each agent alone fails on its blind spot.** Speed spends the most on couriers. Cost is cheapest but trusts unreliable volunteers, so more food spoils when they don't show. Need reaches more shelters but accepts slow, risky trips. Negotiation lets each agent veto the others' blind spots.
-- **The trade-offs we accept:** the team spends 62% more than Cost alone ($2,115 vs $1,305), though 28% less than the baseline. And it asks a person about once per scenario (101 times in 100 runs, vs 36–46 for single agents), because it refuses to force a bad compromise.
+- **The trade-offs we accept:** the team spends 88% more than Cost alone ($704 vs $374), though about the same as the baseline ($719). And it asks a person more often (23 times in 100 runs, vs 10–15 for single agents), because it refuses to force a bad compromise.
 
-The development seeds (1–200) agree: the team lost 1,570 servings vs 2,887 for the best single agent (46% less) and 7,212 for the baseline (78% less). There, it lost more than the baseline in 1 run of 200.
+The development seeds (1–200) agree: the team lost 229 servings vs 1,320 for the best single agent (83% less) and 5,086 for the baseline (95% less), and never lost more than the baseline in any of the 200 runs.
 
 ## The scripted scenarios: what each behaviour looks like
 
@@ -50,15 +50,15 @@ All 9 scenarios combined:
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Team |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Meals delivered safely | 763 | 934 | 934 | 934 | 934 |
-| Servings lost | 171 | 0 | 0 | 0 | 0 |
-| Money spent | $186.47 | $259.99 | $84.45 | $185.01 | $228.59 |
-| Shelters fed | 17 | 20 | 20 | 22 | **23** |
-| Asked a human | 0 | 1 | 1 | 1 | 6 |
+| Meals delivered safely | 859 | 914 | 934 | 934 | 934 |
+| Servings lost | 75 | 20 | 0 | 0 | 0 |
+| Money spent | $147.05 | $235.79 | $93.18 | $171.41 | $188.80 |
+| Shelters fed | 18 | 20 | 20 | 22 | **23** |
+| Asked a human | 0 | 2 | 0 | 0 | 7 |
 
-How the team's 48 decisions ended: **consensus 39**, unacceptable compromise 4, majority with dissent 2, insufficient evidence 2, irreconcilable 1.
+How the team's 53 decisions ended: **consensus 42**, majority with dissent 5, unacceptable compromise 3, insufficient evidence 2, irreconcilable 1.
 
-These scenarios are small and hand-built, so every policy with the safety rules delivers everything; they exist to show *behaviours* (a veto, a deadlock, a question to the business), not to rank policies. The random scenarios, with no-shows and scarcity, are where the policies separate.
+These scenarios are small and hand-built, so nearly every policy with the safety rules delivers everything (Speed alone loses 20 servings); they exist to show *behaviours* (a veto, a deadlock, a question to the business), not to rank policies. The random scenarios, with no-shows and scarcity, are where the policies separate.
 
 ## The agents as a distributed system
 
@@ -67,34 +67,34 @@ Every agent runs as its own process and is an **AGNTCY A2A agent over NATS** (Ci
 | Check (`tests/test_mesh.py`) | Result |
 | --- | --- |
 | All 9 scenarios, distributed over AGNTCY A2A/NATS vs in-process | Identical metrics and identical negotiations, every scenario |
-| Messages | 1,107 A2A messages, 0 failed (all over A2A/NATS) |
-| Same over plain HTTP | Identical; 1,727 messages, 0 failed. Broadcasting cut the message count by 36% |
+| Messages | 1,078 A2A messages, 0 failed (all over A2A/NATS) |
+| Same over plain HTTP | Identical; 1,711 messages, 0 failed. Broadcasting cut the message count by 37% |
 | A shelter agent stopped mid-run | Drops out of the directory, is never consulted, the food is still delivered |
 | A stopped agent restarted | Re-registers and is consulted again |
 | A negotiator stopped | The negotiation still completes; the same logic stands in, and that is logged |
-| Live, 18-donation city scenario | 21 agent processes (including ones that joined mid-run), 512 A2A messages, 0 failed, about 5 ms per reply |
+| Live, 18-donation city scenario | Drivers and a pantry that join mid-run start their own agent processes and are consulted at once |
 
 ## What we learned
 
 1. **Safety rules first, negotiation second.** Most of the gap to the naive baseline comes from code that removes unsafe plans before anyone negotiates. Every policy with those rules beats the baseline by a wide margin. We would build the rules first again.
 
-2. **Negotiation pays off under uncertainty, not in easy cases.** In our hand-written scenarios every safe policy delivered everything, so they looked equal. Only randomized scenarios with no-shows and scarcity showed the team losing half as much food as any single agent. Lesson: evaluate on stress you didn't design.
+2. **Negotiation pays off under uncertainty, not in easy cases.** In our hand-written scenarios every safe policy delivered everything, so they looked equal. Only randomized scenarios with no-shows and scarcity showed the team losing a third as much food as the best single agent. Lesson: evaluate on stress you didn't design.
 
 3. **Each agent is right about something the others ignore.** Cost alone is cheapest and Need alone is fairest, but each loses more food. The team's advantage is that one agent can stop another's blind spot (Speed vetoes an unreliable driver Cost wanted; Need vetoes a shelter that was just fed).
 
 4. **Without red lines, agents always agree.** Before we gave each agent a veto, every negotiation ended in full agreement, because each agent lowers its bar every round. Real disagreement, and the cases where agreeing would be wrong, only appeared once each agent had something it would not trade away.
 
-5. **Refusing to agree has a cost, and it's worth it.** The team asks a person about once per scenario. Those are the deadlocks, vetoed majorities and missing facts where a forced decision would have been worse. The fallback rule acts in time if nobody answers.
+5. **Refusing to agree has a cost, and it's worth it.** The team asks a person about once every four random scenarios, more than any single agent. Those are the deadlocks, vetoed majorities and missing facts where a forced decision would have been worse. The fallback rule acts in time if nobody answers.
 
 6. **The protocol is separate from the decisions.** Moving every agent into its own process, then onto AGNTCY A2A over NATS, changed nothing about what the agents decided: identical results in every scenario. Broadcasting also cut the number of messages by a third.
 
-7. **Model-driven agents agreed more readily.** When Claude played the three agents (LLM_AGENTS=1), it compromised sooner than the rules-based agents, showing less of the disagreement this track is about. We demo the rules-based agents and keep the model option.
+7. **Model-driven agents agreed more readily.** When Claude played the three agents (LLM_AGENTS=1), it compromised sooner than the rules-based agents, showing less of the disagreement this track is about. We demo the rules-based agents and keep the model option; each Claude agent now sees only its own goal's facts and votes against the same per-round bar, so it stays in character.
 
 8. **Fallbacks need deadlines computed from the plan.** Our first "nobody answered" rule waited until 15 minutes before the food spoiled, when every option was already too slow, so food arrived spoiled. It now acts at the last moment an option can still arrive safely.
 
 ## Limits
 
-- The city is simulated: fictional shelters and drivers, straight-line travel, scripted events.
+- The city is simulated. The shelters, businesses and menus are real Santa Cruz places (see `data/SOURCES.md`), but their capacities, hours, fridges and needs are made up; the drivers are fictional; travel is straight-line; events are scripted.
 - The random generator is ours. Held-out seeds guard against tuning to specific runs, not against a generator that favours our design.
 - Results are for the rules-based agents. Model-driven agents use the same protocol and red lines, but their output varies run to run.
 - In scripted and random runs, a simulated coordinator answers when the agents ask a human. It picks the agents' top-ranked option, which a real coordinator might not.
@@ -106,31 +106,31 @@ python scenarios.py                                    # scripted scenarios: eve
 python -c "import scenarios as s; r = s.compare_random(100, first_seed=1001, solo=True); r.pop('runs'); print(r)"   # held-out
 python -c "import scenarios as s; r = s.compare_random(200, solo=True); r.pop('runs'); print(r)"                   # development
 python tests/test_mesh.py                              # distributed agents over HTTP and AGNTCY A2A/NATS
-python tests/test_core.py                              # 38 behaviour checks
+python tests/test_core.py                              # 39 behaviour checks
 ```
 
 ## Full output of `python scenarios.py`
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
 |---|---:|---:|---:|---:|---:|
-| Meals delivered safely | 763 | 934 | 934 | 934 | 934 |
-| Servings lost | 171 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 186.47 | 259.99 | 84.45 | 185.01 | 228.59 |
-| Shelters fed | 17 | 20 | 20 | 22 | 23 |
-| Avg minutes to spare (perishable food) | 76 | 73 | 69 | 66 | 68 |
-| Asked a human | 0 | 1 | 1 | 1 | 6 |
+| Meals delivered safely | 859 | 914 | 934 | 934 | 934 |
+| Servings lost | 75 | 20 | 0 | 0 | 0 |
+| Money spent ($) | 147.05 | 235.79 | 93.18 | 171.41 | 188.8 |
+| Shelters fed | 18 | 20 | 20 | 22 | 23 |
+| Avg minutes to spare (perishable food) | 78 | 73 | 71 | 72 | 75 |
+| Asked a human | 0 | 2 | 0 | 0 | 7 |
 
-**How the team's negotiations ended:** consensus 39, unacceptable 4, majority 2, insufficient evidence 2, irreconcilable 1
+**How the team's negotiations ended:** consensus 42, majority 5, unacceptable 3, insufficient evidence 2, irreconcilable 1
 
 **Lunch rush: four donations, a full shelter and a no-show**
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
 |---|---:|---:|---:|---:|---:|
-| Meals delivered safely | 102 | 142 | 142 | 142 | 142 |
-| Servings lost | 40 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 8.06 | 21.29 | 11.23 | 14.69 | 12.97 |
+| Meals delivered safely | 142 | 142 | 142 | 142 | 142 |
+| Servings lost | 0 | 0 | 0 | 0 | 0 |
+| Money spent ($) | 9.36 | 22.56 | 9.36 | 19.18 | 9.77 |
 | Shelters fed | 3 | 3 | 3 | 4 | 4 |
-| Avg minutes to spare (perishable food) | 71 | 71 | 68 | 72 | 67 |
+| Avg minutes to spare (perishable food) | 77 | 77 | 76 | 75 | 77 |
 | Asked a human | 0 | 0 | 0 | 0 | 0 |
 
 Team outcomes: consensus 5
@@ -139,14 +139,14 @@ Team outcomes: consensus 5
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
 |---|---:|---:|---:|---:|---:|
-| Meals delivered safely | 49 | 69 | 69 | 69 | 69 |
-| Servings lost | 20 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 21.98 | 23.8 | 9.55 | 29.84 | 9.55 |
-| Shelters fed | 2 | 2 | 2 | 3 | 3 |
-| Avg minutes to spare (perishable food) | 76 | 72 | 69 | 66 | 69 |
+| Meals delivered safely | 69 | 69 | 69 | 69 | 69 |
+| Servings lost | 0 | 0 | 0 | 0 | 0 |
+| Money spent ($) | 18.4 | 23.51 | 9.23 | 25.31 | 10.57 |
+| Shelters fed | 3 | 3 | 2 | 3 | 3 |
+| Avg minutes to spare (perishable food) | 74 | 75 | 73 | 71 | 75 |
 | Asked a human | 0 | 0 | 0 | 0 | 0 |
 
-Team outcomes: consensus 4
+Team outcomes: consensus 5
 
 **Standoff: every safe option is expensive, so the agents ask a coordinator**
 
@@ -154,38 +154,38 @@ Team outcomes: consensus 4
 |---|---:|---:|---:|---:|---:|
 | Meals delivered safely | 120 | 120 | 120 | 120 | 120 |
 | Servings lost | 0 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 32.55 | 32.55 | 17.55 | 15.04 | 72.4 |
+| Money spent ($) | 26.86 | 27.29 | 26.86 | 25.02 | 47.03 |
 | Shelters fed | 1 | 1 | 1 | 1 | 2 |
 | Avg minutes to spare (perishable food) | 0 | 0 | 0 | 0 | 0 |
 | Asked a human | 0 | 0 | 0 | 0 | 2 |
 
 Team outcomes: unacceptable 2
 
-**City mode: 18 donations across Santa Clara in 45 minutes**
+**City mode: 18 donations across Santa Cruz in 45 minutes**
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
 |---|---:|---:|---:|---:|---:|
-| Meals delivered safely | 367 | 433 | 433 | 433 | 433 |
-| Servings lost | 66 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 96.02 | 111.51 | 46.12 | 103.48 | 96.48 |
-| Shelters fed | 8 | 8 | 8 | 7 | 7 |
-| Avg minutes to spare (perishable food) | 78 | 79 | 76 | 71 | 76 |
-| Asked a human | 0 | 1 | 1 | 1 | 2 |
+| Meals delivered safely | 433 | 413 | 433 | 433 | 433 |
+| Servings lost | 0 | 20 | 0 | 0 | 0 |
+| Money spent ($) | 64.14 | 101.16 | 47.73 | 82.75 | 86.92 |
+| Shelters fed | 7 | 7 | 8 | 7 | 7 |
+| Avg minutes to spare (perishable food) | 80 | 79 | 77 | 78 | 82 |
+| Asked a human | 0 | 2 | 0 | 0 | 3 |
 
-Team outcomes: consensus 22, majority 1, unacceptable 1
+Team outcomes: consensus 25, majority 4
 
 **New information: a pantry joins the directory mid-run**
 
 | Metric | Nearest shelter | Speed alone | Cost alone | Need alone | Agents together |
 |---|---:|---:|---:|---:|---:|
-| Meals delivered safely | 50 | 50 | 50 | 50 | 50 |
-| Servings lost | 0 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 0.0 | 20.91 | 0.0 | 0.0 | 0.0 |
+| Meals delivered safely | 20 | 50 | 50 | 50 | 50 |
+| Servings lost | 30 | 0 | 0 | 0 | 0 |
+| Money spent ($) | 0.0 | 20.53 | 0.0 | 0.0 | 0.0 |
 | Shelters fed | 1 | 1 | 1 | 2 | 2 |
-| Avg minutes to spare (perishable food) | 62 | 60 | 58 | 55 | 56 |
+| Avg minutes to spare (perishable food) | 42 | 58 | 58 | 60 | 61 |
 | Asked a human | 0 | 0 | 0 | 0 | 0 |
 
-Team outcomes: consensus 5
+Team outcomes: consensus 4
 
 **Majority with dissent: Cost is outvoted on a paid courier; its objection stays on record**
 
@@ -193,9 +193,9 @@ Team outcomes: consensus 5
 |---|---:|---:|---:|---:|---:|
 | Meals delivered safely | 25 | 25 | 25 | 25 | 25 |
 | Servings lost | 0 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 14.93 | 14.93 | 0.0 | 0.0 | 15.23 |
+| Money spent ($) | 14.81 | 14.81 | 0.0 | 0.0 | 15.36 |
 | Shelters fed | 1 | 1 | 1 | 1 | 1 |
-| Avg minutes to spare (perishable food) | 48 | 48 | 35 | 36 | 48 |
+| Avg minutes to spare (perishable food) | 49 | 49 | 32 | 35 | 48 |
 | Asked a human | 0 | 0 | 0 | 0 | 0 |
 
 Team outcomes: majority 1
@@ -208,7 +208,7 @@ Team outcomes: majority 1
 | Servings lost | 25 | 0 | 0 | 0 | 0 |
 | Money spent ($) | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |
 | Shelters fed | 0 | 1 | 1 | 1 | 1 |
-| Avg minutes to spare (perishable food) | 0 | 33 | 35 | 33 | 33 |
+| Avg minutes to spare (perishable food) | 0 | 47 | 47 | 45 | 45 |
 | Asked a human | 0 | 0 | 0 | 0 | 1 |
 
 Team outcomes: unacceptable 1, consensus 1
@@ -219,9 +219,9 @@ Team outcomes: unacceptable 1, consensus 1
 |---|---:|---:|---:|---:|---:|
 | Meals delivered safely | 0 | 20 | 20 | 20 | 20 |
 | Servings lost | 20 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 12.93 | 13.79 | 0.0 | 21.96 | 21.96 |
+| Money spent ($) | 13.48 | 15.12 | 0.0 | 19.15 | 19.15 |
 | Shelters fed | 0 | 1 | 1 | 1 | 1 |
-| Avg minutes to spare (perishable food) | 0 | 22 | 10 | 10 | 10 |
+| Avg minutes to spare (perishable food) | 0 | 17 | 6 | 11 | 11 |
 | Asked a human | 0 | 0 | 0 | 0 | 1 |
 
 Team outcomes: irreconcilable 1
@@ -232,13 +232,12 @@ Team outcomes: irreconcilable 1
 |---|---:|---:|---:|---:|---:|
 | Meals delivered safely | 50 | 50 | 50 | 50 | 50 |
 | Servings lost | 0 | 0 | 0 | 0 | 0 |
-| Money spent ($) | 0.0 | 21.21 | 0.0 | 0.0 | 0.0 |
-| Shelters fed | 1 | 2 | 2 | 2 | 2 |
-| Avg minutes to spare (perishable food) | 98 | 94 | 94 | 94 | 76 |
+| Money spent ($) | 0.0 | 10.81 | 0.0 | 0.0 | 0.0 |
+| Shelters fed | 2 | 2 | 2 | 2 | 2 |
+| Avg minutes to spare (perishable food) | 97 | 96 | 95 | 97 | 83 |
 | Asked a human | 0 | 0 | 0 | 0 | 0 |
 
 Team outcomes: insufficient evidence 2, consensus 2
-
 
 ## Photo reading accuracy
 

@@ -1,3 +1,16 @@
-{"id": "maple-pantry", "name": "Maple Street Pantry (new)", "lat": 37.3816, "lng": -121.9801,
- "accepts": ["hot prepared", "cold prepared", "packaged"], "has_fridge": true,
- "open_until": "21:00", "capacity_servings": 60, "last_donation_days": 7, "avoid_allergens": []}
+{
+ "id": "maple-pantry",
+ "name": "Elm Street Mission (new)",
+ "lat": 36.9708,
+ "lng": -122.0256,
+ "accepts": [
+  "hot prepared",
+  "cold prepared",
+  "packaged"
+ ],
+ "has_fridge": true,
+ "open_until": "21:00",
+ "capacity_servings": 60,
+ "last_donation_days": 7,
+ "avoid_allergens": []
+}

@@ -166,7 +166,7 @@ def test_agents_never_lose_more_food_than_baseline_on_random_runs():
 
 def test_city_mode_combines_trips_and_beats_baseline():
     a, b = scenarios.run("city_rush", "agents"), scenarios.run("city_rush", "baseline")
-    assert len(a.donations) == 18 and a.done()
+    assert len(a.donations) >= 18 and a.done()   # 18 donated; counter-offers can split some in two
     assert any("rides along" in f["text"] for f in a.feed)
     assert a.metrics()["servings_lost"] <= b.metrics()["servings_lost"]
 
@@ -201,7 +201,7 @@ def test_shelter_agents_accept_counter_and_decline():
 def test_category_limit_shapes_the_offer():
     import network
     w = fresh()
-    d = w.add_donation(dict(PIZZA, servings=50), "campus-cafe")   # Harbor House serves at most 40 hot meals a day
+    d = w.add_donation(dict(PIZZA, servings=50), "campus-cafe")   # Housing Matters (harbor-house) serves at most 40 hot meals a day
     o = network.shelter_offer(w, w.nonprofits["harbor-house"], d)
     assert o["kind"] == "counter" and o["servings"] == 40
 
@@ -418,12 +418,12 @@ def test_spoken_leftovers_fill_in_the_menu():
     try:
         c = app.app.test_client()
         r = c.post("/api/voice/donation", data={"business": "corner-bakery",
-                   "text": "we have two dozen plain bagels and 12 sesame bagels and 4 sourdough loaves"}).get_json()
+                   "text": "we have two dozen bagels and 12 croissants and 4 country loaves"}).get_json()
         got = {ln["name"]: ln["qty"] for ln in r["lines"]}
-        assert got == {"Plain bagel": 24, "Sesame bagel": 12, "Sourdough loaf": 4}, got
+        assert got == {"Bagel": 24, "Croissant": 12, "Country loaf": 4}, got
         r = c.post("/api/voice/donation", data={"business": "lakeside-hotel",
-                   "text": "two trays of chicken curry with rice and one vegetable lasagna"}).get_json()
-        assert {ln["name"]: ln["qty"] for ln in r["lines"]} == {"Chicken curry with rice": 2, "Vegetable lasagna": 1}
+                   "text": "two trays of campanella pasta and one quart of dream inn chowder"}).get_json()
+        assert {ln["name"]: ln["qty"] for ln in r["lines"]} == {"Campanella Pasta": 2, "Dream Inn Chowder": 1}
         assert c.post("/api/voice/donation", data={"business": "campus-cafe"}).status_code == 400
     finally:
         llm.available = saved
