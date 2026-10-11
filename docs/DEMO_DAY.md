@@ -66,7 +66,7 @@ Open http://localhost:5050/ops and hard-refresh (Cmd+Shift+R).
 
 ## 3. The 3-minute demo
 
-Two people works best: one drives the laptop, one talks.
+**The full three-speaker script, with what's on screen at each moment, is in [DEMO_SCRIPT.md](DEMO_SCRIPT.md).** This is the short version.
 
 **1. Problem (20 s).** "California requires many food businesses to donate edible leftovers, but at closing time donating is a pile of tradeoffs: the fast courier costs money, the free volunteer might not show, and the closest shelter already ate today while another has waited five days."
 
