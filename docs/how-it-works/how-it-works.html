@@ -103,7 +103,7 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <tr><td class="agent need">Need</td><td>Food goes to whoever has waited longest</td><td>"Grace Kitchen hasn't had a donation in 4 days."</td></tr>
 </table>
 <p>No agent is the boss. They propose plans, vote, and give ground until they agree. <b>Safety rules written in plain code</b> remove every unsafe option before the debate starts, so the agents can never argue their way into an unsafe delivery. When they truly can't agree, or agreeing would cross a line one of them refuses to cross, they <b>stop and ask a person</b> instead of forcing a bad decision.</p>
-<p>When the food arrives, Uplink writes the donation record that California's SB 1383 law requires.</p>
+<p>Every agent runs as <b>its own service</b>: shelters, drivers and the three negotiators find each other through an agent directory and talk over the network, like a small marketplace. When the food arrives, Uplink writes the donation record that California's SB 1383 law requires.</p>
 <div class="plain"><span class="tag">The one-sentence pitch</span>Food rescue is full of real tradeoffs. Our agents negotiate them with no boss, safety is never up for debate, and when they truly can't agree, they ask a human.</div>
 </div>
 
@@ -144,57 +144,62 @@ svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-
 <!-- ============ 4 ============ -->
 <div class="section newpage">
 <h2><span class="num">4</span>System architecture</h2>
-<p>Uplink is one Python web server (Flask) with a simulated city inside it. Browsers poll the server once a second for the current state. The agents are real code making real decisions; the city around them (shelters, drivers, the clock) is simulated.</p>
+<p>Uplink is a Python web server (Flask) that simulates the city, plus <b>one separate process per agent</b>. The agents find each other through an agent directory and exchange messages over HTTP. The agents' decisions are real; the city around them (shelters' locations, drivers moving, the clock) is simulated.</p>
 <figure>
-<svg viewBox="0 0 760 560" width="100%" role="img" aria-label="Uplink architecture">
+<svg viewBox="0 0 760 640" width="82%" style="display:block;margin:0 auto" role="img" aria-label="Uplink architecture">
 <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>
-<!-- browsers -->
-<text x="20" y="22" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">IN THE BROWSER</text>
+<text x="20" y="20" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">IN THE BROWSER</text>
 <g font-size="12">
-<rect x="20" y="32" width="170" height="58" rx="8" fill="#e6f4f2" stroke="#0f766e" stroke-width="1.5"/><text x="105" y="56" text-anchor="middle" font-weight="700" fill="#0f172a">Customer site  /</text><text x="105" y="74" text-anchor="middle" font-size="10.5" fill="#334155">schedule · track · receipts</text>
-<rect x="205" y="32" width="170" height="58" rx="8" fill="#fff" stroke="#94a3b8"/><text x="290" y="56" text-anchor="middle" font-weight="700" fill="#0f172a">Ops dashboard  /ops</text><text x="290" y="74" text-anchor="middle" font-size="10.5" fill="#334155">live debate · map · evidence</text>
-<rect x="390" y="32" width="170" height="58" rx="8" fill="#fff" stroke="#94a3b8"/><text x="475" y="56" text-anchor="middle" font-weight="700" fill="#0f172a">Shelter phone  /shelter</text><text x="475" y="74" text-anchor="middle" font-size="10.5" fill="#334155">accept · counter · decline</text>
-<rect x="575" y="32" width="165" height="58" rx="8" fill="#fff" stroke="#94a3b8"/><text x="657" y="56" text-anchor="middle" font-weight="700" fill="#0f172a">Camera  camera.py</text><text x="657" y="74" text-anchor="middle" font-size="10.5" fill="#334155">counts food, closing time</text>
+<rect x="20" y="30" width="170" height="54" rx="8" fill="#e6f4f2" stroke="#0f766e" stroke-width="1.5"/><text x="105" y="52" text-anchor="middle" font-weight="700" fill="#0f172a">Customer site  /</text><text x="105" y="70" text-anchor="middle" font-size="10.5" fill="#334155">schedule · track · receipts</text>
+<rect x="205" y="30" width="170" height="54" rx="8" fill="#fff" stroke="#94a3b8"/><text x="290" y="52" text-anchor="middle" font-weight="700" fill="#0f172a">Ops dashboard  /ops</text><text x="290" y="70" text-anchor="middle" font-size="10.5" fill="#334155">network · debate · phone line</text>
+<rect x="390" y="30" width="170" height="54" rx="8" fill="#fff" stroke="#94a3b8"/><text x="475" y="52" text-anchor="middle" font-weight="700" fill="#0f172a">Shelter phone  /shelter</text><text x="475" y="70" text-anchor="middle" font-size="10.5" fill="#334155">accept · counter · decline</text>
+<rect x="575" y="30" width="165" height="54" rx="8" fill="#fff" stroke="#94a3b8"/><text x="657" y="52" text-anchor="middle" font-weight="700" fill="#0f172a">Camera  camera.py</text><text x="657" y="70" text-anchor="middle" font-size="10.5" fill="#334155">counts food, closing time</text>
 </g>
-<path d="M380 92V128" stroke="#64748b" stroke-width="1.3" marker-end="url(#ar)"/>
-<text x="390" y="114" font-size="10.5" fill="#64748b">HTTP: poll /api/state every second, POST actions</text>
-<!-- server -->
-<rect x="20" y="132" width="720" height="300" rx="10" fill="#f8fafc" stroke="#94a3b8"/>
-<text x="36" y="154" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">FLASK SERVER  ·  app.py  (routes, clock thread, planner thread)</text>
+<path d="M380 86V112" stroke="#64748b" stroke-width="1.3" marker-end="url(#ar)"/>
+<text x="390" y="104" font-size="10.5" fill="#64748b">HTTP: poll /api/state every second, POST actions</text>
+<rect x="20" y="116" width="720" height="214" rx="10" fill="#f8fafc" stroke="#94a3b8"/>
+<text x="36" y="138" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">FLASK SERVER  ·  app.py  (pages, API, clock thread, planner thread)</text>
 <g font-size="12">
-<rect x="40" y="168" width="215" height="112" rx="8" fill="#fff" stroke="#94a3b8"/><text x="147" y="190" text-anchor="middle" font-weight="700" fill="#0f172a">Simulated world</text><text x="147" y="206" text-anchor="middle" font-size="10.5" fill="#64748b">world.py</text>
-<text x="56" y="228" font-size="10.5" fill="#334155">• directory of shelters, drivers</text><text x="56" y="244" font-size="10.5" fill="#334155">• SAFETY RULES (code)</text><text x="56" y="260" font-size="10.5" fill="#334155">• clock, events, routes, records</text><text x="56" y="274" font-size="10.5" fill="#334155">• fallback rules, baselines</text>
-<rect x="272" y="168" width="215" height="112" rx="8" fill="#fff" stroke="#94a3b8"/><text x="379" y="190" text-anchor="middle" font-weight="700" fill="#0f172a">Agent network</text><text x="379" y="206" text-anchor="middle" font-size="10.5" fill="#64748b">network.py</text>
-<text x="288" y="228" font-size="10.5" fill="#334155">• each shelter agent: accept,</text><text x="300" y="244" font-size="10.5" fill="#334155">counter-offer, or decline</text><text x="288" y="260" font-size="10.5" fill="#334155">• each driver agent: bids</text><text x="300" y="274" font-size="10.5" fill="#334155">or refuses (too far)</text>
-<rect x="504" y="168" width="220" height="112" rx="8" fill="#e6f4f2" stroke="#0f766e" stroke-width="1.5"/><text x="614" y="190" text-anchor="middle" font-weight="700" fill="#0f172a">The negotiators</text><text x="614" y="206" text-anchor="middle" font-size="10.5" fill="#64748b">agents.py</text>
-<text x="520" y="228" font-size="10.5" fill="#c2410c" font-weight="700">Speed</text><text x="562" y="228" font-size="10.5" fill="#15803d" font-weight="700">Cost</text><text x="598" y="228" font-size="10.5" fill="#6d28d9" font-weight="700">Need</text>
-<text x="520" y="244" font-size="10.5" fill="#334155">• propose, vote, concede</text><text x="520" y="260" font-size="10.5" fill="#334155">• red lines (vetoes)</text><text x="520" y="274" font-size="10.5" fill="#334155">• rules or Claude reasoning</text>
-<rect x="40" y="300" width="215" height="112" rx="8" fill="#fff" stroke="#94a3b8"/><text x="147" y="322" text-anchor="middle" font-weight="700" fill="#0f172a">Photo reading</text><text x="147" y="338" text-anchor="middle" font-size="10.5" fill="#64748b">vision.py</text>
-<text x="56" y="360" font-size="10.5" fill="#334155">• shrink, rotate, HEIC → JPEG</text><text x="56" y="376" font-size="10.5" fill="#334155">• model counts; code computes</text><text x="68" y="392" font-size="10.5" fill="#334155">servings, weight, safe time</text>
-<rect x="272" y="300" width="215" height="112" rx="8" fill="#fff" stroke="#94a3b8"/><text x="379" y="322" text-anchor="middle" font-weight="700" fill="#0f172a">Model wrapper</text><text x="379" y="338" text-anchor="middle" font-size="10.5" fill="#64748b">llm.py · env.py</text>
-<text x="288" y="360" font-size="10.5" fill="#334155">• keys from .env</text><text x="288" y="376" font-size="10.5" fill="#334155">• Claude (official SDK) or any</text><text x="300" y="392" font-size="10.5" fill="#334155">OpenAI-style server (vLLM)</text>
-<rect x="504" y="300" width="220" height="112" rx="8" fill="#fff" stroke="#94a3b8"/><text x="614" y="322" text-anchor="middle" font-weight="700" fill="#0f172a">Voices</text><text x="614" y="338" text-anchor="middle" font-size="10.5" fill="#64748b">voice.py</text>
-<text x="520" y="360" font-size="10.5" fill="#334155">• agents speak the debate</text><text x="520" y="376" font-size="10.5" fill="#334155">• shelter hears requests,</text><text x="532" y="392" font-size="10.5" fill="#334155">answers out loud</text>
+<rect x="36" y="150" width="170" height="78" rx="8" fill="#fff" stroke="#94a3b8"/><text x="121" y="171" text-anchor="middle" font-weight="700" fill="#0f172a">Simulated world</text><text x="121" y="186" text-anchor="middle" font-size="10.5" fill="#64748b">world.py</text><text x="121" y="204" text-anchor="middle" font-size="10.5" fill="#334155">city, clock, deliveries,</text><text x="121" y="219" text-anchor="middle" font-size="10.5" fill="#b91c1c" font-weight="700">SAFETY RULES</text>
+<rect x="218" y="150" width="170" height="78" rx="8" fill="#fff" stroke="#94a3b8"/><text x="303" y="171" text-anchor="middle" font-weight="700" fill="#0f172a">Negotiation table</text><text x="303" y="186" text-anchor="middle" font-size="10.5" fill="#64748b">agents.py</text><text x="303" y="204" text-anchor="middle" font-size="10.5" fill="#334155">relays messages,</text><text x="303" y="219" text-anchor="middle" font-size="10.5" fill="#334155">counts votes; no boss</text>
+<rect x="400" y="150" width="152" height="78" rx="8" fill="#fff" stroke="#94a3b8"/><text x="476" y="171" text-anchor="middle" font-weight="700" fill="#0f172a">Photo reading</text><text x="476" y="186" text-anchor="middle" font-size="10.5" fill="#64748b">vision.py · menu.py</text><text x="476" y="204" text-anchor="middle" font-size="10.5" fill="#334155">model counts;</text><text x="476" y="219" text-anchor="middle" font-size="10.5" fill="#334155">code does the math</text>
+<rect x="564" y="150" width="160" height="78" rx="8" fill="#fff" stroke="#94a3b8"/><text x="644" y="171" text-anchor="middle" font-weight="700" fill="#0f172a">Model wrapper</text><text x="644" y="186" text-anchor="middle" font-size="10.5" fill="#64748b">llm.py · env.py</text><text x="644" y="204" text-anchor="middle" font-size="10.5" fill="#334155">Claude SDK, or</text><text x="644" y="219" text-anchor="middle" font-size="10.5" fill="#334155">a vLLM server</text>
+<rect x="36" y="240" width="170" height="74" rx="8" fill="#fff" stroke="#94a3b8"/><text x="121" y="261" text-anchor="middle" font-weight="700" fill="#0f172a">Voices</text><text x="121" y="276" text-anchor="middle" font-size="10.5" fill="#64748b">voice.py</text><text x="121" y="296" text-anchor="middle" font-size="10.5" fill="#334155">ElevenLabs speech in/out</text>
+<rect x="400" y="240" width="152" height="74" rx="8" fill="#e6f4f2" stroke="#0f766e" stroke-width="1.5"/><text x="476" y="261" text-anchor="middle" font-weight="700" fill="#0f172a">Mesh client</text><text x="476" y="276" text-anchor="middle" font-size="10.5" fill="#64748b">mesh/client.py</text><text x="476" y="296" text-anchor="middle" font-size="10.5" fill="#334155">finds agents, traces messages</text>
+<rect x="564" y="240" width="160" height="74" rx="8" fill="#fff" stroke="#94a3b8"/><text x="644" y="261" text-anchor="middle" font-weight="700" fill="#0f172a">Launcher</text><text x="644" y="276" text-anchor="middle" font-size="10.5" fill="#64748b">mesh/launcher.py</text><text x="644" y="296" text-anchor="middle" font-size="10.5" fill="#334155">starts and stops agents</text>
 </g>
+<g stroke="#64748b" stroke-width="1.3" fill="none"><path d="M206 189H216" marker-end="url(#ar)"/><path d="M552 189H562" marker-end="url(#ar)"/><path d="M303 228V277H398" marker-end="url(#ar)"/></g>
+<text x="20" y="358" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">AGENT SERVICES  ·  ONE PROCESS EACH  (mesh/agent.py)</text>
+<rect x="20" y="368" width="720" height="164" rx="10" fill="#fff" stroke="#0f766e" stroke-width="1.5" stroke-dasharray="0"/>
+<g font-size="12">
+<rect x="36" y="382" width="200" height="56" rx="8" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/><text x="136" y="404" text-anchor="middle" font-weight="700" fill="#0f172a">Agent directory</text><text x="136" y="422" text-anchor="middle" font-size="10.5" fill="#334155">records, skills, heartbeats</text>
+<text x="260" y="400" font-size="11" font-weight="700" fill="#0f172a">7 shelter agents</text><text x="260" y="416" font-size="10.5" fill="#334155">offer.request → accept / counter / decline</text>
+<text x="260" y="446" font-size="11" font-weight="700" fill="#0f172a">6 driver agents</text><text x="260" y="462" font-size="10.5" fill="#334155">bid.request → bid or refuse</text>
+<text x="260" y="492" font-size="11" font-weight="700" fill="#0f172a">3 negotiators: <tspan fill="#c2410c">Speed</tspan>, <tspan fill="#15803d">Cost</tspan>, <tspan fill="#6d28d9">Need</tspan></text><text x="260" y="508" font-size="10.5" fill="#334155">plan.evaluate · plan.propose · plan.vote</text>
+</g>
+<g fill="#e6f4f2" stroke="#0f766e">
+<circle cx="560" cy="404" r="9"/><circle cx="584" cy="404" r="9"/><circle cx="608" cy="404" r="9"/><circle cx="632" cy="404" r="9"/><circle cx="656" cy="404" r="9"/><circle cx="680" cy="404" r="9"/><circle cx="704" cy="404" r="9"/>
+<circle cx="560" cy="450" r="9"/><circle cx="584" cy="450" r="9"/><circle cx="608" cy="450" r="9"/><circle cx="632" cy="450" r="9"/><circle cx="656" cy="450" r="9"/><circle cx="680" cy="450" r="9"/>
+</g>
+<circle cx="560" cy="498" r="9" fill="#fde7d9" stroke="#c2410c"/><circle cx="584" cy="498" r="9" fill="#dcfce7" stroke="#15803d"/><circle cx="608" cy="498" r="9" fill="#ede9fe" stroke="#6d28d9"/>
+<text x="136" y="462" text-anchor="middle" font-size="10.5" fill="#64748b">every agent registers here</text><text x="136" y="477" text-anchor="middle" font-size="10.5" fill="#64748b">and heartbeats every 2 s</text>
 <g stroke="#64748b" stroke-width="1.3" fill="none">
-<path d="M256 224H270" marker-end="url(#ar)"/><path d="M488 224H502" marker-end="url(#ar)"/>
-<path d="M256 356H270" marker-end="url(#ar)"/>
+<path d="M476 316V366" marker-end="url(#ar)"/><path d="M644 316V366" marker-end="url(#ar)" stroke-dasharray="4 3"/>
 </g>
-<!-- external -->
-<text x="20" y="462" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">OUTSIDE SERVICES (OPTIONAL)</text>
+<text x="468" y="346" text-anchor="end" font-size="10.5" fill="#64748b">A2A-style JSON messages over HTTP</text>
+<text x="652" y="346" font-size="10.5" fill="#64748b">starts them</text>
+<text x="20" y="560" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">OUTSIDE SERVICES (OPTIONAL)</text>
 <g font-size="12">
-<rect x="150" y="474" width="210" height="62" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/><text x="255" y="498" text-anchor="middle" font-weight="700" fill="#0f172a">Anthropic Claude API</text><text x="255" y="516" text-anchor="middle" font-size="10.5" fill="#334155">reads photos; optional agent voice</text>
-<rect x="375" y="474" width="210" height="62" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/><text x="480" y="498" text-anchor="middle" font-weight="700" fill="#0f172a">Qwen on NVIDIA Brev GPU</text><text x="480" y="516" text-anchor="middle" font-size="10.5" fill="#334155">backup photo reader (vLLM)</text>
-<rect x="600" y="474" width="140" height="62" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/><text x="670" y="498" text-anchor="middle" font-weight="700" fill="#0f172a">ElevenLabs</text><text x="670" y="516" text-anchor="middle" font-size="10.5" fill="#334155">speech in and out</text>
-</g>
-<g stroke="#64748b" stroke-width="1.3" fill="none" stroke-dasharray="4 3">
-<path d="M379 414V444H255V472" marker-end="url(#ar)"/><path d="M379 444H480V472" marker-end="url(#ar)"/><path d="M670 414V472" marker-end="url(#ar)"/>
+<rect x="150" y="570" width="210" height="56" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/><text x="255" y="593" text-anchor="middle" font-weight="700" fill="#0f172a">Anthropic Claude API</text><text x="255" y="610" text-anchor="middle" font-size="10.5" fill="#334155">reads photos; optional agent reasoning</text>
+<rect x="375" y="570" width="210" height="56" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/><text x="480" y="593" text-anchor="middle" font-weight="700" fill="#0f172a">Qwen on NVIDIA Brev GPU</text><text x="480" y="610" text-anchor="middle" font-size="10.5" fill="#334155">backup photo reader (vLLM)</text>
+<rect x="600" y="570" width="140" height="56" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/><text x="670" y="593" text-anchor="middle" font-weight="700" fill="#0f172a">ElevenLabs</text><text x="670" y="610" text-anchor="middle" font-size="10.5" fill="#334155">voices, speech to text</text>
 </g>
 </svg>
-<figcaption>Solid boxes run on your laptop. Dashed boxes are optional outside services. Without any keys, everything still runs: photos get a labeled demo result and the agents use their built-in rules.</figcaption>
+<figcaption>Each agent is a separate process that registers in the directory and answers messages. Dashed boxes are optional; without any keys everything still runs.</figcaption>
 </figure>
-<div class="tech"><span class="tag">Technical detail</span>
-Two background threads run inside the server. The <b>clock thread</b> advances simulated time (one simulated minute per real second at 1× speed) and moves drivers. The <b>planner thread</b> picks up any donation that needs a decision and runs the negotiation outside the shared lock, so a slow AI call never freezes the dashboard. The clock pauses while agents deliberate. Pages are plain HTML, CSS and JavaScript with no build step; the maps use Leaflet.
+<div class="grid2">
+<div class="plain"><span class="tag">In plain words</span>Each shelter, driver and negotiator is its own little program, like separate people with their own phones. A directory works like a phone book: agents list themselves there, and anyone can look up who can take food or drive a trip. If one agent goes offline, it drops out of the phone book and the others carry on.</div>
+<div class="tech"><span class="tag">Technical detail</span>The <b>clock thread</b> advances simulated time (1 simulated minute per real second at 1×). The <b>planner thread</b> runs each negotiation outside the shared lock, so a slow agent never freezes the dashboard. Each agent process is a small HTTP server; the launcher starts about 16 of them on ports 7300 and up, and they exit when the app exits.</div>
 </div>
 </div>
 
@@ -238,11 +243,11 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <text x="660" y="180" font-size="10.5" fill="#64748b">yes</text><text x="452" y="122" font-size="10.5" fill="#64748b">no</text>
 <text x="468" y="264" font-size="10.5" fill="#64748b">answer, or wait 15 min</text>
 </svg>
-<figcaption>One donation's decision. The agents never see an unsafe plan, and a human is asked only when agreeing would be wrong.</figcaption>
+<figcaption>One donation's decision. Every step between agents is a real message: offers, bids, and each negotiator's evaluation, proposal and votes. The agents never see an unsafe plan, and a human is asked only when agreeing would be wrong.</figcaption>
 </figure>
 <div class="grid2">
 <div class="plain"><span class="tag">In plain words</span>Think of three coworkers with different priorities picking a delivery plan. Each suggests their favourite, everyone gives a thumbs up or down with a reason, and if nobody budges, each is willing to accept a slightly worse option for their goal. Each also has one line they will never cross.</div>
-<div class="tech"><span class="tag">Technical detail</span>Each agent scores every safe plan from 0 to 1 against its own goal. It accepts a plan scoring at least 90%, 78% then 65% of its best option in rounds 1, 2 and 3. When proposing in later rounds it blends its own score with the least-happy other agent's (weight 0, 0.45, 0.75). Vote weights start at 1.0; a majority needs 2.0.</div>
+<div class="tech"><span class="tag">Technical detail</span>Each agent scores every safe plan from 0 to 1 against its own goal. It accepts a plan scoring at least 90%, 78% then 65% of its best option in rounds 1, 2 and 3. When proposing in later rounds it blends its own score with the least-happy other agent's (weight 0, 0.45, 0.75). Vote weights start at 1.0; a majority needs 2.0. Before round 1, each negotiator sends the others its scores and vetoes for every plan (<code>plan.evaluate</code>), so every agent argues from shared evidence.</div>
 </div>
 <h3>How each agent scores a plan</h3>
 <table>
@@ -317,6 +322,16 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <tr><td><b>Combined trips</b></td><td>Two donations from the same pickup can ride in one vehicle (up to 150 servings), keeping another driver free. Cost values this.</td></tr>
 <tr><td><b>Shelter phones</b></td><td>When a person is answering a shelter's phone page, the agents ask first and hold the driver for up to 8 simulated minutes, then try elsewhere.</td></tr>
 </table>
+<h3>Every agent is its own service</h3>
+<table>
+<tr><th>Piece</th><th>How it works</th></tr>
+<tr><td><b>Agent directory</b></td><td>Each agent publishes a record: its id, name, skills (for example <code>food.receive</code>, <code>trip.bid</code>, <code>plan.vote</code>), what it can do (food types, fridge, range) and its address. Modeled on AGNTCY's Agent Directory and OASF agent records.</td></tr>
+<tr><td><b>Heartbeats</b></td><td>Every agent checks in every 2 seconds. One that goes silent for 6 seconds, or shuts down, drops out and is no longer discovered.</td></tr>
+<tr><td><b>Messages</b></td><td>A2A-style JSON over HTTP: <code>offer.request</code> to shelters, <code>bid.request</code> to drivers, <code>plan.evaluate</code>, <code>plan.propose</code> and <code>plan.vote</code> to the negotiators. Every message is traced with sender, receiver, type and reply time (about 1 to 12 ms locally).</td></tr>
+<tr><td><b>Resilience</b></td><td>Stop a shelter's agent and it isn't consulted; the food goes elsewhere. A pantry or driver that joins mid-run gets its own agent, which registers itself. If a negotiator is down, the same logic stands in for it and that is logged.</td></tr>
+<tr><td><b>Proof it's the same</b></td><td><code>tests/test_mesh.py</code> replays all 9 scenarios through the real processes (about 1,700 messages, 0 failures) and checks every number and every negotiation matches the in-process version exactly.</td></tr>
+</table>
+<div class="tech"><span class="tag">Honest note</span>We built the directory and messaging ourselves, in the style of Cisco's AGNTCY project. AGNTCY's own SLIM messaging and directory servers need Docker, which wasn't available; they could replace ours without changing the agents.</div>
 </div>
 
 <!-- ============ 9 ============ -->
@@ -330,6 +345,7 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <li><b>The business checks.</b> Low-confidence counts are highlighted, and every field can be edited before confirming.</li>
 <li><b>Never a fake answer.</b> If the call fails or the photo isn't food, the form comes back empty with the reason. With no model connected, a clearly labeled demo result appears instead.</li>
 </ol>
+<p><b>Or pick from your menu.</b> Each business has its own menu. Instead of a photo or typing, staff can pick leftovers straight from it, and after a photo the items are matched to the menu so allergens and category come from the business's own data.</p>
 <h3>Two ways to run the model</h3>
 <table>
 <tr><th>Option</th><th>How</th><th>Tradeoffs</th></tr>
@@ -349,6 +365,7 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <li><b>The agents speak.</b> Turn on Demo controls → Sound → Voices on the ops dashboard. Speed, Cost and Need each read their lines in a different voice, and a dispatcher voice announces the outcome. Each line waits for the previous one to finish.</li>
 <li><b>The shelter hears requests.</b> On the shelter phone page, turn Voice on, and each new request is read aloud.</li>
 <li><b>The shelter answers out loud.</b> Tap "Answer by voice" and say "yes", "no", or a number like "just 20". ElevenLabs turns speech into text, and Uplink's code turns that into accept, decline or take part.</li>
+<li><b>The Phone line.</b> On the ops dashboard, after the agents choose a shelter, a dispatcher voice "calls" it: it reads out the food, driver and arrival time, and the shelter answers with its agent's actual reply ("We'll take 20 of the 30"). Voices use ElevenLabs Flash; spoken answers are transcribed with ElevenLabs Scribe. It's a voiced replay in the browser, not a call over the phone network; a staff member's real spoken answer from the shelter phone page appears in it too.</li>
 <li><b>No key?</b> It falls back to the browser's built-in voice and speech recognition.</li>
 </ul>
 </div>
@@ -362,7 +379,7 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <table>
 <tr><th>Page</th><th>What it shows</th></tr>
 <tr><td>Home</td><td>"Leftover food? We'll get it picked up." One button: Schedule a pickup.</td></tr>
-<tr><td>Schedule</td><td>3 steps: photo (or type it in) → "Does this look right?" summary → scheduled</td></tr>
+<tr><td>Schedule</td><td>3 steps: photo, pick from your menu, or type it in → "Does this look right?" summary → scheduled</td></tr>
 <tr><td>Track</td><td>A status timeline (Received → Finding a place → Driver assigned → Picked up → Delivered), the shelter and arrival time in big text, and a map of only this pickup. If Uplink needs an answer, a simple yes/no question appears here.</td></tr>
 <tr><td>My donations</td><td>Past donations and printable SB 1383 receipts, with CSV download</td></tr>
 <tr><td>Help</td><td>Short answers: what food is accepted, is it safe, what it costs (free), what record you get</td></tr>
@@ -370,9 +387,9 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <h3>Ops dashboard · <code>/ops</code></h3>
 <table>
 <tr><th>Page</th><th>What it shows</th></tr>
-<tr><td>Live</td><td>The current donation, the three agents' positions, the outcome in plain words, and the city map. "See the debate" opens the full transcript and vote matrix.</td></tr>
+<tr><td>Live</td><td>A dark judges' view: headline numbers; a live <b>agent network diagram</b> (business → shelter agents → driver agents → the three negotiators, with every message in a log beside it); the <b>Phone line</b>; the current donation; the three agents' positions and the outcome; and the city map. "See the debate" opens the full transcript and vote matrix.</td></tr>
 <tr><td>Decisions</td><td>The coordinator's inbox: escalations with options and a "decide by" time. A red badge in the nav shows the count.</td></tr>
-<tr><td>Activity</td><td>Agent network messages, agent feed, safety decision log, donations list</td></tr>
+<tr><td>Activity</td><td>Agent network messages, agent feed, safety decision log, donations list, and <b>Agent services</b>: every agent's process, port, skills, message count and reply time, with Stop and Restart buttons and a live message trace</td></tr>
 <tr><td>Evidence</td><td>Team versus baselines across scripted and randomized scenarios</td></tr>
 <tr><td>Records · How it works</td><td>Printable SB 1383 records; a short visual explanation for judges</td></tr>
 <tr><td>Demo controls</td><td>Scenario picker, speed, pause, voices, and "inject a problem" buttons: shelter full, driver cancels, new pantry joins, camera closing time</td></tr>
@@ -403,8 +420,8 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <div class="chart"><h4>Money spent on drivers (lower is better)</h4>
 <div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:71.7%;display:block"></span></span><span class="val">$186</span></div>
 <div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:100%;display:block"></span></span><span class="val">$260</span></div>
-<div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:38.2%;display:block"></span></span><span class="val">$99</span></div>
-<div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:77%;display:block"></span></span><span class="val">$200</span></div>
+<div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:32.5%;display:block"></span></span><span class="val">$84</span></div>
+<div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:71.2%;display:block"></span></span><span class="val">$185</span></div>
 <div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:87.9%;display:block"></span></span><span class="val">$229</span></div>
 </div>
 <div class="chart"><h4>Times a human was asked</h4>
@@ -420,9 +437,9 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <ol>
 <li><b>The safety rules matter most.</b> Nearest shelter lost 171 servings; every policy with the safety rules lost none, including one agent deciding alone.</li>
 <li><b>The team spreads food most fairly.</b> It fed 23 shelters, more than any single agent.</li>
-<li><b>The team is not the cheapest.</b> It spent $229, more than Cost alone ($99), because it pays for reliable couriers and fairness. That is the tradeoff, and we say so.</li>
+<li><b>The team is not the cheapest.</b> It spent $229, more than Cost alone ($84), because it pays for reliable couriers and fairness. That is the tradeoff, and we say so.</li>
 <li><b>Refusing bad compromises involves people.</b> The team asked a human 6 times, where single agents just acted. That is by design: those are the cases where agreeing would have been wrong.</li>
-<li><b>Real disagreement needs red lines.</b> Before red lines were added, every negotiation in the original scenarios ended in full agreement. Now the team's 48 decisions ended: consensus 40, unacceptable compromise 4, insufficient evidence 2, majority 1, irreconcilable 1.</li>
+<li><b>Real disagreement needs red lines.</b> Before red lines were added, every negotiation in the original scenarios ended in full agreement. Now the team's 48 decisions ended: consensus 39, unacceptable compromise 4, majority 2, insufficient evidence 2, irreconcilable 1.</li>
 </ol>
 <div class="tech"><span class="tag">Randomized check</span>The dashboard's Evidence page also runs 50 randomized scenarios (3 to 6 donations each, with no-shows, full shelters and new pantries) against the nearest-shelter baseline. In the run we checked, the agents lost 77% less food, delivered 22% more meals and spent 14% less on drivers, and lost more food than the baseline in 0 of 50 runs. Random runs vary slightly each time.</div>
 </div>
@@ -432,8 +449,8 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <h2><span class="num">13</span>What's real and what's simulated</h2>
 <p class="lead">The agents and their decisions are real. The world around them is simulated, which judges expect at a hackathon.</p>
 <div class="grid2">
-<div class="card"><h4>Real</h4><p>• Photo reading by a vision model (Claude, or Qwen on a GPU)<br>• The agent loop: offers, bids, proposals, votes, red lines, outcomes<br>• Re-planning when a shelter declines or a driver cancels<br>• Safety rules and fallback rules<br>• Human approvals, business answers, shelter replies (tap or voice)<br>• Generated donation records<br>• Voices and speech recognition (with keys)</p></div>
-<div class="card"><h4>Simulated</h4><p>• Shelters, drivers and businesses: fictional, placed near Santa Clara<br>• The clock: 1 simulated minute = 1 real second at 1× speed<br>• Driver movement along straight lines<br>• Events like a full shelter, a no-show or a new pantry, triggered from Demo controls or scripted scenarios</p></div>
+<div class="card"><h4>Real</h4><p>• Photo reading by a vision model (Claude, or Qwen on a GPU)<br>• The agent loop: offers, bids, proposals, votes, red lines, outcomes<br>• Re-planning when a shelter declines or a driver cancels<br>• Safety rules and fallback rules<br>• Human approvals, business answers, shelter replies (tap or voice)<br>• Generated donation records<br>• Voices and speech recognition (with keys)<br>• Each agent as its own process, the agent directory, and the messages between them</p></div>
+<div class="card"><h4>Simulated</h4><p>• Shelters, drivers and businesses: fictional, placed near Santa Clara<br>• The clock: 1 simulated minute = 1 real second at 1× speed<br>• Driver movement along straight lines<br>• Events like a full shelter, a no-show or a new pantry, triggered from Demo controls or scripted scenarios<br>• The Phone line is voiced in the browser, not a real phone call (the shelter's words are its agent's real reply)</p></div>
 </div>
 <p style="margin-top:10pt">Skipped on purpose: logins and accounts, payments, real traffic routing, and training our own model.</p>
 </div>
@@ -447,15 +464,17 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <tr><td><code>world.py</code></td><td>The simulated city: directory, safety rules, drivers, clock, events, routes, records, fallback rules, the baseline and single-agent policies</td></tr>
 <tr><td><code>network.py</code></td><td>Shelter agents (accept, counter, decline) and driver agents (bid or refuse)</td></tr>
 <tr><td><code>agents.py</code></td><td>Speed, Cost and Need: scoring, red lines, the negotiation protocol, the evidence check, optional Claude reasoning</td></tr>
+<tr><td><code>mesh/</code></td><td>The agent mesh: directory, one service per agent, the client that discovers and messages them (with a trace), and the launcher</td></tr>
 <tr><td><code>config.py</code></td><td>Every tuning knob in one place: thresholds, timeouts, limits, speeds</td></tr>
 <tr><td><code>vision.py</code></td><td>Photo → food details: preparation, the counting prompt, the unit table, failure handling</td></tr>
 <tr><td><code>llm.py</code>, <code>env.py</code></td><td>Model wrapper (Claude SDK or an OpenAI-style server) and loading keys from <code>.env</code></td></tr>
+<tr><td><code>menu.py</code></td><td>Each business's menu: pick leftovers from it, and match photo results to it</td></tr>
 <tr><td><code>voice.py</code></td><td>ElevenLabs text-to-speech and speech-to-text; understanding "yes", "no" and numbers</td></tr>
 <tr><td><code>camera.py</code></td><td>The business camera: live food counting, closing-time snapshot</td></tr>
 <tr><td><code>scenarios.py</code></td><td>9 scripted scenarios and the five-policy comparison</td></tr>
 <tr><td><code>static/</code></td><td>Web pages: customer site (<code>app.*</code>), ops dashboard (<code>dashboard.*</code>), shelter phone, records, shared styles</td></tr>
 <tr><td><code>data/</code></td><td>Fictional shelters, drivers and businesses</td></tr>
-<tr><td><code>tests/test_core.py</code></td><td>30 automated checks, such as cold food never going without a fridge</td></tr>
+<tr><td><code>tests/</code></td><td><code>test_core.py</code>: 34 automated checks, such as cold food never going without a fridge. <code>test_mesh.py</code>: the agent processes decide identically and survive a stopped agent</td></tr>
 <tr><td><code>scripts/</code></td><td>Brev GPU setup, start and stop scripts; the photo accuracy test</td></tr>
 <tr><td><code>docs/</code></td><td>Architecture, results, Brev setup guide, and this document</td></tr>
 </table>
@@ -468,7 +487,7 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <code>cd ~/uplink</code><br>
 <code>source .venv/bin/activate</code><br>
 <code>pip install -r requirements.txt</code> (first time only)<br>
-<code>PORT=5050 python app.py</code>
+<code>python app.py</code> (port 5050 by default; it also starts the agent processes)
 </div>
 <table>
 <tr><th>Page</th><th>Address</th></tr>
@@ -484,9 +503,10 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Claude reads photos (and, with <code>LLM_AGENTS=1</code>, writes the agents' arguments)</td></tr>
 <tr><td><code>ELEVENLABS_API_KEY</code></td><td>Real voices for the debate and shelter phone</td></tr>
 <tr><td><code>LLM_AGENTS=1</code></td><td>Agents reason with Claude instead of rules</td></tr>
+<tr><td><code>MESH=0</code></td><td>Run every agent in-process instead of as separate services</td></tr>
 <tr><td>none</td><td>Everything runs: a labeled demo photo result, rules-based agents, the browser's voice</td></tr>
 </table>
-<p>Run the checks with <code>python tests/test_core.py</code> and the evidence with <code>python scenarios.py</code>.</p>
+<p>Run the checks with <code>python tests/test_core.py</code> and <code>python tests/test_mesh.py</code>, and the evidence with <code>python scenarios.py</code>.</p>
 </div>
 
 <!-- ============ 16 ============ -->
@@ -497,7 +517,7 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <li><b>Problem (30 s).</b> Businesses throw away edible food, and California now requires many to donate it. But donating is a hassle full of tradeoffs.</li>
 <li><b>Photo (20 s).</b> Photograph real leftover food on the customer site. The details fill in.</li>
 <li><b>Agents negotiate (40 s).</b> On <code>/ops</code>, Speed, Cost and Need argue, the safety rules remove an unsafe shelter, and a truck starts moving.</li>
-<li><b>Things change (45 s).</b> Click "Shelter says full": they reroute. Click "Driver cancels": reliability drops and the agent that warned gains weight. Run a deadlock scenario: they ask a human.</li>
+<li><b>Things change (45 s).</b> Click "Shelter says full": they reroute. Click "Driver cancels": reliability drops and the agent that warned gains weight. Run a deadlock scenario: they ask a human. Then open Activity → Agent services and stop a shelter's agent: it drops out of the directory and the next donation goes elsewhere.</li>
 <li><b>Evidence (25 s).</b> The Evidence page: team versus single agents and the simple baseline.</li>
 <li><b>Close (20 s).</b> "Our agents negotiate real tradeoffs with no boss, safety is never up for debate, and they ask a human when they truly can't agree."</li>
 </ol>
@@ -508,6 +528,7 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <div><b>Is the AI deciding whether food is safe?</b>No. Safety is fixed rules in code (time, refrigeration, allergens, capacity, hours) that remove unsafe plans before any agent sees them.</div>
 <div><b>How do you know this beats a simple approach?</b>We ran the same scenarios against a nearest-shelter baseline and against each agent alone. See section 12, including where the team costs more.</div>
 <div><b>How do you know the amount from a photo?</b>The model counts what it can see and gives a range and a confidence level. Code computes servings and weight, and the business confirms or corrects every number.</div>
+<div><b>Are these really separate agents?</b>Yes. Each shelter, driver and negotiator runs as its own process, registers in an agent directory, and answers messages over HTTP. You can stop one live and watch the others carry on. A test proves the distributed agents decide exactly as the in-process ones.</div>
 <div><b>Is this real?</b>The agents, photo reading, safety rules and records are real. The city, drivers and clock are simulated for the demo.</div>
 <div><b>How is this different from Copia?</b>Copia makes businesses enter details and coordinate. Uplink cuts it to one photo, and the agents handle matching, failures, tradeoffs and paperwork.</div>
 </div>
@@ -530,6 +551,10 @@ Two background threads run inside the server. The <b>clock thread</b> advances s
 <tr><td>Fallback rule</td><td>A disclosed automatic action when nobody answers in time, so food doesn't spoil</td></tr>
 <tr><td>Baseline</td><td>A simple comparison policy (nearest shelter, or one agent alone) used to measure the team</td></tr>
 <tr><td>Counter-offer</td><td>A shelter offering to take only part of a donation; the rest is re-announced</td></tr>
+<tr><td>Agent directory</td><td>A registry where agents list who they are, what they can do and where to reach them, so others can find them</td></tr>
+<tr><td>Heartbeat</td><td>A regular "still here" signal; an agent that stops sending it drops out of the directory</td></tr>
+<tr><td>A2A message</td><td>An agent-to-agent message: a small JSON request and reply sent over HTTP</td></tr>
+<tr><td>OASF record</td><td>AGNTCY's standard format for describing an agent; our directory records are modeled on it</td></tr>
 <tr><td>Vision model</td><td>AI that understands images; here, it identifies and counts food</td></tr>
 <tr><td>vLLM / Brev</td><td>Software that serves an open AI model; Brev rents the NVIDIA GPU it runs on</td></tr>
 <tr><td>SB 1383</td><td>California law requiring many food businesses to donate edible surplus food and keep records</td></tr>
