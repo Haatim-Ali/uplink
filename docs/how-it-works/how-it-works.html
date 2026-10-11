@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Uplink: How It Works</title>
+<style>
+@page { size: Letter; margin: 0.65in 0.7in 0.75in; }
+:root { --ink:#0f172a; --ink2:#334155; --muted:#64748b; --line:#e2e8f0; --soft:#f8fafc; --accent:#0f766e; --accent-soft:#e6f4f2;
+        --speed:#c2410c; --cost:#15803d; --need:#6d28d9; --warn:#b45309; --bad:#b91c1c; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font: 10.5pt/1.55 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--ink); margin: 0; }
+h1 { font-size: 30pt; line-height: 1.1; margin: 0 0 6pt; letter-spacing: -0.5pt; }
+h2 { font-size: 17pt; margin: 0 0 8pt; padding-top: 4pt; letter-spacing: -0.2pt; }
+h3 { font-size: 12pt; margin: 14pt 0 4pt; }
+p { margin: 0 0 8pt; }
+ul, ol { margin: 0 0 8pt; padding-left: 18pt; }
+li { margin-bottom: 3pt; }
+code { font: 9pt/1.3 Menlo, Consolas, monospace; background: var(--soft); border: 1px solid var(--line); border-radius: 3pt; padding: 0 3pt; }
+.section { margin-top: 26pt; padding-top: 14pt; border-top: 1px solid var(--line); }
+.section.newpage { break-before: page; margin-top: 0; padding-top: 0; border-top: 0; }
+.cover { break-after: page; }
+h2, h3 { break-after: avoid; }
+.lead, .section > p:first-of-type { break-after: avoid; }
+.keep { break-inside: avoid; }
+.lead { font-size: 12.5pt; color: var(--ink2); }
+.num { display:inline-block; width: 22pt; height: 22pt; border-radius: 11pt; background: var(--accent); color: #fff; text-align:center; font-weight:700; line-height:22pt; margin-right: 6pt; font-size: 11pt; }
+.plain, .tech { border-radius: 6pt; padding: 9pt 12pt; margin: 8pt 0 10pt; break-inside: avoid; }
+.plain { background: var(--accent-soft); border-left: 4pt solid var(--accent); }
+.tech { background: var(--soft); border-left: 4pt solid #94a3b8; }
+.tag { font-size: 8pt; font-weight: 700; letter-spacing: 0.8pt; text-transform: uppercase; color: var(--muted); display:block; margin-bottom: 3pt; }
+.plain .tag { color: var(--accent); }
+table { width: 100%; border-collapse: collapse; margin: 6pt 0 12pt; font-size: 9.5pt; break-inside: avoid; }
+th { text-align: left; background: #eef2f7; color: var(--ink2); font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.5pt; padding: 5pt 7pt; }
+td { padding: 5pt 7pt; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.n, th.n { text-align: right; white-space: nowrap; }
+.agent { font-weight: 700; }
+.speed { color: var(--speed); } .cost { color: var(--cost); } .need { color: var(--need); }
+figure { margin: 8pt 0 12pt; break-inside: avoid; }
+figcaption { font-size: 9pt; color: var(--muted); margin-top: 4pt; }
+svg text { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.cover { height: 9.3in; display: flex; flex-direction: column; justify-content: center; }
+.cover .mark { width: 54pt; height: 54pt; border-radius: 12pt; background: var(--accent); color:#fff; font-size: 30pt; font-weight: 800; display:flex; align-items:center; justify-content:center; margin-bottom: 18pt; }
+.cover .sub { font-size: 15pt; color: var(--ink2); max-width: 5.2in; }
+.cover .meta { margin-top: 26pt; color: var(--muted); font-size: 10pt; }
+.toc { columns: 2; column-gap: 24pt; font-size: 10.5pt; margin-top: 26pt; }
+.toc div { break-inside: avoid; margin-bottom: 4pt; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+.card { border: 1px solid var(--line); border-radius: 6pt; padding: 8pt 10pt; break-inside: avoid; }
+.card h4 { margin: 0 0 3pt; font-size: 10.5pt; }
+.card p { margin: 0; font-size: 9.5pt; color: var(--ink2); }
+.bar { display:flex; align-items:center; gap: 6pt; margin: 2pt 0; font-size: 9pt; }
+.bar .lbl { width: 1.25in; color: var(--ink2); }
+.bar .track { flex: 1; height: 11pt; background: #eef2f7; border-radius: 3pt; overflow: hidden; }
+.bar .fill { height: 100%; background: #94a3b8; }
+.bar .fill.team { background: var(--accent); }
+.bar .val { width: 0.55in; text-align: right; font-weight: 600; }
+.chart { break-inside: avoid; margin: 6pt 0 12pt; }
+.chart h4 { margin: 0 0 3pt; font-size: 10pt; }
+.qa p { margin-bottom: 3pt; }
+.qa b { display:block; }
+.qa div { margin-bottom: 9pt; break-inside: avoid; }
+.small { font-size: 9pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="mark">↑</div>
+  <h1>Uplink: How It Works</h1>
+  <div class="sub">One photo of leftover food becomes a safe, completed donation, decided by three AI agents with competing goals and no boss.</div>
+  <div class="meta">A complete guide to the project: what it does, how the agents work together, the architecture, and how to explain it to others.<br>UCSC AI Hackathon · Cisco Cloud AI track, "When AI Agents Disagree" · October 10, 2026</div>
+  <div class="toc">
+    <div>1. Uplink in one minute</div>
+    <div>2. The problem and who uses it</div>
+    <div>3. A donation's journey</div>
+    <div>4. System architecture</div>
+    <div>5. The agentic workflow</div>
+    <div>6. Safety rules and red lines</div>
+    <div>7. When the agents should not agree</div>
+    <div>8. The wider agent network</div>
+    <div>9. Reading the photo</div>
+    <div>10. Voices</div>
+    <div>11. The two websites</div>
+    <div>12. Evidence: does the team do better?</div>
+    <div>13. What's real and what's simulated</div>
+    <div>14. Code map</div>
+    <div>15. How to run it</div>
+    <div>16. Explaining Uplink to others</div>
+    <div>17. Glossary</div>
+  </div>
+</div>
+
+<!-- ============ 1 ============ -->
+<div class="section newpage">
+<h2><span class="num">1</span>Uplink in one minute</h2>
+<p class="lead">Uplink turns one photo of leftover food into a safe, completed donation. A business photographs its surplus food, AI identifies it, and three AI agents with competing goals work out where it should go and who should drive it.</p>
+<table>
+<tr><th>Agent</th><th>What it wants</th><th>A typical argument</th></tr>
+<tr><td class="agent speed">Speed</td><td>Food delivered fast and reliably, long before it spoils</td><td>"Hot food can't wait. The paid courier is 8 minutes away."</td></tr>
+<tr><td class="agent cost">Cost</td><td>Spend as little as possible on drivers</td><td>"Use the volunteer. She's free."</td></tr>
+<tr><td class="agent need">Need</td><td>Food goes to whoever has waited longest</td><td>"Grace Kitchen hasn't had a donation in 4 days."</td></tr>
+</table>
+<p>No agent is the boss. They propose plans, vote, and give ground until they agree. <b>Safety rules written in plain code</b> remove every unsafe option before the debate starts, so the agents can never argue their way into an unsafe delivery. When they truly can't agree, or agreeing would cross a line one of them refuses to cross, they <b>stop and ask a person</b> instead of forcing a bad decision.</p>
+<p>When the food arrives, Uplink writes the donation record that California's SB 1383 law requires.</p>
+<div class="plain"><span class="tag">The one-sentence pitch</span>Food rescue is full of real tradeoffs. Our agents negotiate them with no boss, safety is never up for debate, and when they truly can't agree, they ask a human.</div>
+</div>
+
+<!-- ============ 2 ============ -->
+<div class="section">
+<h2><span class="num">2</span>The problem and who uses it</h2>
+<p>California's SB 1383 requires many food businesses (grocery stores, large restaurants, hotels, caterers, schools) to donate edible surplus food and keep records of it. Much of it is still thrown away, because donating is a hassle: someone has to find a shelter that can take <i>this</i> food <i>tonight</i>, check it has a fridge, find a driver, and do the paperwork.</p>
+<p>Every one of those choices is a tradeoff. The fastest driver costs money. The free volunteer may not show up. The nearest shelter may already have been fed today, while another has waited four days. Uplink cuts the business's part down to one photo and lets agents handle the tradeoffs.</p>
+<table>
+<tr><th>Who</th><th>What they want</th><th>What they use in Uplink</th></tr>
+<tr><td><b>Business</b><br>café, bakery, hotel kitchen</td><td>Get leftover food picked up now, with proof for compliance</td><td>The customer site at <code>/</code>: schedule a pickup, track it, download the receipt</td></tr>
+<tr><td><b>Shelter or pantry</b></td><td>Food it can actually use, with no surprises</td><td>The shelter phone page at <code>/shelter</code>: accept, take part, or decline each request, by tap or by voice</td></tr>
+<tr><td><b>Driver</b><br>volunteer, paid courier, a nonprofit's own van</td><td>Trips that fit their range and schedule</td><td>Simulated in this demo; each driver has its own agent that bids on trips</td></tr>
+<tr><td><b>Coordinator</b><br>the human in the loop</td><td>Step in only when the agents shouldn't decide alone</td><td>The Decisions inbox on the ops dashboard</td></tr>
+<tr><td><b>Judges, presenters</b></td><td>See how the agents think, and proof it works</td><td>The ops dashboard at <code>/ops</code>: live negotiation, map, logs, evidence, how it works</td></tr>
+</table>
+<div class="plain"><span class="tag">Why it's different from existing apps</span>Services like Copia already match donations to nonprofits, but businesses still have to enter details and coordinate. Uplink cuts it to one photo, and the agents handle matching, failures and paperwork, including the hard tradeoffs a fixed rule gets wrong.</div>
+</div>
+
+<!-- ============ 3 ============ -->
+<div class="section">
+<h2><span class="num">3</span>A donation's journey, step by step</h2>
+<p>At 2:00 PM a hotel kitchen has 30 servings of chicken curry left over. Here is everything that happens next, in plain words, with the technical name of each step and the file that does it.</p>
+<ol>
+<li><b>The manager takes a photo</b> on the customer site. <span class="small">(vision · <code>vision.py</code>)</span><br>The photo goes to an AI vision model, which names the food, counts it, and says how sure it is. Uplink's own code, not the AI, turns the count into servings, weight and how long the food stays safe.</li>
+<li><b>The manager checks and confirms.</b> If the AI got something wrong, they fix it. If they aren't sure about allergens, they tick "Not sure".</li>
+<li><b>The food is announced to the network.</b> <span class="small">(agent network · <code>network.py</code>)</span><br>Every shelter's agent answers from its own point of view: "Yes, we can take all 30", "We can take 12 of the 30", or "Sorry, we're full". Every driver's agent bids on each trip with an arrival time and a price, or says no if it's too far.</li>
+<li><b>Safety rules remove anything unsafe.</b> <span class="small">(safety rules · <code>world.py</code>)</span><br>No fridge for cold food, an allergen the shelter must avoid, closed by arrival time, no room, or arriving too close to when the food spoils. Those options disappear before any agent sees them.</li>
+<li><b>Speed, Cost and Need negotiate.</b> <span class="small">(negotiation · <code>agents.py</code>)</span><br>Each proposes a plan, votes on every plan on the table, and gives ground over up to three rounds. Here they agree: Riverside Family Center, via a paid courier arriving in about 10 minutes.</li>
+<li><b>If they can't or shouldn't agree, a person decides.</b> <span class="small">(escalation)</span><br>The question lands in the coordinator's Decisions inbox with the reason, the agents' top two options, and a "decide by" time.</li>
+<li><b>The shelter confirms.</b> <span class="small">(shelter phone)</span><br>If someone is answering the shelter's phone page, they accept, take part, or decline. Otherwise the plan goes ahead.</li>
+<li><b>The driver picks up and delivers.</b> <span class="small">(simulated world)</span><br>The manager watches on the tracking page: "Driver on the way, arrives 2:19 PM." (times here are an example)</li>
+<li><b>Something may change mid-route.</b> <span class="small">(adaptation)</span><br>A shelter fills up, or a volunteer cancels. The agents re-plan from wherever the food is now.</li>
+<li><b>Delivered, and the record is written.</b> <span class="small">(SB 1383 record)</span><br>Donor, recipient, items, weight, pickup and delivery times and transport type are logged automatically, ready to print or download.</li>
+</ol>
+</div>
+
+<!-- ============ 4 ============ -->
+<div class="section newpage">
+<h2><span class="num">4</span>System architecture</h2>
+<p>Uplink is one Python web server (Flask) with a simulated city inside it. Browsers poll the server once a second for the current state. The agents are real code making real decisions; the city around them (shelters, drivers, the clock) is simulated.</p>
+<figure>
+<svg viewBox="0 0 760 560" width="100%" role="img" aria-label="Uplink architecture">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>
+<!-- browsers -->
+<text x="20" y="22" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">IN THE BROWSER</text>
+<g font-size="12">
+<rect x="20" y="32" width="170" height="58" rx="8" fill="#e6f4f2" stroke="#0f766e" stroke-width="1.5"/><text x="105" y="56" text-anchor="middle" font-weight="700" fill="#0f172a">Customer site  /</text><text x="105" y="74" text-anchor="middle" font-size="10.5" fill="#334155">schedule · track · receipts</text>
+<rect x="205" y="32" width="170" height="58" rx="8" fill="#fff" stroke="#94a3b8"/><text x="290" y="56" text-anchor="middle" font-weight="700" fill="#0f172a">Ops dashboard  /ops</text><text x="290" y="74" text-anchor="middle" font-size="10.5" fill="#334155">live debate · map · evidence</text>
+<rect x="390" y="32" width="170" height="58" rx="8" fill="#fff" stroke="#94a3b8"/><text x="475" y="56" text-anchor="middle" font-weight="700" fill="#0f172a">Shelter phone  /shelter</text><text x="475" y="74" text-anchor="middle" font-size="10.5" fill="#334155">accept · counter · decline</text>
+<rect x="575" y="32" width="165" height="58" rx="8" fill="#fff" stroke="#94a3b8"/><text x="657" y="56" text-anchor="middle" font-weight="700" fill="#0f172a">Camera  camera.py</text><text x="657" y="74" text-anchor="middle" font-size="10.5" fill="#334155">counts food, closing time</text>
+</g>
+<path d="M380 92V128" stroke="#64748b" stroke-width="1.3" marker-end="url(#ar)"/>
+<text x="390" y="114" font-size="10.5" fill="#64748b">HTTP: poll /api/state every second, POST actions</text>
+<!-- server -->
+<rect x="20" y="132" width="720" height="300" rx="10" fill="#f8fafc" stroke="#94a3b8"/>
+<text x="36" y="154" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">FLASK SERVER  ·  app.py  (routes, clock thread, planner thread)</text>
+<g font-size="12">
+<rect x="40" y="168" width="215" height="112" rx="8" fill="#fff" stroke="#94a3b8"/><text x="147" y="190" text-anchor="middle" font-weight="700" fill="#0f172a">Simulated world</text><text x="147" y="206" text-anchor="middle" font-size="10.5" fill="#64748b">world.py</text>
+<text x="56" y="228" font-size="10.5" fill="#334155">• directory of shelters, drivers</text><text x="56" y="244" font-size="10.5" fill="#334155">• SAFETY RULES (code)</text><text x="56" y="260" font-size="10.5" fill="#334155">• clock, events, routes, records</text><text x="56" y="274" font-size="10.5" fill="#334155">• fallback rules, baselines</text>
+<rect x="272" y="168" width="215" height="112" rx="8" fill="#fff" stroke="#94a3b8"/><text x="379" y="190" text-anchor="middle" font-weight="700" fill="#0f172a">Agent network</text><text x="379" y="206" text-anchor="middle" font-size="10.5" fill="#64748b">network.py</text>
+<text x="288" y="228" font-size="10.5" fill="#334155">• each shelter agent: accept,</text><text x="300" y="244" font-size="10.5" fill="#334155">counter-offer, or decline</text><text x="288" y="260" font-size="10.5" fill="#334155">• each driver agent: bids</text><text x="300" y="274" font-size="10.5" fill="#334155">or refuses (too far)</text>
+<rect x="504" y="168" width="220" height="112" rx="8" fill="#e6f4f2" stroke="#0f766e" stroke-width="1.5"/><text x="614" y="190" text-anchor="middle" font-weight="700" fill="#0f172a">The negotiators</text><text x="614" y="206" text-anchor="middle" font-size="10.5" fill="#64748b">agents.py</text>
+<text x="520" y="228" font-size="10.5" fill="#c2410c" font-weight="700">Speed</text><text x="562" y="228" font-size="10.5" fill="#15803d" font-weight="700">Cost</text><text x="598" y="228" font-size="10.5" fill="#6d28d9" font-weight="700">Need</text>
+<text x="520" y="244" font-size="10.5" fill="#334155">• propose, vote, concede</text><text x="520" y="260" font-size="10.5" fill="#334155">• red lines (vetoes)</text><text x="520" y="274" font-size="10.5" fill="#334155">• rules or Claude reasoning</text>
+<rect x="40" y="300" width="215" height="112" rx="8" fill="#fff" stroke="#94a3b8"/><text x="147" y="322" text-anchor="middle" font-weight="700" fill="#0f172a">Photo reading</text><text x="147" y="338" text-anchor="middle" font-size="10.5" fill="#64748b">vision.py</text>
+<text x="56" y="360" font-size="10.5" fill="#334155">• shrink, rotate, HEIC → JPEG</text><text x="56" y="376" font-size="10.5" fill="#334155">• model counts; code computes</text><text x="68" y="392" font-size="10.5" fill="#334155">servings, weight, safe time</text>
+<rect x="272" y="300" width="215" height="112" rx="8" fill="#fff" stroke="#94a3b8"/><text x="379" y="322" text-anchor="middle" font-weight="700" fill="#0f172a">Model wrapper</text><text x="379" y="338" text-anchor="middle" font-size="10.5" fill="#64748b">llm.py · env.py</text>
+<text x="288" y="360" font-size="10.5" fill="#334155">• keys from .env</text><text x="288" y="376" font-size="10.5" fill="#334155">• Claude (official SDK) or any</text><text x="300" y="392" font-size="10.5" fill="#334155">OpenAI-style server (vLLM)</text>
+<rect x="504" y="300" width="220" height="112" rx="8" fill="#fff" stroke="#94a3b8"/><text x="614" y="322" text-anchor="middle" font-weight="700" fill="#0f172a">Voices</text><text x="614" y="338" text-anchor="middle" font-size="10.5" fill="#64748b">voice.py</text>
+<text x="520" y="360" font-size="10.5" fill="#334155">• agents speak the debate</text><text x="520" y="376" font-size="10.5" fill="#334155">• shelter hears requests,</text><text x="532" y="392" font-size="10.5" fill="#334155">answers out loud</text>
+</g>
+<g stroke="#64748b" stroke-width="1.3" fill="none">
+<path d="M256 224H270" marker-end="url(#ar)"/><path d="M488 224H502" marker-end="url(#ar)"/>
+<path d="M256 356H270" marker-end="url(#ar)"/>
+</g>
+<!-- external -->
+<text x="20" y="462" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">OUTSIDE SERVICES (OPTIONAL)</text>
+<g font-size="12">
+<rect x="150" y="474" width="210" height="62" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/><text x="255" y="498" text-anchor="middle" font-weight="700" fill="#0f172a">Anthropic Claude API</text><text x="255" y="516" text-anchor="middle" font-size="10.5" fill="#334155">reads photos; optional agent voice</text>
+<rect x="375" y="474" width="210" height="62" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/><text x="480" y="498" text-anchor="middle" font-weight="700" fill="#0f172a">Qwen on NVIDIA Brev GPU</text><text x="480" y="516" text-anchor="middle" font-size="10.5" fill="#334155">backup photo reader (vLLM)</text>
+<rect x="600" y="474" width="140" height="62" rx="8" fill="#fff" stroke="#94a3b8" stroke-dasharray="5 4"/><text x="670" y="498" text-anchor="middle" font-weight="700" fill="#0f172a">ElevenLabs</text><text x="670" y="516" text-anchor="middle" font-size="10.5" fill="#334155">speech in and out</text>
+</g>
+<g stroke="#64748b" stroke-width="1.3" fill="none" stroke-dasharray="4 3">
+<path d="M379 414V444H255V472" marker-end="url(#ar)"/><path d="M379 444H480V472" marker-end="url(#ar)"/><path d="M670 414V472" marker-end="url(#ar)"/>
+</g>
+</svg>
+<figcaption>Solid boxes run on your laptop. Dashed boxes are optional outside services. Without any keys, everything still runs: photos get a labeled demo result and the agents use their built-in rules.</figcaption>
+</figure>
+<div class="tech"><span class="tag">Technical detail</span>
+Two background threads run inside the server. The <b>clock thread</b> advances simulated time (one simulated minute per real second at 1× speed) and moves drivers. The <b>planner thread</b> picks up any donation that needs a decision and runs the negotiation outside the shared lock, so a slow AI call never freezes the dashboard. The clock pauses while agents deliberate. Pages are plain HTML, CSS and JavaScript with no build step; the maps use Leaflet.
+</div>
+</div>
+
+<!-- ============ 5 ============ -->
+<div class="section newpage">
+<h2><span class="num">5</span>The agentic workflow: negotiation with no boss</h2>
+<p class="lead">Three agents with competing goals decide every plan together. Shared code only counts the votes; no supervisor picks the winner.</p>
+<figure>
+<svg viewBox="0 0 760 520" width="100%" role="img" aria-label="Negotiation workflow">
+<defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>
+<g font-size="12" fill="#0f172a">
+<rect x="20" y="20" width="170" height="52" rx="8" fill="#fff" stroke="#94a3b8"/><text x="105" y="42" text-anchor="middle" font-weight="700">New donation</text><text x="105" y="60" text-anchor="middle" font-size="10.5" fill="#334155">photo confirmed</text>
+<rect x="220" y="20" width="200" height="52" rx="8" fill="#fff" stroke="#94a3b8"/><text x="320" y="42" text-anchor="middle" font-weight="700">Shelters offer, drivers bid</text><text x="320" y="60" text-anchor="middle" font-size="10.5" fill="#334155">every (shelter, driver) pair = a plan</text>
+<rect x="450" y="20" width="290" height="52" rx="8" fill="#fde8e8" stroke="#b91c1c" stroke-width="1.5"/><text x="595" y="42" text-anchor="middle" font-weight="700">Safety rules remove unsafe plans</text><text x="595" y="60" text-anchor="middle" font-size="10.5" fill="#334155">code, never negotiated</text>
+<polygon points="600,96 740,132 600,168 460,132" fill="#fff" stroke="#94a3b8"/><text x="600" y="128" text-anchor="middle" font-weight="700" font-size="11">Best option blocked only</text><text x="600" y="143" text-anchor="middle" font-weight="700" font-size="11">by a missing fact?</text>
+<rect x="560" y="196" width="180" height="52" rx="8" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/><text x="650" y="218" text-anchor="middle" font-weight="700">Ask the business</text><text x="650" y="236" text-anchor="middle" font-size="10.5" fill="#334155">"Is it free of peanuts?"</text>
+<rect x="150" y="104" width="300" height="148" rx="10" fill="#e6f4f2" stroke="#0f766e" stroke-width="1.5"/>
+<text x="300" y="126" text-anchor="middle" font-weight="700">Rounds 1 to 3</text>
+<text x="170" y="150" font-size="11">1. Each agent <tspan font-weight="700">proposes</tspan> one plan</text>
+<text x="170" y="170" font-size="11">2. Each agent <tspan font-weight="700">votes</tspan> on every plan on the table:</text>
+<text x="185" y="186" font-size="11">accept, object (with a reason), or veto</text>
+<text x="170" y="206" font-size="11">3. Not settled? Agents <tspan font-weight="700">concede</tspan>: their bar</text>
+<text x="185" y="222" font-size="11">drops (90% → 78% → 65% of their best)</text>
+<text x="185" y="238" font-size="11">and they lean toward the least-happy agent</text>
+<polygon points="300,280 400,312 300,344 200,312" fill="#fff" stroke="#94a3b8"/><text x="300" y="309" text-anchor="middle" font-weight="700" font-size="11.5">How does it</text><text x="300" y="324" text-anchor="middle" font-weight="700" font-size="11.5">end?</text>
+<rect x="20" y="380" width="160" height="62" rx="8" fill="#e3f3e8" stroke="#15803d"/><text x="100" y="402" text-anchor="middle" font-weight="700">Consensus</text><text x="100" y="418" text-anchor="middle" font-size="10.5" fill="#334155">all three accept</text><text x="100" y="433" text-anchor="middle" font-size="10.5" fill="#334155">→ dispatch</text>
+<rect x="195" y="380" width="160" height="62" rx="8" fill="#e3f3e8" stroke="#15803d"/><text x="275" y="402" text-anchor="middle" font-weight="700">Majority or urgent</text><text x="275" y="418" text-anchor="middle" font-size="10.5" fill="#334155">2 of 3, no veto; or time short</text><text x="275" y="433" text-anchor="middle" font-size="10.5" fill="#334155">→ dispatch, dissent recorded</text>
+<rect x="370" y="380" width="190" height="62" rx="8" fill="#fef3c7" stroke="#b45309"/><text x="465" y="402" text-anchor="middle" font-weight="700">Ask a human</text><text x="465" y="418" text-anchor="middle" font-size="10.5" fill="#334155">deadlock, a vetoed majority,</text><text x="465" y="433" text-anchor="middle" font-size="10.5" fill="#334155">or over the $25 limit</text>
+<rect x="190" y="462" width="380" height="44" rx="8" fill="#fff" stroke="#94a3b8"/><text x="380" y="480" text-anchor="middle" font-weight="700">Shelter confirms → driver delivers → SB 1383 record</text><text x="380" y="496" text-anchor="middle" font-size="10.5" fill="#334155">a full shelter or a no-show sends it back to the agents</text>
+</g>
+<g stroke="#64748b" stroke-width="1.3" fill="none">
+<path d="M190 46H218" marker-end="url(#a2)"/><path d="M420 46H448" marker-end="url(#a2)"/>
+<path d="M600 72V94" marker-end="url(#a2)"/>
+<path d="M650 155V194" marker-end="url(#a2)"/>
+<path d="M460 132H452" marker-end="url(#a2)"/>
+<path d="M300 252V278" marker-end="url(#a2)"/>
+<path d="M650 248V270H452V200" marker-end="url(#a2)"/>
+<path d="M230 330L110 378" marker-end="url(#a2)"/><path d="M285 344L278 378" marker-end="url(#a2)"/><path d="M370 330L455 378" marker-end="url(#a2)"/>
+<path d="M100 442V484H188" marker-end="url(#a2)"/><path d="M275 442V460" marker-end="url(#a2)"/><path d="M465 442V460" marker-end="url(#a2)"/>
+</g>
+<text x="660" y="180" font-size="10.5" fill="#64748b">yes</text><text x="452" y="122" font-size="10.5" fill="#64748b">no</text>
+<text x="468" y="264" font-size="10.5" fill="#64748b">answer, or wait 15 min</text>
+</svg>
+<figcaption>One donation's decision. The agents never see an unsafe plan, and a human is asked only when agreeing would be wrong.</figcaption>
+</figure>
+<div class="grid2">
+<div class="plain"><span class="tag">In plain words</span>Think of three coworkers with different priorities picking a delivery plan. Each suggests their favourite, everyone gives a thumbs up or down with a reason, and if nobody budges, each is willing to accept a slightly worse option for their goal. Each also has one line they will never cross.</div>
+<div class="tech"><span class="tag">Technical detail</span>Each agent scores every safe plan from 0 to 1 against its own goal. It accepts a plan scoring at least 90%, 78% then 65% of its best option in rounds 1, 2 and 3. When proposing in later rounds it blends its own score with the least-happy other agent's (weight 0, 0.45, 0.75). Vote weights start at 1.0; a majority needs 2.0.</div>
+</div>
+<h3>How each agent scores a plan</h3>
+<table>
+<tr><th>Agent</th><th>Score (0 to 1)</th><th>Red line: always vetoes</th></tr>
+<tr><td class="agent speed">Speed</td><td>Minutes to spare ÷ minutes left, weighted by driver reliability</td><td>Under 10 minutes to spare, or a driver under 50% reliable</td></tr>
+<tr><td class="agent cost">Cost</td><td>Cheaper is better, weighted by reliability (a no-show means paying a courier to rescue the food)</td><td>Over $20 for one donation</td></tr>
+<tr><td class="agent need">Need</td><td>Days since the shelter's last donation (70%) and room left (30%)</td><td>Feeding a shelter that got food today while another has waited 4+ days</td></tr>
+</table>
+<div class="tech"><span class="tag">Rules or AI reasoning</span>By default the agents reason with these scoring rules, which are fast and repeatable for demos and tests. With <code>LLM_AGENTS=1</code> and a Claude key, each agent's proposals, votes and reasons come from Claude, told its goal and red line. Red lines are still enforced in code, and any failed AI call falls back to the rules for that agent. In testing, Claude-driven agents agreed more readily, so the rules show disagreement more clearly.</div>
+</div>
+
+<!-- ============ 6 ============ -->
+<div class="section">
+<h2><span class="num">6</span>Safety rules and red lines</h2>
+<p class="lead">There are two kinds of limits. Safety rules protect people and are never up for debate. Red lines protect each agent's goal and act as vetoes inside the debate.</p>
+<h3>Safety rules: plain code, applied before any agent sees a plan</h3>
+<table>
+<tr><th>Rule</th><th>A plan is removed when…</th></tr>
+<tr><td>Food type</td><td>The shelter doesn't accept that category (hot prepared, cold prepared, packaged, produce)</td></tr>
+<tr><td>Cold chain</td><td>The food must stay cold and the shelter has no fridge</td></tr>
+<tr><td>Allergens</td><td>The food contains an allergen the shelter must avoid, or allergens are unconfirmed and the shelter avoids any (unconfirmed counts as present)</td></tr>
+<tr><td>Capacity</td><td>The shelter has no room, counting food already on its way</td></tr>
+<tr><td>Opening hours</td><td>The shelter would be closed when the driver arrives</td></tr>
+<tr><td>Safe time</td><td>The food would arrive less than 5 minutes before it becomes unsafe</td></tr>
+<tr><td>Full</td><td>The shelter has said it's full</td></tr>
+</table>
+<div class="plain"><span class="tag">Why this matters</span>"Is the AI deciding if food is safe?" No. Safety is fixed rules in code. The agents only choose among options that already passed them, so they can never pick an unsafe one, however persuasive an argument is.</div>
+<h3>Red lines: each agent's veto</h3>
+<p>A veto holds in every round, and a majority cannot override it. If the only plan two agents like is vetoed by the third, the agents don't force it through: they hand the choice to a person and explain why. That is how Uplink shows <b>"consensus is not always the right outcome"</b>, which the Cisco challenge asks for. The red lines are in the scoring table in section 5.</p>
+</div>
+
+<!-- ============ 7 ============ -->
+<div class="section">
+<h2><span class="num">7</span>When the agents should not agree</h2>
+<p class="lead">A negotiation can end six ways. Three act on a plan, and three stop and ask a person, because agreeing would be wrong.</p>
+<table>
+<tr><th>Outcome</th><th>When it happens</th><th>What happens next</th></tr>
+<tr><td><b>Consensus</b></td><td>All three agents accept a plan</td><td>It goes ahead</td></tr>
+<tr><td><b>Majority with dissent</b></td><td>After 3 rounds, 2 of 3 (by vote weight) accept a plan nobody vetoed</td><td>It goes ahead; the losing agent's objection is kept on record</td></tr>
+<tr><td><b>Time is short</b></td><td>Under 30 minutes until the food is unsafe</td><td>Stop debating; act on the best-supported plan nobody vetoed</td></tr>
+<tr><td><b>Unacceptable compromise</b></td><td>The majority's plan crosses the third agent's red line</td><td>Ask a human, with the reason and the top two options</td></tr>
+<tr><td><b>Irreconcilable goals</b></td><td>After 3 rounds, no plan has majority support</td><td>Ask a human</td></tr>
+<tr><td><b>Insufficient evidence</b></td><td>An agent's best plan is blocked only by an unconfirmed fact (allergens), with 45+ minutes left</td><td>Ask the business; wait up to 15 minutes, then act on what is known</td></tr>
+</table>
+<p>A plan that costs more than $25 also goes to a human.</p>
+<h3>Fallback rules (disclosed, not decision-makers)</h3>
+<ul>
+<li><b>Nobody answers the coordinator.</b> The agents act at the last moment an option can still arrive safely, using their best-ranked option that still makes it. The Decisions card shows this "decide by" time.</li>
+<li><b>Any approval is re-checked.</b> If time has passed and an option would now arrive too late, it isn't dispatched; the agents find one that still works.</li>
+<li><b>Scripted test runs</b> have no human at the keyboard, so a simulated coordinator picks the agents' top-ranked option. The activity feed labels all of these.</li>
+</ul>
+<div class="tech"><span class="tag">Why the fallbacks were redesigned</span>The first version waited until 15 minutes before the food spoiled. In testing, every option by then took 25 minutes, so food arrived spoiled. Now the deadline is computed from the options themselves (the latest safe departure, minus 2 minutes), so the fallback always leaves a plan that still works.</div>
+</div>
+
+<!-- ============ 8 ============ -->
+<div class="section">
+<h2><span class="num">8</span>The wider agent network</h2>
+<p class="lead">Beyond the three negotiators, every shelter and every driver has its own agent. Together they behave like a small marketplace with no central dispatcher.</p>
+<div class="grid2">
+<div class="card"><h4>Business agent</h4><p>Announces the surplus to the network: what it is, how much, and how long it's safe.</p></div>
+<div class="card"><h4>Shelter agents</h4><p>Each answers from its own situation: accept all, counter-offer to take only part (for example "12 of 30, we're low on room"), or decline with a reason.</p></div>
+<div class="card"><h4>Driver agents</h4><p>Each bids on each trip with an arrival time, a price and its reliability, or refuses a trip beyond its range (volunteers drive 12 km at most by default).</p></div>
+<div class="card"><h4>Speed, Cost, Need</h4><p>Negotiate over every (shelter offer × driver bid) combination that passed the safety rules.</p></div>
+</div>
+<h3>What makes the network adaptive</h3>
+<table>
+<tr><th>Behaviour</th><th>How it works</th></tr>
+<tr><td><b>Discovery</b></td><td>Agents search a directory of shelters by capability (food types, fridge, hours, room). A new pantry can join mid-run, and waiting donations are reconsidered.</td></tr>
+<tr><td><b>Re-planning</b></td><td>A shelter saying "full" or a driver cancelling sends the donation back to the agents. If the driver already has the food, they re-plan from the driver's position.</td></tr>
+<tr><td><b>Learning who was right</b></td><td>A driver who cancels loses 30 points of reliability, and every agent sees it. An agent that warned about that driver gains +0.25 vote weight for the rest of the run.</td></tr>
+<tr><td><b>Split donations</b></td><td>If the winning plan is a counter-offer, the rest of the food is split off and announced again, so nothing is left behind.</td></tr>
+<tr><td><b>Combined trips</b></td><td>Two donations from the same pickup can ride in one vehicle (up to 150 servings), keeping another driver free. Cost values this.</td></tr>
+<tr><td><b>Shelter phones</b></td><td>When a person is answering a shelter's phone page, the agents ask first and hold the driver for up to 8 simulated minutes, then try elsewhere.</td></tr>
+</table>
+</div>
+
+<!-- ============ 9 ============ -->
+<div class="section">
+<h2><span class="num">9</span>Reading the photo</h2>
+<p class="lead">The AI model only does what it's good at: naming the food and counting what it can see. Uplink's code does the math, so the same count always gives the same numbers.</p>
+<ol>
+<li><b>Prepare the photo.</b> Fix its rotation, shrink it to 1568 pixels on the long side, and convert iPhone HEIC photos to JPEG. This happens in the browser and again on the server.</li>
+<li><b>The model identifies and counts.</b> For each kind of food it gives a count range (a range when some is hidden), says how it counted ("3 rows of 4"), lists likely allergens, and states its confidence: high, medium or low.</li>
+<li><b>Code computes the rest</b> from a unit table: 1 bagel ≈ 1 serving and 0.25 lb, 1 pizza slice ≈ 1 serving, 1 catering tray ≈ 10 servings. Safe time comes from the category (hot prepared about 2 hours, cold about 90 minutes, packaged 24 hours).</li>
+<li><b>The business checks.</b> Low-confidence counts are highlighted, and every field can be edited before confirming.</li>
+<li><b>Never a fake answer.</b> If the call fails or the photo isn't food, the form comes back empty with the reason. With no model connected, a clearly labeled demo result appears instead.</li>
+</ol>
+<h3>Two ways to run the model</h3>
+<table>
+<tr><th>Option</th><th>How</th><th>Tradeoffs</th></tr>
+<tr><td><b>Claude</b> (current)</td><td>Anthropic's API, through the official Python SDK. Key in <code>.env</code>.</td><td>Most accurate; about 2 to 4 cents per photo; needs internet</td></tr>
+<tr><td><b>Qwen2.5-VL on an NVIDIA Brev GPU</b> (backup)</td><td>An open model served by vLLM on a rented L4 GPU, reached through a private tunnel. <code>scripts/start_vision.sh</code></td><td>No API key needed; less accurate; about $0.90 per hour while running</td></tr>
+</table>
+<div class="tech"><span class="tag">Tested result</span>A photo of a cut vegetable pizza came back as "vegetable pizza, 8 slices, high confidence", noting one slice had a bite taken out. A busy bagel display came back as 23 labelled kinds, 240 to 367 bagels, low confidence, which is honest because many were stacked out of sight.</div>
+<h3>The camera at the business</h3>
+<p><code>camera.py</code> watches the counter with a fast on-device detector (YOLO-World) that counts food live. At closing time it sends one snapshot to the vision model, which splits the leftovers into one donation per food category, since safety rules differ by category. Video never leaves the laptop.</p>
+</div>
+
+<!-- ============ 10 ============ -->
+<div class="section">
+<h2><span class="num">10</span>Voices</h2>
+<p class="lead">With an ElevenLabs key, the debate can be heard, and shelters can answer by speaking.</p>
+<ul>
+<li><b>The agents speak.</b> Turn on Demo controls → Sound → Voices on the ops dashboard. Speed, Cost and Need each read their lines in a different voice, and a dispatcher voice announces the outcome. Each line waits for the previous one to finish.</li>
+<li><b>The shelter hears requests.</b> On the shelter phone page, turn Voice on, and each new request is read aloud.</li>
+<li><b>The shelter answers out loud.</b> Tap "Answer by voice" and say "yes", "no", or a number like "just 20". ElevenLabs turns speech into text, and Uplink's code turns that into accept, decline or take part.</li>
+<li><b>No key?</b> It falls back to the browser's built-in voice and speech recognition.</li>
+</ul>
+</div>
+
+<!-- ============ 11 ============ -->
+<div class="section">
+<h2><span class="num">11</span>The two websites</h2>
+<p class="lead">Two audiences, two sites. The customer site shows what a real business would use. The ops dashboard shows judges what happens behind the scenes.</p>
+<h3>Customer site · <code>/</code></h3>
+<p>Built for a busy café manager who isn't technical. No agent jargon anywhere, only outcomes.</p>
+<table>
+<tr><th>Page</th><th>What it shows</th></tr>
+<tr><td>Home</td><td>"Leftover food? We'll get it picked up." One button: Schedule a pickup.</td></tr>
+<tr><td>Schedule</td><td>3 steps: photo (or type it in) → "Does this look right?" summary → scheduled</td></tr>
+<tr><td>Track</td><td>A status timeline (Received → Finding a place → Driver assigned → Picked up → Delivered), the shelter and arrival time in big text, and a map of only this pickup. If Uplink needs an answer, a simple yes/no question appears here.</td></tr>
+<tr><td>My donations</td><td>Past donations and printable SB 1383 receipts, with CSV download</td></tr>
+<tr><td>Help</td><td>Short answers: what food is accepted, is it safe, what it costs (free), what record you get</td></tr>
+</table>
+<h3>Ops dashboard · <code>/ops</code></h3>
+<table>
+<tr><th>Page</th><th>What it shows</th></tr>
+<tr><td>Live</td><td>The current donation, the three agents' positions, the outcome in plain words, and the city map. "See the debate" opens the full transcript and vote matrix.</td></tr>
+<tr><td>Decisions</td><td>The coordinator's inbox: escalations with options and a "decide by" time. A red badge in the nav shows the count.</td></tr>
+<tr><td>Activity</td><td>Agent network messages, agent feed, safety decision log, donations list</td></tr>
+<tr><td>Evidence</td><td>Team versus baselines across scripted and randomized scenarios</td></tr>
+<tr><td>Records · How it works</td><td>Printable SB 1383 records; a short visual explanation for judges</td></tr>
+<tr><td>Demo controls</td><td>Scenario picker, speed, pause, voices, and "inject a problem" buttons: shelter full, driver cancels, new pantry joins, camera closing time</td></tr>
+</table>
+<p>The shelter phone page (<code>/shelter</code>) is a third, phone-sized page a teammate can hold on stage to play a shelter.</p>
+</div>
+
+<!-- ============ 12 ============ -->
+<div class="section newpage">
+<h2><span class="num">12</span>Evidence: does the team do better?</h2>
+<p class="lead">The Cisco challenge asks: "Can independent AI agents make better decisions together than they can individually?" Uplink answers with numbers from repeatable scenarios.</p>
+<p>The same 9 scripted scenarios run under five decision policies. <b>Nearest shelter</b> uses no agents and no safety checks. <b>Speed, Cost or Need alone</b> use the same safety rules as the team, but one agent decides by itself.</p>
+<div class="grid2">
+<div class="chart"><h4>Servings lost (lower is better)</h4>
+<div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:100%;display:block"></span></span><span class="val">171</span></div>
+<div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:0%;display:block"></span></span><span class="val">0</span></div>
+<div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:0%;display:block"></span></span><span class="val">0</span></div>
+<div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:0%;display:block"></span></span><span class="val">0</span></div>
+<div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:0%;display:block"></span></span><span class="val">0</span></div>
+</div>
+<div class="chart"><h4>Shelters fed (higher is better)</h4>
+<div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:73.9%;display:block"></span></span><span class="val">17</span></div>
+<div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:87%;display:block"></span></span><span class="val">20</span></div>
+<div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:87%;display:block"></span></span><span class="val">20</span></div>
+<div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:95.7%;display:block"></span></span><span class="val">22</span></div>
+<div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:100%;display:block"></span></span><span class="val">23</span></div>
+</div>
+<div class="chart"><h4>Money spent on drivers (lower is better)</h4>
+<div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:71.7%;display:block"></span></span><span class="val">$186</span></div>
+<div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:100%;display:block"></span></span><span class="val">$260</span></div>
+<div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:38.2%;display:block"></span></span><span class="val">$99</span></div>
+<div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:77%;display:block"></span></span><span class="val">$200</span></div>
+<div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:87.9%;display:block"></span></span><span class="val">$229</span></div>
+</div>
+<div class="chart"><h4>Times a human was asked</h4>
+<div class="bar"><span class="lbl">Nearest shelter</span><span class="track"><span class="fill" style="width:0%;display:block"></span></span><span class="val">0</span></div>
+<div class="bar"><span class="lbl">Speed alone</span><span class="track"><span class="fill" style="width:16.7%;display:block"></span></span><span class="val">1</span></div>
+<div class="bar"><span class="lbl">Cost alone</span><span class="track"><span class="fill" style="width:16.7%;display:block"></span></span><span class="val">1</span></div>
+<div class="bar"><span class="lbl">Need alone</span><span class="track"><span class="fill" style="width:16.7%;display:block"></span></span><span class="val">1</span></div>
+<div class="bar"><span class="lbl"><b>Agents together</b></span><span class="track"><span class="fill team" style="width:100%;display:block"></span></span><span class="val">6</span></div>
+</div>
+</div>
+<p class="small">All 9 scripted scenarios combined, rules mode, from <code>python scenarios.py</code> on October 10, 2026. Meals delivered safely: 763 for nearest shelter, 934 for every other policy.</p>
+<h3>What the numbers say (honestly)</h3>
+<ol>
+<li><b>The safety rules matter most.</b> Nearest shelter lost 171 servings; every policy with the safety rules lost none, including one agent deciding alone.</li>
+<li><b>The team spreads food most fairly.</b> It fed 23 shelters, more than any single agent.</li>
+<li><b>The team is not the cheapest.</b> It spent $229, more than Cost alone ($99), because it pays for reliable couriers and fairness. That is the tradeoff, and we say so.</li>
+<li><b>Refusing bad compromises involves people.</b> The team asked a human 6 times, where single agents just acted. That is by design: those are the cases where agreeing would have been wrong.</li>
+<li><b>Real disagreement needs red lines.</b> Before red lines were added, every negotiation in the original scenarios ended in full agreement. Now the team's 48 decisions ended: consensus 40, unacceptable compromise 4, insufficient evidence 2, majority 1, irreconcilable 1.</li>
+</ol>
+<div class="tech"><span class="tag">Randomized check</span>The dashboard's Evidence page also runs 50 randomized scenarios (3 to 6 donations each, with no-shows, full shelters and new pantries) against the nearest-shelter baseline. In the run we checked, the agents lost 77% less food, delivered 22% more meals and spent 14% less on drivers, and lost more food than the baseline in 0 of 50 runs. Random runs vary slightly each time.</div>
+</div>
+
+<!-- ============ 13 ============ -->
+<div class="section">
+<h2><span class="num">13</span>What's real and what's simulated</h2>
+<p class="lead">The agents and their decisions are real. The world around them is simulated, which judges expect at a hackathon.</p>
+<div class="grid2">
+<div class="card"><h4>Real</h4><p>• Photo reading by a vision model (Claude, or Qwen on a GPU)<br>• The agent loop: offers, bids, proposals, votes, red lines, outcomes<br>• Re-planning when a shelter declines or a driver cancels<br>• Safety rules and fallback rules<br>• Human approvals, business answers, shelter replies (tap or voice)<br>• Generated donation records<br>• Voices and speech recognition (with keys)</p></div>
+<div class="card"><h4>Simulated</h4><p>• Shelters, drivers and businesses: fictional, placed near Santa Clara<br>• The clock: 1 simulated minute = 1 real second at 1× speed<br>• Driver movement along straight lines<br>• Events like a full shelter, a no-show or a new pantry, triggered from Demo controls or scripted scenarios</p></div>
+</div>
+<p style="margin-top:10pt">Skipped on purpose: logins and accounts, payments, real traffic routing, and training our own model.</p>
+</div>
+
+<!-- ============ 14 ============ -->
+<div class="section">
+<h2><span class="num">14</span>Code map</h2>
+<table>
+<tr><th>File</th><th>What it does</th></tr>
+<tr><td><code>app.py</code></td><td>Flask server: page routes, the JSON API, the clock thread and the planner thread</td></tr>
+<tr><td><code>world.py</code></td><td>The simulated city: directory, safety rules, drivers, clock, events, routes, records, fallback rules, the baseline and single-agent policies</td></tr>
+<tr><td><code>network.py</code></td><td>Shelter agents (accept, counter, decline) and driver agents (bid or refuse)</td></tr>
+<tr><td><code>agents.py</code></td><td>Speed, Cost and Need: scoring, red lines, the negotiation protocol, the evidence check, optional Claude reasoning</td></tr>
+<tr><td><code>config.py</code></td><td>Every tuning knob in one place: thresholds, timeouts, limits, speeds</td></tr>
+<tr><td><code>vision.py</code></td><td>Photo → food details: preparation, the counting prompt, the unit table, failure handling</td></tr>
+<tr><td><code>llm.py</code>, <code>env.py</code></td><td>Model wrapper (Claude SDK or an OpenAI-style server) and loading keys from <code>.env</code></td></tr>
+<tr><td><code>voice.py</code></td><td>ElevenLabs text-to-speech and speech-to-text; understanding "yes", "no" and numbers</td></tr>
+<tr><td><code>camera.py</code></td><td>The business camera: live food counting, closing-time snapshot</td></tr>
+<tr><td><code>scenarios.py</code></td><td>9 scripted scenarios and the five-policy comparison</td></tr>
+<tr><td><code>static/</code></td><td>Web pages: customer site (<code>app.*</code>), ops dashboard (<code>dashboard.*</code>), shelter phone, records, shared styles</td></tr>
+<tr><td><code>data/</code></td><td>Fictional shelters, drivers and businesses</td></tr>
+<tr><td><code>tests/test_core.py</code></td><td>30 automated checks, such as cold food never going without a fridge</td></tr>
+<tr><td><code>scripts/</code></td><td>Brev GPU setup, start and stop scripts; the photo accuracy test</td></tr>
+<tr><td><code>docs/</code></td><td>Architecture, results, Brev setup guide, and this document</td></tr>
+</table>
+</div>
+
+<!-- ============ 15 ============ -->
+<div class="section">
+<h2><span class="num">15</span>How to run it</h2>
+<div class="tech"><span class="tag">Start the app</span>
+<code>cd ~/uplink</code><br>
+<code>source .venv/bin/activate</code><br>
+<code>pip install -r requirements.txt</code> (first time only)<br>
+<code>PORT=5050 python app.py</code>
+</div>
+<table>
+<tr><th>Page</th><th>Address</th></tr>
+<tr><td>Customer site</td><td><code>http://localhost:5050</code></td></tr>
+<tr><td>Ops dashboard</td><td><code>http://localhost:5050/ops</code></td></tr>
+<tr><td>Shelter phone</td><td><code>http://localhost:5050/shelter?id=northside-youth</code></td></tr>
+<tr><td>Records</td><td><code>http://localhost:5050/records</code></td></tr>
+</table>
+<p>On a phone on the same Wi-Fi, replace <code>localhost</code> with the laptop's IP address. Campus Wi-Fi sometimes blocks this; a phone hotspot works.</p>
+<h3>Keys and settings (in <code>.env</code>, never committed)</h3>
+<table>
+<tr><th>Setting</th><th>Effect</th></tr>
+<tr><td><code>ANTHROPIC_API_KEY</code></td><td>Claude reads photos (and, with <code>LLM_AGENTS=1</code>, writes the agents' arguments)</td></tr>
+<tr><td><code>ELEVENLABS_API_KEY</code></td><td>Real voices for the debate and shelter phone</td></tr>
+<tr><td><code>LLM_AGENTS=1</code></td><td>Agents reason with Claude instead of rules</td></tr>
+<tr><td>none</td><td>Everything runs: a labeled demo photo result, rules-based agents, the browser's voice</td></tr>
+</table>
+<p>Run the checks with <code>python tests/test_core.py</code> and the evidence with <code>python scenarios.py</code>.</p>
+</div>
+
+<!-- ============ 16 ============ -->
+<div class="section">
+<h2><span class="num">16</span>Explaining Uplink to others</h2>
+<h3>The 3-minute demo</h3>
+<ol>
+<li><b>Problem (30 s).</b> Businesses throw away edible food, and California now requires many to donate it. But donating is a hassle full of tradeoffs.</li>
+<li><b>Photo (20 s).</b> Photograph real leftover food on the customer site. The details fill in.</li>
+<li><b>Agents negotiate (40 s).</b> On <code>/ops</code>, Speed, Cost and Need argue, the safety rules remove an unsafe shelter, and a truck starts moving.</li>
+<li><b>Things change (45 s).</b> Click "Shelter says full": they reroute. Click "Driver cancels": reliability drops and the agent that warned gains weight. Run a deadlock scenario: they ask a human.</li>
+<li><b>Evidence (25 s).</b> The Evidence page: team versus single agents and the simple baseline.</li>
+<li><b>Close (20 s).</b> "Our agents negotiate real tradeoffs with no boss, safety is never up for debate, and they ask a human when they truly can't agree."</li>
+</ol>
+<h3>Answers to likely questions</h3>
+<div class="qa">
+<div><b>Who makes the final decision?</b>No single agent. A plan wins by agreement, or by majority after up to 3 rounds without a veto; otherwise a person decides.</div>
+<div><b>What if the agents never agree?</b>After 3 rounds, or if the best plan crosses a red line or costs over $25, a coordinator gets the question with both sides' reasons and a deadline.</div>
+<div><b>Is the AI deciding whether food is safe?</b>No. Safety is fixed rules in code (time, refrigeration, allergens, capacity, hours) that remove unsafe plans before any agent sees them.</div>
+<div><b>How do you know this beats a simple approach?</b>We ran the same scenarios against a nearest-shelter baseline and against each agent alone. See section 12, including where the team costs more.</div>
+<div><b>How do you know the amount from a photo?</b>The model counts what it can see and gives a range and a confidence level. Code computes servings and weight, and the business confirms or corrects every number.</div>
+<div><b>Is this real?</b>The agents, photo reading, safety rules and records are real. The city, drivers and clock are simulated for the demo.</div>
+<div><b>How is this different from Copia?</b>Copia makes businesses enter details and coordinate. Uplink cuts it to one photo, and the agents handle matching, failures, tradeoffs and paperwork.</div>
+</div>
+</div>
+
+<!-- ============ 17 ============ -->
+<div class="section">
+<h2><span class="num">17</span>Glossary</h2>
+<table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Agent</td><td>A piece of software with its own goal that makes decisions on its own</td></tr>
+<tr><td>Agentic workflow</td><td>A process where agents act, react to events and re-plan, instead of following fixed steps once</td></tr>
+<tr><td>Consensus</td><td>All three agents accept the same plan</td></tr>
+<tr><td>Majority with dissent</td><td>Two of three accept; the third's objection is kept on record</td></tr>
+<tr><td>Red line / veto</td><td>A limit one agent never accepts crossing; a majority can't override it</td></tr>
+<tr><td>Unacceptable compromise</td><td>The majority's plan crosses the third agent's red line, so a person decides</td></tr>
+<tr><td>Irreconcilable</td><td>After 3 rounds no plan has majority support, so a person decides</td></tr>
+<tr><td>Insufficient evidence</td><td>The decision depends on a fact nobody has confirmed, so the agents ask before guessing</td></tr>
+<tr><td>Safety rules</td><td>Fixed code that removes unsafe plans before negotiation</td></tr>
+<tr><td>Fallback rule</td><td>A disclosed automatic action when nobody answers in time, so food doesn't spoil</td></tr>
+<tr><td>Baseline</td><td>A simple comparison policy (nearest shelter, or one agent alone) used to measure the team</td></tr>
+<tr><td>Counter-offer</td><td>A shelter offering to take only part of a donation; the rest is re-announced</td></tr>
+<tr><td>Vision model</td><td>AI that understands images; here, it identifies and counts food</td></tr>
+<tr><td>vLLM / Brev</td><td>Software that serves an open AI model; Brev rents the NVIDIA GPU it runs on</td></tr>
+<tr><td>SB 1383</td><td>California law requiring many food businesses to donate edible surplus food and keep records</td></tr>
+<tr><td>AGNTCY</td><td>Cisco's open-source infrastructure for agent discovery and messaging (optional for this track)</td></tr>
+</table>
+</div>
+
+</body>
+</html>
