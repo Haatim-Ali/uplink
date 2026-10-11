@@ -451,6 +451,18 @@ def test_agntcy_off_means_in_process_and_same_answers():
     assert agntcy_bridge.offers(w, d, list(w.nonprofits.values())) is None   # caller falls back to in-process
 
 
+def test_new_information_opens_the_replan_and_each_agent_says_if_it_changed_its_mind():
+    w = World(copy.deepcopy(scenarios.SCENARIOS["volunteer_no_show"]), live=False)
+    for _ in range(60):
+        w.tick()
+    replans = [n for n in w.negotiations if n.get("new_info")]
+    assert replans, "a driver cancelled, so some negotiation should carry the new information"
+    first = replans[0]["rounds"][0]["messages"]
+    assert first[0]["type"] == "news" and "cancelled" in first[0]["text"]
+    assert {m["agent"] for m in first if m["type"] == "revise"} == {"Speed", "Cost", "Need"}
+    assert any(m["text"].startswith("That changes my pick") for m in first if m["type"] == "revise")
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

@@ -136,7 +136,7 @@ details.more summary::-webkit-details-marker{display:none}
 .debate{max-height:14rem;overflow:auto;border:1px solid var(--line);border-radius:var(--r2);padding:.5rem;margin:.8rem 0;background:var(--panel-2);scroll-behavior:smooth}
 .bubble{padding:.45rem .65rem;margin:.3rem 0;border-radius:var(--r2);background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--line-2);font-size:var(--t-sm);line-height:1.4}
 .bubble.Speed{border-left-color:var(--speed)}.bubble.Cost{border-left-color:var(--cost)}.bubble.Need{border-left-color:var(--need)}
-.bubble.objection{background:var(--panel)8f8}
+.bubble.objection{background:var(--bad-soft)}
 .b-who{font-weight:800;margin-right:.35rem}
 .bubble.Speed .b-who{color:var(--speed)}.bubble.Cost .b-who{color:var(--cost)}.bubble.Need .b-who{color:var(--need)}
 .b-r{font:600 var(--t-xs) var(--mono);color:var(--muted);background:var(--chip);border-radius:4px;padding:.05rem .35rem;margin-right:.4rem}
@@ -454,3 +454,9 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .wire-right{display:inline-flex;align-items:center;gap:.75rem}
 .xport{font-family:var(--mono);font-weight:500;color:var(--muted)}
 .xport.on{color:var(--ok);border-color:var(--ok)}
+
+/* the effect of new information */
+.bubble.news{background:var(--warn-soft);border-left:3px solid var(--warn);color:var(--ink);font-weight:600}
+.bubble.news .b-who{color:var(--warn-ink)}
+.bubble.revise{border-left:3px solid currentColor}
+.wire-log .k-news .kd,.wire-log .k-revise .kd{color:var(--warn)}

@@ -648,7 +648,7 @@ function drawWire(){
 
   // the message log: network messages, then the debate lines as they're revealed
   const log = msgs.map(m => ({t:m.time, from:m.from, to:m.to === "network" ? "all shelters" : m.to, kind:m.kind, text:m.text}))
-    .concat(lines.slice(0, shown).map(l => ({t:n.time, from:l.agent, to:"team", kind:l.type === "objection" ? (/Veto/.test(l.text) ? "veto" : "object") : "propose", text:l.text.replace(/^R\d+ · /, "")})));
+    .concat(lines.slice(0, shown).map(l => ({t:n.time, from:l.agent === "News" ? "World" : l.agent, to:"team", kind:l.type === "objection" ? (/Veto/.test(l.text) ? "veto" : "object") : l.type === "news" ? "news" : l.type === "revise" ? "revise" : "propose", text:l.text.replace(/^R\d+ · /, "")})));
   if(done && n.plan) log.push({t:n.time, from:"Team", to:n.plan.np_name, kind:"decide", text:((OUTCOME[n.outcome]||{}).t || n.outcome) + ". " + n.plan.np_name + " via " + n.plan.driver_name});
   setHTML("wire-log", log.slice(-40).map(l => `<li class="k-${esc(l.kind)}"><span class="t">${esc(l.t||"")}</span><span class="r">${esc(short(l.from, 18))} → ${esc(short(l.to, 18))}</span><span class="kd">${esc(l.kind)}</span><span class="tx">${esc(l.text)}</span></li>`).join(""));
   const wl = $("wire-log"); wl.scrollTop = wl.scrollHeight;
