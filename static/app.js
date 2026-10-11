@@ -361,7 +361,7 @@ function drawTrackMap(d){
   if(tlayers.line){ tlayers.line.remove(); delete tlayers.line; }
   if(d.plan && d.dest){
     const pts = showDrv && d.status === "en_route" ? (d.picked ? [[drv.lat,drv.lng],[d.dest.lat,d.dest.lng]] : [[drv.lat,drv.lng],[d.origin.lat,d.origin.lng],[d.dest.lat,d.dest.lng]]) : [[d.origin.lat,d.origin.lng],[d.dest.lat,d.dest.lng]];
-    tlayers.line = L.polyline(pts, {color:"#f05a22", weight:4, opacity:.8}).addTo(tmap);
+    tlayers.line = L.polyline(pts, {color:"#2563eb", weight:4, opacity:.8}).addTo(tmap);
   }
   const all = ["pickup","dest","drv"].filter(k => tlayers[k]).map(k => tlayers[k].getLatLng());
   const key = all.length + "|" + (showDrv ? 1 : 0);
@@ -409,7 +409,7 @@ function drawReceipt(){
     <div class="acts"><button class="btn primary" type="button" onclick="window.print()">Print receipt</button><a class="btn" href="#/donations">Back</a></div></div>`);
 }
 
-route(); refresh(); setInterval(refresh, 1500);
+route(); refresh(); setInterval(refresh, 1500;
 
 // "Closing up": straight to the camera, the way a register's end-of-day button goes straight to the count
 const closingBtn = document.getElementById("closing-up");

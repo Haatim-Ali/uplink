@@ -6,13 +6,13 @@
   --bg:#f2f2f3; --panel:#ffffff; --panel-2:#f7f7f8; --ink:#18181a; --ink-2:#3a3a3e; --muted:#6a6a70; --faint:#8b8b92;
   --line:#ebebee; --line-2:#d9d9de;
   /* brand */
-  --brand:#f05a22; --brand-ink:#c2410c; --brand-soft:#fff0e8; --nav:#151517; --nav-2:#2a2a2e;
+  --brand:#2563eb; --brand-ink:#1d4ed8; --brand-soft:#eaf2ff; --nav:#151517; --nav-2:#2a2a2e;
   --amber:#f5a524; --amber-ink:#8a5300;
   /* agents (each also has an icon + name wherever it appears) */
   --speed:#0f8a8a; --speed-soft:#e3f5f5; --cost:#2563c9; --cost-soft:#e9f0fc; --need:#7c3aed; --need-soft:#f1ebfe;
   /* semantic */
   --ok:#1e9a52; --ok-soft:#e6f6ec; --bad:#d63a2f; --bad-soft:#fdecea; --warn:#a35f00; --warn-soft:#fff3dc;
-  --info:#c2410c; --info-soft:#fff0e8;
+  --info:#1d4ed8; --info-soft:#eaf2ff;
   --ok-ink:#14612f; --bad-ink:#991b1b; --warn-ink:#7c4806; --need-ink:#5b21b6; --info-ink:#1e40af; --chip:#e7eae8;
   /* legacy aliases used by older rules */
   --safety:#d63a2f; --result:#2563c9; --human:#a35f00; --adapt:#1e9a52; --world:#6a6a70; --intake:#3a3a3e;
@@ -29,10 +29,10 @@
 :root[data-theme="dark"]{
   --bg:#0c0c0e; --panel:#141417; --panel-2:#1b1b1f; --ink:#ecebe8; --ink-2:#c9c8c4; --muted:#9a9aa3; --faint:#6f6f78;
   --line:#26262c; --line-2:#34343b; --nav:#0c0c0e; --nav-2:#1b1b1f; --chip:#22222a;
-  --brand:#f26a30; --brand-ink:#ff8a57; --brand-soft:rgba(242,106,48,.14);
+  --brand:#3b82f6; --brand-ink:#93c5fd; --brand-soft:rgba(59,130,246,.14);
   --speed:#2dd4bf; --speed-soft:rgba(45,212,191,.12); --cost:#60a5fa; --cost-soft:rgba(96,165,250,.12); --need:#c084fc; --need-soft:rgba(192,132,252,.12);
   --ok:#34d399; --ok-soft:rgba(52,211,153,.13); --bad:#f87171; --bad-soft:rgba(248,113,113,.13); --warn:#fbbf24; --warn-soft:rgba(251,191,36,.13);
-  --info:#ff8a57; --info-soft:rgba(242,106,48,.14);
+  --info:#93c5fd; --info-soft:rgba(59,130,246,.14);
   --ok-ink:#6ee7b7; --bad-ink:#fca5a5; --warn-ink:#fcd34d; --need-ink:#d8b4fe; --info-ink:#93c5fd;
   --shadow:none; --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
   color-scheme:dark;
