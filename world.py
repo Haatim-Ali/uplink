@@ -9,6 +9,7 @@ import math
 import os
 
 import agents
+import agntcy_bridge
 import network
 from config import (COST_LIMIT, HANDOFF_MIN, HUMAN_TIMEOUT, JOIN_EXTRA_MIN, PHONE_ONLINE_SECONDS,
                     MIN_LOT, RELIABILITY_PENALTY, SAFETY_MARGIN, SHELTER_TIMEOUT, SPEED_KMH, START,
@@ -220,9 +221,11 @@ class World:
                      f"safe until {hhmm(d['safe_until'])}. {len(ok)} shelters can safely take it.")
             d["announced"] = True
         # each shelter agent answers from its own point of view
+        # with AGNTCY on, this is one A2A broadcast over NATS to the shelter agents (agntcy_bridge.py)
+        remote = agntcy_bridge.offers(self, d, ok) if (log and self.live) else None
         offers = {}
         for n in ok:
-            o = network.shelter_offer(self, n, d)
+            o = remote[n["id"]] if remote else network.shelter_offer(self, n, d)
             offers[n["id"]] = o
             if log:
                 self.net(d, n["name"], d["business_name"], o["kind"], o["reason"])
@@ -230,23 +233,28 @@ class World:
         # each driver agent bids on each trip
         plans, late, refused = [], 0, 0
         bids_by_driver = {}
+        trips = []
         for n in ok:
-            o = offers[n["id"]]
             for dr in self.usable_drivers(d, n):
                 p = self.make_plan(d, n, dr)
                 if p["arrive"] > d["safe_until"] - SAFETY_MARGIN or p["arrive"] > n["open_min"]:
                     late += 1
                     continue
-                bid = network.driver_bid(self, dr, d, n, p)
-                if not bid["willing"]:
-                    refused += 1
-                    bids_by_driver.setdefault(dr["name"], []).append(f"declines {n['name']}: {bid['reason']}")
-                    continue
-                p["servings"] = o["servings"]
-                p["partial"] = o["kind"] == "counter"
-                p["offer"] = o["reason"]
-                bids_by_driver.setdefault(dr["name"], []).append(f"{n['name']}: {bid['reason']}")
-                plans.append(p)
+                trips.append((f"{n['id']}|{dr['id']}", dr, n, p))
+        # with AGNTCY on, one A2A broadcast to the driver agents carries every trip they could make
+        remote_bids = agntcy_bridge.bids(self, d, trips) if (log and self.live) else None
+        for key, dr, n, p in trips:
+            o = offers[n["id"]]
+            bid = remote_bids[key] if remote_bids else network.driver_bid(self, dr, d, n, p)
+            if not bid["willing"]:
+                refused += 1
+                bids_by_driver.setdefault(dr["name"], []).append(f"declines {n['name']}: {bid['reason']}")
+                continue
+            p["servings"] = o["servings"]
+            p["partial"] = o["kind"] == "counter"
+            p["offer"] = o["reason"]
+            bids_by_driver.setdefault(dr["name"], []).append(f"{n['name']}: {bid['reason']}")
+            plans.append(p)
         if log:
             for name, lines in bids_by_driver.items():
                 more = f" (+{len(lines) - 2} more)" if len(lines) > 2 else ""

@@ -382,6 +382,9 @@ function drawGlobal(){
   document.querySelectorAll("[data-k]").forEach(el=>{ el.textContent = vals[el.dataset.k]; if(el.hasAttribute("data-bad")) el.classList.toggle("nonzero", i.spoiled>0); });
   $("clock").textContent = S.now + (S.paused?" (paused)":"");
   $("mode").textContent = modeText(S.mode);
+  const ax = S.agntcy || {}, xp = $("xport");
+  if(xp){ xp.textContent = ax.on ? `AGNTCY · A2A over NATS · ${ax.agents} agents${ax.last_ms != null ? " · " + ax.last_ms + " ms" : ""}` : "in-process";
+    xp.title = ax.on ? `${ax.broadcasts} broadcasts, ${ax.messages} A2A messages so far` : (ax.reason || ""); xp.classList.toggle("on", !!ax.on); }
   $("pause").textContent = S.paused ? "Resume" : "Pause";
   drawCamera();
   const pend = pendingList(), c = $("dec-count");

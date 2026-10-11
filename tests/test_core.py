@@ -429,6 +429,28 @@ def test_spoken_leftovers_fill_in_the_menu():
         llm.available = saved
 
 
+# ---------- AGNTCY ----------
+
+def test_every_agent_has_an_a2a_card_and_an_oasf_record():
+    import app
+    app.state["world"] = World(live=True)
+    r = app.app.test_client().get("/agntcy/records").get_json()
+    w = app.state["world"]
+    assert r["count"] == len(w.businesses) + len(w.nonprofits) + len(w.drivers) + 3   # + Speed, Cost, Need
+    rec = r["records"][0]
+    assert rec["schema_version"] and rec["modules"][0]["name"] == "integration/a2a"
+    card = rec["modules"][0]["data"]["card_data"]
+    assert card["name"].startswith("uplink/") and card["preferredTransport"] == "natspatterns"
+
+
+def test_agntcy_off_means_in_process_and_same_answers():
+    import agntcy_bridge
+    assert not agntcy_bridge.enabled()   # tests never need a NATS server
+    w = World(live=True)
+    d = w.add_donation(dict(PIZZA), "campus-cafe")
+    assert agntcy_bridge.offers(w, d, list(w.nonprofits.values())) is None   # caller falls back to in-process
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

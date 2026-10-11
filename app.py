@@ -14,6 +14,7 @@ import env
 env.load()   # API keys from .env (gitignored) before anything reads them
 
 import agents  # noqa: E402
+import agntcy_bridge  # noqa: E402
 import llm  # noqa: E402
 import menu  # noqa: E402
 import scenarios  # noqa: E402
@@ -143,6 +144,7 @@ def api_state():
                  "agents_model": (os.getenv("AGENT_MODEL") or (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL if claude else os.getenv("OPENAI_MODEL", ""))) if agents.use_llm() else "",
                  "vision_model": (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL) if claude else (os.getenv("OPENAI_MODEL", "") if prov else "")}
     s["scenarios"] = [{"name": k, "title": v["title"]} for k, v in scenarios.SCENARIOS.items()]
+    s["agntcy"] = dict(agntcy_bridge.state)
     s["cameras"] = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
     return jsonify(s)
 
@@ -199,6 +201,23 @@ def api_menu_add(biz):
         return jsonify(item=menu.add(biz, request.get_json(silent=True) or {}))
     except ValueError as e:
         return jsonify(error=str(e)), 400
+
+
+# ---------------- AGNTCY: agent cards and OASF records ----------------
+
+@app.get("/agntcy/records")
+def agntcy_records():
+    """Every Uplink agent as an OASF record (AGNTCY's agent description format), ready for an AGNTCY Directory."""
+    with lock:
+        recs, how = agntcy_bridge.oasf_records(W())
+    return jsonify(records=recs, count=len(recs), converted_by=how, transport=agntcy_bridge.state)
+
+
+@app.get("/agntcy/cards")
+def agntcy_cards():
+    """Every Uplink agent's A2A AgentCard."""
+    with lock:
+        return jsonify(cards=agntcy_bridge.all_cards(W()))
 
 
 @app.post("/api/voice/donation")
@@ -389,6 +408,8 @@ def compare_results(n=50):
 if __name__ == "__main__":
     threading.Thread(target=clock_loop, daemon=True).start()
     threading.Thread(target=planner_loop, daemon=True).start()
+    st = agntcy_bridge.start(lambda: state["world"])   # shelter and driver agents on AGNTCY, if AGNTCY=1
+    print(f"Agent network: {st['transport']}" + (f" ({st['agents']} agents)" if st["on"] else f" · {st['reason']}"))
     threading.Thread(target=compare_results, daemon=True).start()   # warm the Evidence page in the background
     port = int(os.getenv("PORT", "5050"))   # 5000 is taken by AirPlay on Macs
     print("Uplink · food rescue agents")
