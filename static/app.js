@@ -95,11 +95,12 @@ function fillBusinesses(){
   const saved = store.get("uplink_biz");
   $("biz").innerHTML = bs.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join("");
   if(saved && bs.some(b => b.id === saved)) $("biz").value = saved;
+  loadMenu();
   const f = $("bizFilter"), cur = f.value || store.get("uplink_biz") || "all";
   f.innerHTML = `<option value="all">All businesses</option>` + bs.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join("");
   f.value = bs.some(b => b.id === cur) ? cur : "all";
 }
-$("biz").onchange = () => store.set("uplink_biz", $("biz").value);
+$("biz").onchange = () => { store.set("uplink_biz", $("biz").value); qty = {}; loadMenu(); };
 $("bizFilter").onchange = () => { if(S) drawDonations(); };
 function bizName(id){ const b = S && S.businesses.find(x => x.id === id); return b ? b.name : null; }
 
@@ -118,7 +119,7 @@ function setStep(n){
   [1,2,3].forEach(i => { const li = $("st"+i); li.className = i<n ? "done" : i===n ? "active" : ""; if(i===n) li.setAttribute("aria-current","step"); else li.removeAttribute("aria-current"); });
 }
 function resetSchedule(full){
-  $("sch-photo").hidden = false; $("sch-confirm").hidden = true; setStep(1);
+  $("sch-pick").hidden = false; $("sch-confirm").hidden = true; setStep(1);
   if(full){ photo = null; $("file").value = ""; $("preview").style.display = "none"; $("dropText").textContent = "Take or choose a photo"; $("analyze").disabled = true; }
 }
 $("file").onchange = e => {
@@ -178,6 +179,7 @@ function showSource(r){
   $("servings").classList.remove("check"); $("items").classList.remove("check");
   if(r.source === "demo"){ notice("warn", "This is a sample result (demo mode), not your photo. Please edit anything that's wrong."); }
   else if(r.source === "fallback"){ notice("bad", "We couldn't read this photo. Please fill in what you have."); openForm(true); }
+  else if(f.menu_matches){ notice("ok", `We matched ${f.menu_matches === 1 ? "1 item" : f.menu_matches + " items"} to your menu, so the allergens come from your recipes. Please check the amounts.`); }
   else if(f.confidence === "high"){ notice("ok", "We read your photo. Please check that it looks right."); }
   else { notice("warn", "We're not sure about the amount. Please check the number of servings."); openForm(true); }
 }
@@ -186,11 +188,11 @@ function fill(f){
   $("wlo").value = f.weight_lbs[0]; $("whi").value = f.weight_lbs[1]; $("category").value = f.category;
   $("allergens").value = f.allergens.join(", "); $("cold").checked = !!f.needs_cold; $("unsure").checked = !!f.allergens_unverified;
   $("err").hidden = true; openForm(false); drawSummary();
-  $("sch-photo").hidden = true; $("sch-confirm").hidden = false; setStep(2); window.scrollTo(0, 0);
+  $("sch-pick").hidden = true; $("sch-confirm").hidden = false; setStep(2); window.scrollTo(0, 0);
 }
 $("analyze").onclick = async () => {
   $("analyze").disabled = true; $("analyze").textContent = "Reading your photo…";
-  const fd = new FormData(); fd.append("photo", await shrink(photo), "photo.jpg");
+  const fd = new FormData(); fd.append("photo", await shrink(photo), "photo.jpg"); fd.append("business", $("biz").value);
   let r;
   try { r = await (await fetch("/api/vision", {method:"POST", body:fd})).json(); if(!r.food) throw new Error(); }
   catch(e){ r = {source:"fallback", food:{items:[],servings:1,safe_minutes:120,weight_lbs:[1,2],category:"hot prepared",allergens:[],needs_cold:false}}; }
@@ -395,4 +397,68 @@ route(); refresh(); setInterval(refresh, 1500);
 
 // "Closing up": straight to the camera, the way a register's end-of-day button goes straight to the count
 const closingBtn = document.getElementById("closing-up");
-if(closingBtn) closingBtn.onclick = () => { location.hash = "#/schedule"; $("file").click(); };
+if(closingBtn) closingBtn.onclick = () => { location.hash = "#/schedule"; showTab("photo"); $("file").click(); };
+
+// ---------- your menu: tap + on what's left; allergens come from the recipes ----------
+let menuItems = [], menuFor = null, qty = {};
+const KIND = {"hot prepared":"Hot", "cold prepared":"Cold", packaged:"Packaged", produce:"Produce"};
+function showTab(which){
+  const m = which === "menu";
+  $("tab-menu").setAttribute("aria-selected", String(m)); $("tab-photo").setAttribute("aria-selected", String(!m));
+  $("sch-menu").hidden = !m; $("sch-photo").hidden = m;
+}
+$("tab-menu").onclick = () => showTab("menu");
+$("tab-photo").onclick = () => showTab("photo");
+async function loadMenu(){
+  const biz = $("biz").value; if(!biz) return;
+  try{ menuItems = (await (await fetch("/api/menu/" + encodeURIComponent(biz))).json()).items || []; }catch(e){ menuItems = []; }
+  if(menuFor !== biz){ menuFor = biz; showTab(menuItems.length ? "menu" : "photo"); }
+  drawMenu();
+}
+function drawMenu(){
+  $("menuList").innerHTML = menuItems.map(m => {
+    const n = qty[m.id] || 0;
+    const serves = m.serves > 1 ? `Serves ${m.serves} per ${esc(m.unit)}` : `1 serving each`;
+    return `<li class="${n ? "on" : ""}"><div class="mi"><b>${esc(m.name)}</b><small>${serves}${m.allergens.length ? " · " + esc(m.allergens.join(", ")) : ""}</small>
+      <span class="kind">${KIND[m.category] || ""}${m.cold ? ", keep cold" : ""}${m.added ? " · added by you" : ""}</span></div>
+      <div class="qty"><button type="button" aria-label="One fewer ${esc(m.name)}" data-id="${esc(m.id)}" data-k="-1" ${n ? "" : "disabled"}>−</button>
+      <output aria-live="polite">${n}</output><button type="button" aria-label="One more ${esc(m.name)}" data-id="${esc(m.id)}" data-k="1">+</button></div></li>`;
+  }).join("") || `<li class="none">Your menu is empty. Add what you have below, or take a photo.</li>`;
+  const picked = menuItems.filter(m => qty[m.id] > 0);
+  const servings = picked.reduce((t, m) => t + qty[m.id] * m.serves, 0);
+  $("menuTotal").hidden = !picked.length || !$("addForm").hidden;   // don't cover the add form
+  $("mtCount").textContent = picked.length === 1 ? "1 item" : `${picked.length} items`;
+  $("mtServ").textContent = `About ${servings} servings`;
+}
+$("menuList").onclick = e => {
+  const b = e.target.closest("button[data-id]"); if(!b) return;
+  qty[b.dataset.id] = Math.max(0, (qty[b.dataset.id] || 0) + (+b.dataset.k));
+  drawMenu();
+};
+$("addToggle").onclick = () => { const f = $("addForm"); f.hidden = !f.hidden; $("addToggle").setAttribute("aria-expanded", String(!f.hidden)); drawMenu(); if(!f.hidden) $("newName").focus(); };
+$("addSave").onclick = async () => {
+  $("addErr").hidden = true;
+  const body = {name:$("newName").value, category:$("newKind").value, serves:+$("newServes").value || 1,
+    allergens:$("newAlg").value.split(",").map(x => x.trim()).filter(Boolean), cold:$("newKind").value === "cold prepared"};
+  try{
+    const r = await fetch("/api/menu/" + encodeURIComponent($("biz").value), {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+    const j = await r.json(); if(!r.ok) throw new Error(j.error || "Couldn't add it.");
+    qty[j.item.id] = (qty[j.item.id] || 0) + 1;
+    $("newName").value = ""; $("newAlg").value = ""; $("newServes").value = 1; $("addForm").hidden = true; $("addToggle").setAttribute("aria-expanded","false");
+    await loadMenu();
+  }catch(e){ $("addErr").textContent = e.message; $("addErr").hidden = false; }
+};
+$("menuConfirm").onclick = async () => {
+  const lines = Object.entries(qty).filter(([, n]) => n > 0).map(([id, n]) => ({id, qty:n}));
+  if(!lines.length) return;
+  $("menuConfirm").disabled = true; $("menuConfirm").textContent = "Scheduling…"; $("menuErr").hidden = true;
+  try{
+    const r = await post("/api/donate/menu", {business:$("biz").value, lines});
+    store.set("uplink_biz", $("biz").value); store.set("uplink_last", r.ids[0]); try{ sessionStorage.setItem("uplink_new", r.ids[0]); }catch(e){}
+    qty = {}; drawMenu();
+    location.hash = "#/track/" + r.ids[0];
+    refresh();
+  }catch(e){ $("menuErr").textContent = "We couldn't schedule this. Check your connection and try again."; $("menuErr").hidden = false; }
+  $("menuConfirm").disabled = false; $("menuConfirm").textContent = "Schedule pickup";
+};
+

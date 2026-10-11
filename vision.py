@@ -206,7 +206,7 @@ def analyze_many(image_bytes, media_type="image/jpeg", hint="nothing"):
         return [], "fallback"
 
 
-def analyze(image_bytes, media_type="image/jpeg"):
+def analyze(image_bytes, media_type="image/jpeg", menu_hint=""):
     if not llm.available():
         return normalize(DEMO), "demo"
     image_bytes, media_type = prepare(image_bytes, media_type)
@@ -215,7 +215,7 @@ def analyze(image_bytes, media_type="image/jpeg"):
     try:
         b64 = base64.b64encode(image_bytes).decode()
         data = llm.chat_json("You are a careful food-donation intake assistant. You count, you don't guess.",
-                             PROMPT, image_b64=b64, media_type=media_type, max_tokens=4000, effort="high")
+                             PROMPT + (menu_hint or ""), image_b64=b64, media_type=media_type, max_tokens=4000, effort="high")
     except Exception as e:  # noqa: BLE001 - any failure becomes a clear message, never fake food
         return failed(f"the vision model call failed: {type(e).__name__}")
     if data.get("is_food") is False:

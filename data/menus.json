@@ -1,0 +1,630 @@
+{
+ "campus-cafe": [
+  {
+   "name": "Pepperoni pizza",
+   "unit": "pizza",
+   "serves": 8,
+   "lbs": 2.5,
+   "category": "hot prepared",
+   "allergens": [
+    "dairy",
+    "gluten"
+   ],
+   "cold": false,
+   "id": "campus-cafe-1"
+  },
+  {
+   "name": "Cheese pizza",
+   "unit": "pizza",
+   "serves": 8,
+   "lbs": 2.3,
+   "category": "hot prepared",
+   "allergens": [
+    "dairy",
+    "gluten"
+   ],
+   "cold": false,
+   "id": "campus-cafe-2"
+  },
+  {
+   "name": "Turkey sandwich",
+   "unit": "sandwich",
+   "serves": 1,
+   "lbs": 0.6,
+   "category": "cold prepared",
+   "allergens": [
+    "gluten"
+   ],
+   "cold": true,
+   "id": "campus-cafe-3"
+  },
+  {
+   "name": "Caesar salad",
+   "unit": "salad",
+   "serves": 1,
+   "lbs": 0.5,
+   "category": "cold prepared",
+   "allergens": [
+    "dairy",
+    "eggs",
+    "fish"
+   ],
+   "cold": true,
+   "id": "campus-cafe-4"
+  },
+  {
+   "name": "Blueberry muffin",
+   "unit": "muffin",
+   "serves": 1,
+   "lbs": 0.25,
+   "category": "packaged",
+   "allergens": [
+    "gluten",
+    "eggs",
+    "dairy"
+   ],
+   "cold": false,
+   "id": "campus-cafe-5"
+  },
+  {
+   "name": "Chocolate chip cookie",
+   "unit": "cookie",
+   "serves": 1,
+   "lbs": 0.15,
+   "category": "packaged",
+   "allergens": [
+    "gluten",
+    "eggs",
+    "dairy"
+   ],
+   "cold": false,
+   "id": "campus-cafe-6"
+  },
+  {
+   "name": "Banana",
+   "unit": "banana",
+   "serves": 1,
+   "lbs": 0.3,
+   "category": "produce",
+   "allergens": [],
+   "cold": false,
+   "id": "campus-cafe-7"
+  }
+ ],
+ "tech-cafeteria": [
+  {
+   "name": "Turkey sandwich",
+   "unit": "sandwich",
+   "serves": 1,
+   "lbs": 0.6,
+   "category": "cold prepared",
+   "allergens": [
+    "gluten"
+   ],
+   "cold": true,
+   "id": "tech-cafeteria-1"
+  },
+  {
+   "name": "Veggie wrap",
+   "unit": "wrap",
+   "serves": 1,
+   "lbs": 0.5,
+   "category": "cold prepared",
+   "allergens": [
+    "gluten",
+    "soy"
+   ],
+   "cold": true,
+   "id": "tech-cafeteria-2"
+  },
+  {
+   "name": "Chicken teriyaki bowl",
+   "unit": "bowl",
+   "serves": 1,
+   "lbs": 0.9,
+   "category": "hot prepared",
+   "allergens": [
+    "soy",
+    "gluten"
+   ],
+   "cold": false,
+   "id": "tech-cafeteria-3"
+  },
+  {
+   "name": "Garden salad",
+   "unit": "salad",
+   "serves": 1,
+   "lbs": 0.4,
+   "category": "cold prepared",
+   "allergens": [],
+   "cold": true,
+   "id": "tech-cafeteria-4"
+  },
+  {
+   "name": "Yogurt parfait",
+   "unit": "cup",
+   "serves": 1,
+   "lbs": 0.4,
+   "category": "cold prepared",
+   "allergens": [
+    "dairy",
+    "nuts"
+   ],
+   "cold": true,
+   "id": "tech-cafeteria-5"
+  },
+  {
+   "name": "Apple",
+   "unit": "apple",
+   "serves": 1,
+   "lbs": 0.4,
+   "category": "produce",
+   "allergens": [],
+   "cold": false,
+   "id": "tech-cafeteria-6"
+  }
+ ],
+ "corner-bakery": [
+  {
+   "name": "Plain bagel",
+   "unit": "bagel",
+   "serves": 1,
+   "lbs": 0.25,
+   "category": "packaged",
+   "allergens": [
+    "gluten"
+   ],
+   "cold": false,
+   "id": "corner-bakery-1"
+  },
+  {
+   "name": "Sesame bagel",
+   "unit": "bagel",
+   "serves": 1,
+   "lbs": 0.25,
+   "category": "packaged",
+   "allergens": [
+    "gluten",
+    "sesame"
+   ],
+   "cold": false,
+   "id": "corner-bakery-2"
+  },
+  {
+   "name": "Butter croissant",
+   "unit": "croissant",
+   "serves": 1,
+   "lbs": 0.15,
+   "category": "packaged",
+   "allergens": [
+    "gluten",
+    "dairy",
+    "eggs"
+   ],
+   "cold": false,
+   "id": "corner-bakery-3"
+  },
+  {
+   "name": "Sourdough loaf",
+   "unit": "loaf",
+   "serves": 10,
+   "lbs": 1.5,
+   "category": "packaged",
+   "allergens": [
+    "gluten"
+   ],
+   "cold": false,
+   "id": "corner-bakery-4"
+  },
+  {
+   "name": "Granola bar",
+   "unit": "bar",
+   "serves": 1,
+   "lbs": 0.1,
+   "category": "packaged",
+   "allergens": [
+    "nuts",
+    "gluten"
+   ],
+   "cold": false,
+   "id": "corner-bakery-5"
+  },
+  {
+   "name": "Cinnamon roll",
+   "unit": "roll",
+   "serves": 1,
+   "lbs": 0.3,
+   "category": "packaged",
+   "allergens": [
+    "gluten",
+    "dairy",
+    "eggs"
+   ],
+   "cold": false,
+   "id": "corner-bakery-6"
+  }
+ ],
+ "lakeside-hotel": [
+  {
+   "name": "Chicken curry with rice",
+   "unit": "tray",
+   "serves": 15,
+   "lbs": 9,
+   "category": "hot prepared",
+   "allergens": [],
+   "cold": false,
+   "id": "lakeside-hotel-1"
+  },
+  {
+   "name": "Vegetable lasagna",
+   "unit": "tray",
+   "serves": 12,
+   "lbs": 8,
+   "category": "hot prepared",
+   "allergens": [
+    "dairy",
+    "gluten",
+    "eggs"
+   ],
+   "cold": false,
+   "id": "lakeside-hotel-2"
+  },
+  {
+   "name": "Roast vegetables",
+   "unit": "pan",
+   "serves": 10,
+   "lbs": 5,
+   "category": "hot prepared",
+   "allergens": [],
+   "cold": false,
+   "id": "lakeside-hotel-3"
+  },
+  {
+   "name": "Fruit platter",
+   "unit": "platter",
+   "serves": 12,
+   "lbs": 6,
+   "category": "cold prepared",
+   "allergens": [],
+   "cold": true,
+   "id": "lakeside-hotel-4"
+  },
+  {
+   "name": "Dinner rolls",
+   "unit": "bag",
+   "serves": 12,
+   "lbs": 1.5,
+   "category": "packaged",
+   "allergens": [
+    "gluten",
+    "dairy"
+   ],
+   "cold": false,
+   "id": "lakeside-hotel-5"
+  }
+ ],
+ "north-market": [
+  {
+   "name": "Apples",
+   "unit": "crate",
+   "serves": 40,
+   "lbs": 20,
+   "category": "produce",
+   "allergens": [],
+   "cold": false,
+   "id": "north-market-1"
+  },
+  {
+   "name": "Oranges",
+   "unit": "crate",
+   "serves": 40,
+   "lbs": 20,
+   "category": "produce",
+   "allergens": [],
+   "cold": false,
+   "id": "north-market-2"
+  },
+  {
+   "name": "Mixed greens",
+   "unit": "bag",
+   "serves": 6,
+   "lbs": 1,
+   "category": "produce",
+   "allergens": [],
+   "cold": true,
+   "id": "north-market-3"
+  },
+  {
+   "name": "Tomatoes",
+   "unit": "box",
+   "serves": 20,
+   "lbs": 10,
+   "category": "produce",
+   "allergens": [],
+   "cold": false,
+   "id": "north-market-4"
+  },
+  {
+   "name": "Bread loaf",
+   "unit": "loaf",
+   "serves": 10,
+   "lbs": 1.5,
+   "category": "packaged",
+   "allergens": [
+    "gluten"
+   ],
+   "cold": false,
+   "id": "north-market-5"
+  }
+ ],
+ "food-hall": [
+  {
+   "name": "Pad thai",
+   "unit": "container",
+   "serves": 1,
+   "lbs": 0.8,
+   "category": "hot prepared",
+   "allergens": [
+    "peanuts",
+    "eggs",
+    "soy",
+    "fish"
+   ],
+   "cold": false,
+   "id": "food-hall-1"
+  },
+  {
+   "name": "Chicken burrito",
+   "unit": "burrito",
+   "serves": 1,
+   "lbs": 0.7,
+   "category": "hot prepared",
+   "allergens": [
+    "gluten",
+    "dairy"
+   ],
+   "cold": false,
+   "id": "food-hall-2"
+  },
+  {
+   "name": "Margherita pizza",
+   "unit": "pizza",
+   "serves": 8,
+   "lbs": 2.3,
+   "category": "hot prepared",
+   "allergens": [
+    "dairy",
+    "gluten"
+   ],
+   "cold": false,
+   "id": "food-hall-3"
+  },
+  {
+   "name": "Sushi roll",
+   "unit": "roll",
+   "serves": 1,
+   "lbs": 0.4,
+   "category": "cold prepared",
+   "allergens": [
+    "fish",
+    "soy",
+    "sesame"
+   ],
+   "cold": true,
+   "id": "food-hall-4"
+  },
+  {
+   "name": "Falafel bowl",
+   "unit": "bowl",
+   "serves": 1,
+   "lbs": 0.8,
+   "category": "hot prepared",
+   "allergens": [
+    "sesame"
+   ],
+   "cold": false,
+   "id": "food-hall-5"
+  }
+ ],
+ "campus-dining": [
+  {
+   "name": "Pasta marinara",
+   "unit": "pan",
+   "serves": 20,
+   "lbs": 10,
+   "category": "hot prepared",
+   "allergens": [
+    "gluten"
+   ],
+   "cold": false,
+   "id": "campus-dining-1"
+  },
+  {
+   "name": "Grilled chicken",
+   "unit": "pan",
+   "serves": 20,
+   "lbs": 8,
+   "category": "hot prepared",
+   "allergens": [],
+   "cold": false,
+   "id": "campus-dining-2"
+  },
+  {
+   "name": "Steamed rice",
+   "unit": "pan",
+   "serves": 25,
+   "lbs": 8,
+   "category": "hot prepared",
+   "allergens": [],
+   "cold": false,
+   "id": "campus-dining-3"
+  },
+  {
+   "name": "Green salad",
+   "unit": "bowl",
+   "serves": 15,
+   "lbs": 3,
+   "category": "cold prepared",
+   "allergens": [],
+   "cold": true,
+   "id": "campus-dining-4"
+  },
+  {
+   "name": "Chocolate milk",
+   "unit": "carton",
+   "serves": 1,
+   "lbs": 0.5,
+   "category": "cold prepared",
+   "allergens": [
+    "dairy"
+   ],
+   "cold": true,
+   "id": "campus-dining-5"
+  },
+  {
+   "name": "Fresh fruit cup",
+   "unit": "cup",
+   "serves": 1,
+   "lbs": 0.3,
+   "category": "cold prepared",
+   "allergens": [],
+   "cold": true,
+   "id": "campus-dining-6"
+  }
+ ],
+ "grocer": [
+  {
+   "name": "Rotisserie chicken",
+   "unit": "chicken",
+   "serves": 4,
+   "lbs": 2.5,
+   "category": "hot prepared",
+   "allergens": [],
+   "cold": false,
+   "id": "grocer-1"
+  },
+  {
+   "name": "Canned soup",
+   "unit": "can",
+   "serves": 2,
+   "lbs": 0.8,
+   "category": "packaged",
+   "allergens": [
+    "gluten"
+   ],
+   "cold": false,
+   "id": "grocer-2"
+  },
+  {
+   "name": "Yogurt cups",
+   "unit": "cup",
+   "serves": 1,
+   "lbs": 0.3,
+   "category": "cold prepared",
+   "allergens": [
+    "dairy"
+   ],
+   "cold": true,
+   "id": "grocer-3"
+  },
+  {
+   "name": "Bananas",
+   "unit": "bunch",
+   "serves": 6,
+   "lbs": 2,
+   "category": "produce",
+   "allergens": [],
+   "cold": false,
+   "id": "grocer-4"
+  },
+  {
+   "name": "Whole wheat bread",
+   "unit": "loaf",
+   "serves": 10,
+   "lbs": 1.3,
+   "category": "packaged",
+   "allergens": [
+    "gluten",
+    "soy"
+   ],
+   "cold": false,
+   "id": "grocer-5"
+  },
+  {
+   "name": "Milk, 1 gallon",
+   "unit": "gallon",
+   "serves": 16,
+   "lbs": 8.6,
+   "category": "cold prepared",
+   "allergens": [
+    "dairy"
+   ],
+   "cold": true,
+   "id": "grocer-6"
+  }
+ ],
+ "caterer": [
+  {
+   "name": "Chicken alfredo",
+   "unit": "half tray",
+   "serves": 10,
+   "lbs": 6,
+   "category": "hot prepared",
+   "allergens": [
+    "dairy",
+    "gluten"
+   ],
+   "cold": false,
+   "id": "caterer-1"
+  },
+  {
+   "name": "Caprese skewers",
+   "unit": "tray",
+   "serves": 20,
+   "lbs": 3,
+   "category": "cold prepared",
+   "allergens": [
+    "dairy"
+   ],
+   "cold": true,
+   "id": "caterer-2"
+  },
+  {
+   "name": "Roasted salmon",
+   "unit": "half tray",
+   "serves": 8,
+   "lbs": 5,
+   "category": "hot prepared",
+   "allergens": [
+    "fish"
+   ],
+   "cold": false,
+   "id": "caterer-3"
+  },
+  {
+   "name": "Wild rice pilaf",
+   "unit": "half tray",
+   "serves": 12,
+   "lbs": 5,
+   "category": "hot prepared",
+   "allergens": [],
+   "cold": false,
+   "id": "caterer-4"
+  },
+  {
+   "name": "Mini desserts",
+   "unit": "tray",
+   "serves": 24,
+   "lbs": 3,
+   "category": "packaged",
+   "allergens": [
+    "gluten",
+    "dairy",
+    "eggs",
+    "nuts"
+   ],
+   "cold": false,
+   "id": "caterer-5"
+  }
+ ]
+}

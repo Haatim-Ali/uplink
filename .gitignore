@@ -6,3 +6,4 @@ scripts/.tunnel.pid
 scripts/.tunnel.log
 *.pt
 .tts_cache/
+data/menu_additions.json

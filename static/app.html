@@ -53,16 +53,45 @@
 <!-- Schedule -->
 <section class="view narrow" data-view="schedule" hidden>
   <ol class="steps" aria-label="Progress">
-    <li id="st1" class="active" aria-current="step"><span class="dot">1</span>Photo</li>
+    <li id="st1" class="active" aria-current="step"><span class="dot">1</span>Food</li>
     <li id="st2"><span class="dot">2</span>Confirm</li>
     <li id="st3"><span class="dot">3</span>Scheduled</li>
   </ol>
 
-  <div id="sch-photo">
-    <h1>Add a photo of the food</h1>
-    <p class="lead">Show everything in one shot.</p>
-    <label for="biz">Your business</label>
+<div id="sch-pick">
+  <h1>What's left over?</h1>
+  <div class="who-row">
+    <label for="biz">Donating as</label>
     <select id="biz"></select>
+  </div>
+  <div class="segmented" role="tablist" aria-label="How to add food">
+    <button type="button" role="tab" id="tab-menu" aria-selected="true" aria-controls="sch-menu">From your menu</button>
+    <button type="button" role="tab" id="tab-photo" aria-selected="false" aria-controls="sch-photo">Take a photo</button>
+  </div>
+
+  <div id="sch-menu" role="tabpanel" aria-labelledby="tab-menu">
+    <p class="lead">Tap + on what you have left. Allergens come from your menu, so there's nothing to type.</p>
+    <ul class="menu" id="menuList"></ul>
+    <button class="add-toggle" type="button" id="addToggle" aria-expanded="false" aria-controls="addForm">+ Add something that's not on the menu</button>
+    <div class="add-form" id="addForm" hidden>
+      <label for="newName">What is it?</label><input id="newName" autocomplete="off" placeholder="For example: vegetable soup">
+      <div class="grid2">
+        <div><label for="newKind">Type of food</label><select id="newKind"><option value="hot prepared">Hot, prepared</option><option value="cold prepared">Cold, prepared</option><option value="packaged">Packaged</option><option value="produce">Produce</option></select></div>
+        <div><label for="newServes">Servings each</label><input id="newServes" type="number" min="1" value="1" inputmode="numeric"></div>
+      </div>
+      <label for="newAlg">Allergens (separate with commas)</label><input id="newAlg" autocomplete="off" placeholder="for example: dairy, gluten">
+      <button class="btn primary lg" type="button" id="addSave" style="margin-top:1rem">Add to my menu</button>
+      <p class="err" id="addErr" role="alert" hidden></p>
+    </div>
+    <div class="menu-total" id="menuTotal" hidden>
+      <div><b id="mtCount"></b><small id="mtServ"></small></div>
+      <button class="btn primary" type="button" id="menuConfirm">Schedule pickup</button>
+    </div>
+    <p class="err" id="menuErr" role="alert" hidden></p>
+  </div>
+
+  <div id="sch-photo" role="tabpanel" aria-labelledby="tab-photo" hidden>
+    <p class="lead">Show everything in one shot. We match what we see to your menu.</p>
     <label class="drop" for="file" id="dropLabel">
       <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
       <span id="dropText">Take or choose a photo</span>
@@ -72,6 +101,8 @@
     <button class="btn primary xl" id="analyze" type="button" disabled>Continue</button>
     <button class="linkbtn" id="skip" type="button">No photo? Type it in instead</button>
   </div>
+
+</div>
 
   <div id="sch-confirm" hidden>
     <h1>Does this look right?</h1>

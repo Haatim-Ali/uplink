@@ -15,6 +15,7 @@ env.load()   # API keys from .env (gitignored) before anything reads them
 
 import agents  # noqa: E402
 import llm  # noqa: E402
+import menu  # noqa: E402
 import scenarios  # noqa: E402
 import vision  # noqa: E402
 import voice  # noqa: E402
@@ -169,8 +170,41 @@ def api_vision():
     if request.form.get("multi"):   # camera at closing time: one donation per food category
         foods, source = vision.analyze_many(f.read(), f.mimetype or "image/jpeg", request.form.get("hint", ""))
         return jsonify(foods=foods, source=source)
-    food, source = vision.analyze(f.read(), f.mimetype or "image/jpeg")
+    biz = request.form.get("business", "")
+    food, source = vision.analyze(f.read(), f.mimetype or "image/jpeg", menu.hint(biz))
+    if source not in ("demo", "fallback"):
+        food = menu.enrich(food, biz)   # menu items bring their known allergens and category
     return jsonify(food=food, source=source)
+
+
+# ---------------- menus ----------------
+
+@app.get("/api/menu/<biz>")
+def api_menu(biz):
+    return jsonify(items=menu.items(biz))
+
+
+@app.post("/api/menu/<biz>")
+def api_menu_add(biz):
+    """Add a leftover that isn't on the menu yet; it stays on this business's menu from now on."""
+    try:
+        return jsonify(item=menu.add(biz, request.get_json(silent=True) or {}))
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+
+
+@app.post("/api/donate/menu")
+def api_donate_menu():
+    """Donate items picked from the menu. Different kinds of food (hot, cold, packaged, produce) have
+    different safety rules, so each kind becomes its own donation."""
+    body = request.get_json(silent=True) or {}
+    biz = body.get("business")
+    foods = menu.foods_from_lines(biz, body.get("lines"))
+    if not foods:
+        return jsonify(error="Pick at least one item."), 400
+    with lock:
+        ids = [W().add_donation(vision.normalize(f, base=vision.NEUTRAL), biz)["id"] for f in foods]
+    return jsonify(ok=True, ids=ids)
 
 
 @app.post("/api/donate")

@@ -356,6 +356,49 @@ def test_shelter_can_answer_out_loud():
         voice.available = saved
 
 
+# ---------- menus ----------
+
+def test_menu_lines_become_one_donation_per_kind_of_food():
+    import menu
+    foods = menu.foods_from_lines("campus-cafe", [{"id": "campus-cafe-1", "qty": 2}, {"id": "campus-cafe-3", "qty": 12},
+                                                  {"id": "campus-cafe-2", "qty": 1}, {"id": "nope", "qty": 3}])
+    hot = next(f for f in foods if f["category"] == "hot prepared")
+    cold = next(f for f in foods if f["category"] == "cold prepared")
+    assert len(foods) == 2 and hot["servings"] == 24 and set(hot["allergens"]) == {"dairy", "gluten"}
+    assert cold["needs_cold"] and cold["servings"] == 12 and not cold["allergens_unverified"]
+
+
+def test_photo_items_on_the_menu_take_its_allergens():
+    import menu
+    f = menu.enrich({"items": ["pepperoni pizza (2 pizzas)"], "allergens": [], "category": "packaged",
+                     "allergens_unverified": True}, "campus-cafe")
+    assert f["menu_matches"] == 1 and f["category"] == "hot prepared" and set(f["allergens"]) == {"dairy", "gluten"}
+    assert f["allergens_unverified"] is False
+
+
+def test_add_menu_item_and_donate_from_menu():
+    import tempfile
+
+    import app
+    import menu
+    saved = menu.EXTRA
+    with tempfile.TemporaryDirectory() as tmp:
+        menu.EXTRA = os.path.join(tmp, "extra.json")
+        try:
+            app.state["world"] = World(live=True)
+            c = app.app.test_client()
+            item = c.post("/api/menu/campus-cafe", json={"name": "Vegetable soup", "category": "hot prepared",
+                                                          "serves": 4, "allergens": ["Celery"]}).get_json()["item"]
+            assert item["added"] and item["allergens"] == ["celery"]
+            assert any(m["name"] == "Vegetable soup" for m in c.get("/api/menu/campus-cafe").get_json()["items"])
+            r = c.post("/api/donate/menu", json={"business": "campus-cafe", "lines": [{"id": item["id"], "qty": 2}]}).get_json()
+            d = app.state["world"].get(r["ids"][0])
+            assert d["food"]["servings"] == 8 and d["food"]["allergens"] == ["celery"]
+            assert c.post("/api/donate/menu", json={"business": "campus-cafe", "lines": []}).status_code == 400
+        finally:
+            menu.EXTRA = saved
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:
