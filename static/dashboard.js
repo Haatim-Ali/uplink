@@ -21,7 +21,7 @@ setInterval(()=>{ if(voiceOn && speaking) return;   // with voices on, the next 
   if(play.seq !== null && play.shown < play.total){ play.shown++; if(S && view==="live") drawNegotiation(); } }, PLAY_MS);
 
 // ---- Voices: each agent speaks in its own ElevenLabs voice (browser voice if there's no key) ----
-let voiceOn = localStorage.getItem("uplink_voice") !== "off", speaking = false, lastSpoken = null, speakTimer = null;
+let voiceOn = localStorage.getItem("uplink_voice") === "on", speaking = false, lastSpoken = null, speakTimer = null;
 let audioOK = false;   // browsers allow sound only after the first click or key press on the page
 ["pointerdown", "keydown"].forEach(ev => addEventListener(ev, () => { if(!audioOK){ audioOK = true; try{ ringCtx(); }catch(e){} } }, {once: true}));
 const audioCache = {};
@@ -33,22 +33,6 @@ function audioFor(who, text){
   return audioCache[url];
 }
 function endSpeak(){ speaking = false; clearTimeout(speakTimer); }
-function browserSpeak(who, text){
-  if(!window.speechSynthesis){ endSpeak(); return; }
-  const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.rate = 1.08;
-  u.onend = u.onerror = endSpeak; speechSynthesis.speak(u);
-}
-function speak(who, text, next){
-  if(!voiceOn || !text || !audioOK) return;
-  who = PITCH[who] !== undefined ? who : "Dispatch";
-  speaking = true; clearTimeout(speakTimer); speakTimer = setTimeout(endSpeak, 20000);  // never stall the debate
-  if(S && S.mode && S.mode.voice === "elevenlabs"){
-    const a = audioFor(who, text); a.currentTime = 0;
-    a.onended = endSpeak; a.onerror = ()=>browserSpeak(who, text);
-    a.play().catch(()=>browserSpeak(who, text));
-    if(next) audioFor(next.agent in PITCH ? next.agent : "Dispatch", next.text);   // fetch the next line while this one plays
-  } else browserSpeak(who, text);
-}
 function replay(){ const n = pinned ? (S.negotiations||[]).find(h=>h.seq===pinned) : S.negotiation; if(!n) return; callFor = n.seq;
   play = {key: play.key, seq: n.seq, shown: 0, total: n.rounds.reduce((k,r)=>k+r.messages.length,0)}; drawNegotiation(); }
 const $ = id => document.getElementById(id);
@@ -290,14 +274,6 @@ function drawNegotiation(){
     <div class="neg-title"><div><span class="don-id">${esc(n.donation)}</span><b class="food">${esc(n.food)}</b></div><span class="pill outline" title="How the agents reason: fixed scoring rules, or an AI model (red lines are always enforced in code)">${n.mode==="llm"?"AI reasoning":"Rules reasoning"}</span></div>
     ${banner}
     <div class="agents">${cards}</div>`);
-  if(voiceOn && play.seq === n.seq){   // speak the newest line, then the outcome
-    const k = n.seq + ":" + (playing ? shown : "end");
-    if(k !== lastSpoken && !(speaking && !playing)){
-      lastSpoken = k;
-      if(playing && shown) speak(msgs[shown-1].agent, msgs[shown-1].text, msgs[shown]);
-      else if(!playing) speak("Dispatch", plain(o.t + ". " + (n.plan ? "Decision: " + planName(n.plan.id) : "")));
-    }
-  }
 
   if(!playing && n.plan && callFor === n.seq && !pinned){ callFor = null; startCall(n); }
   // nothing left to play for this decision (no plan, or no call coming): let the driver go now
@@ -669,7 +645,7 @@ $("voice").onclick = ()=>{
   voiceOn = !voiceOn; audioOK = true; ringCtx();
   try{ localStorage.setItem("uplink_voice", voiceOn ? "on" : "off"); }catch(e){}
   syncVoiceBtn();
-  if(voiceOn){ toast(S && S.mode.voice==="elevenlabs" ? "Voices on (ElevenLabs). Replaying the debate." : "Voices on (browser voice; add an ElevenLabs key for real voices)", "info"); lastSpoken = null; if(S) replay(); }
+  if(voiceOn) toast(S && S.mode.voice==="elevenlabs" ? "Voices on: you'll hear the dispatcher's call" : "Voices need an ElevenLabs key in .env", S && S.mode.voice==="elevenlabs" ? "info" : "warn");
   else { endSpeak(); if(window.speechSynthesis) speechSynthesis.cancel(); Object.values(audioCache).forEach(a=>a.pause()); }
 };
 
@@ -801,12 +777,10 @@ function callSay(who, say){
     const done = () => { clearTimeout(t); resolve(); };
     const t = setTimeout(resolve, Math.max(2500, text.length * 75));   // never hang the call
     if(!voiceOn || !audioOK){ clearTimeout(t); setTimeout(resolve, Math.max(1600, text.length * 45)); return; }
-    if(S && S.mode && S.mode.voice === "elevenlabs"){
-      const a = audioFor(who, say); a.currentTime = 0; a.onended = done;
-      a.onerror = () => { if(window.speechSynthesis){ const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.onend = done; speechSynthesis.speak(u); } else done(); };
-      a.play().catch(a.onerror);
-    } else if(window.speechSynthesis){ const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.rate = 1.05; u.onend = done; speechSynthesis.speak(u); }
-    else done();
+    const silent = () => { clearTimeout(t); setTimeout(resolve, Math.max(1600, text.length * 45)); };
+    if(!(S && S.mode && S.mode.voice === "elevenlabs")) return silent();
+    const a = audioFor(who, say); a.currentTime = 0; a.onended = done; a.onerror = silent;
+    a.play().catch(silent);
   });
 }
 // The call, written to be spoken: contractions, pauses (…), CAPITALS for emphasis and ElevenLabs v3 cues in [brackets].
