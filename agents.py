@@ -31,6 +31,7 @@ import llm
 from config import CONCESSION, JOIN_BONUS, THRESHOLDS, TIGHT_SLACK, URGENT_MINUTES
 
 AGENTS = ["Speed", "Cost", "Need"]
+LLM_AGENT_TIMEOUT = float(os.getenv("LLM_AGENT_TIMEOUT", "20"))   # seconds; past this an agent falls back to its rules
 GIVE_UP_MARGIN = 0.15   # a Claude agent accepting a plan this far below its bar is overruled by its rules vote
 GOALS = {
     "Speed": "get the food there fast and reliably, with a big safety margin before it spoils",
@@ -291,7 +292,8 @@ def _llm_propose(agent, world, d, plans, S, r, history):
     user = (f"Food: {', '.join(d['food']['items'])}, {d['food']['servings']} servings, "
             f"{d['safe_until'] - world.now} minutes until unsafe.\nRound {r + 1} of 3.\n"
             f"Safe candidate plans:\n{_table(world, d, plans, S, agent)}\n\nEarlier rounds:\n{history or 'none'}")
-    out = llm.chat_json(sysmsg, user, max_tokens=200, model=os.getenv("AGENT_MODEL"), effort="low")
+    out = llm.chat_json(sysmsg, user, max_tokens=200, model=llm.agent_model(), effort="low",
+                         retries=0, timeout=LLM_AGENT_TIMEOUT)
     pid = out["propose"]
     if pid not in S:
         raise ValueError("unknown plan")
@@ -309,7 +311,8 @@ def _llm_vote(agent, world, d, proposed, plans_by_id, S, r, best=None):
               'Reply with JSON only: {"votes": {"<plan id>": {"accept": true|false, "reason": "<under 20 words>"}}}')
     user = (f"Round {r + 1} of 3. {d['safe_until'] - world.now} minutes until the food is unsafe.\n"
             f"Proposed plans:\n{_table(world, d, [plans_by_id[i] for i in proposed], S, agent, best)}")
-    out = llm.chat_json(sysmsg, user, max_tokens=300, model=os.getenv("AGENT_MODEL"), effort="low")
+    out = llm.chat_json(sysmsg, user, max_tokens=300, model=llm.agent_model(), effort="low",
+                         retries=0, timeout=LLM_AGENT_TIMEOUT)
     return {pid: (bool(out["votes"][pid]["accept"]), out["votes"][pid].get("reason", "")) for pid in proposed}
 
 
@@ -435,10 +438,6 @@ def negotiate(world, d, plans, council=None):
         llm_ok = llm_ok or any(props[a][2] for a in AGENTS)
         proposed = list(dict.fromkeys(proposals[a] for a in AGENTS))
 
-        cast = _each(lambda a: council.vote(a, proposed, S, V, r, mode), parallel)
-        llm_ok = llm_ok or any(cast[a][1] for a in AGENTS)
-        votes = {pid: {a: cast[a][0][pid] for a in AGENTS} for pid in proposed}
-
         messages = []
         for a in AGENTS:
             p = plans_by_id[proposals[a]]
@@ -449,12 +448,22 @@ def negotiate(world, d, plans, council=None):
             else:
                 verb = "Revises to"
             messages.append({"agent": a, "type": "propose", "text": f"{verb} {short(p)}. " + reasons[a]})
+        live = getattr(world, "live_rounds", None)   # the live demo shows each step while the next is still thinking
+        if live is not None:
+            live.append({"round": r + 1, "messages": list(messages), "voting": True})
+
+        cast = _each(lambda a: council.vote(a, proposed, S, V, r, mode), parallel)
+        llm_ok = llm_ok or any(cast[a][1] for a in AGENTS)
+        votes = {pid: {a: cast[a][0][pid] for a in AGENTS} for pid in proposed}
+
         for pid in proposed:
             for a in AGENTS:
                 v = votes[pid][a]
                 if not v["accept"] and proposals[a] != pid:
                     messages.append({"agent": a, "type": "objection", "text": f"On {short(plans_by_id[pid])}: {v['reason']}"})
         rounds.append({"round": r + 1, "proposals": dict(proposals), "votes": votes, "messages": messages})
+        if live is not None:
+            live[-1] = {"round": r + 1, "messages": list(messages), "voting": False}
         history += f"Round {r + 1}: " + "; ".join(f"{a} proposed {proposals[a]}" for a in AGENTS) + "\n"
 
         support = {pid: sum(weights[a] for a in AGENTS if votes[pid][a]["accept"]) for pid in proposed}

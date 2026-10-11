@@ -34,13 +34,14 @@ California's SB 1383 requires many food businesses to donate edible surplus food
 - **Our agents always agreed.** Each agent lowers its bar every round, so every negotiation ended in consensus. Real disagreement only appeared once each agent had a red line it would not trade away.
 - **A fallback that spoiled the food.** Our first "nobody answered the coordinator" rule waited until 15 minutes before the food spoiled, when every option already took 25 minutes. It now acts at the last moment an option can still arrive safely.
 - **Distributing without changing decisions.** Moving every agent into its own process, then onto A2A over NATS, had to give exactly the same decisions. We split each agent's logic into its own steps, sent each agent the facts it needs, and wrote a test that replays every scenario both ways.
+- **Claude agents that agreed too easily.** With Claude speaking for each agent, Cost would cite the shelter's 5-day wait and accept a paid courier in round 1. Each agent now sees only the facts it cares about, and votes against a bar that drops each round (90%, 78%, 65% of its best option); if Claude accepts something far below the bar, the rules overrule that vote.
 - **Honest evidence.** In our hand-written scenarios every safe policy looked equal. Only randomized scenarios with no-shows and scarcity showed where negotiation helps.
 
 ## Accomplishments that we're proud of
 
 - On **100 random scenarios the system had never seen**, the negotiating team lost **67% less food than the best agent working alone** and **93% less than a nearest-shelter baseline**, delivered the most meals and reached the most shelters, and lost the least food (or tied) in 99 of 100 runs.
 - The distributed agents on AGNTCY make **identical decisions** to the in-process version in every scenario (about 1,080 A2A messages, 0 failed), and keep working when an agent is stopped live.
-- Two products from one system: a customer site a café manager can use in a minute, and an ops dashboard that shows judges every message, vote and veto.
+- Two products from one system: a customer site a café manager can use in a minute (menu, voice or photo/video), and an ops dashboard that shows every message, vote and veto live, as each agent says it.
 
 ## What we learned
 
@@ -48,7 +49,7 @@ California's SB 1383 requires many food businesses to donate edible surplus food
 - Each agent is right about something the others ignore. The team's value is that one agent can veto another's blind spot.
 - Refusing to agree has a cost (the team asks a person about once every four scenarios), and it's the right cost.
 - The protocol is separate from the decisions: the same agents decide the same way in one process, over HTTP, or over A2A/NATS.
-- Model-driven agents compromised more readily than rules-based ones, which shows less of the disagreement this challenge is about.
+- Model-driven agents cave unless you design against it. Our Claude agents first agreed in round 1 and argued each other's goals. Giving each agent only its own facts, and a numeric bar to vote against, turned that into real three-round negotiations that can end in a majority with dissent on record.
 
 ## What's next for Uplink
 

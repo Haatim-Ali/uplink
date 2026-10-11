@@ -498,3 +498,42 @@ if __name__ == "__main__":
         t()
         print("ok ", t.__name__)
     print(f"\n{len(tests)} tests passed")
+
+
+# ---------- drivers are never stranded as "busy" ----------
+
+def test_driver_is_freed_after_a_reconsider_that_finds_nothing_better():
+    w = fresh()
+    d = w.add_donation(dict(PIZZA), "campus-cafe")
+    w.plan(d)
+    drv = d["plan"]["driver"]
+    d["reconsider"] = True
+    real = w.safe_plans
+    w.safe_plans = lambda *a, **k: []   # nothing better turns up
+    w.plan(d)
+    w.safe_plans = real
+    for _ in range(300):
+        w.tick(plan_inline=False)
+        if d["status"] == "delivered":
+            break
+    assert d["status"] == "delivered"
+    assert w.drivers[drv]["status"] == "free"
+
+
+def test_an_expired_donation_does_not_keep_its_driver_locked():
+    w = fresh()
+    d1 = w.add_donation(dict(PIZZA), "campus-cafe")
+    d1.update(locked_driver="maria", status="stuck", safe_until=w.now)
+    w.tick(plan_inline=False)
+    assert d1["status"] == "expired" and "locked_driver" not in d1
+    for x in w.drivers.values():
+        if x["id"] != "maria":
+            x["status"] = "off"
+    d2 = w.add_donation(dict(PIZZA), "campus-cafe")
+    w.plan(d2)
+    for _ in range(300):
+        w.tick(plan_inline=False)
+        if d2["status"] == "delivered":
+            break
+    assert d2["status"] == "delivered"
+    assert w.drivers["maria"]["status"] == "free"

@@ -93,17 +93,26 @@ def planner_loop():
             if plans is None:
                 continue
             w.busy = True
+            w.live_rounds, w.live_donation = [], d["id"]
         try:
             result = w.decide_plan(d, plans)
         except Exception as e:  # noqa: BLE001
             with lock:
                 w.busy = False
-                w.say("System", f"Negotiation error: {e}", "event")
+                w.live_rounds = None
+                # back off instead of retrying 5x a second: "stuck" is retried every 5 sim minutes by tick()
+                d["reconsider"] = False
+                if d["status"] == "new":
+                    d["status"] = "stuck"
+                elif d["status"] == "en_route":
+                    d.pop("locked_driver", None)
+                w.say("System", f"Negotiation error on {d['id']}: {e}. Will retry shortly.", "event", d["id"])
             continue
         with lock:
             if W() is not w:
                 continue  # reset happened mid-negotiation
             w.busy = False
+            w.live_rounds = None
             plan = result.get("plan")
             if plan and not plan.get("join") and w.drivers[plan["driver"]]["status"] != "free" \
                     and d.get("locked_driver") != plan["driver"] \
@@ -166,6 +175,7 @@ def records_page():
 def api_state():
     with lock:
         s = W().to_json()
+        cams = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
     s["speed"] = state["speed"]
     s["paused"] = state["paused"]
     prov = llm.provider()
@@ -174,13 +184,13 @@ def api_state():
                  "voice": "elevenlabs" if voice.available() else "browser",
                  "llm_error": llm.auth_error(),
                  # which models are actually answering, so the dashboard can credit them
-                 "agents_model": (os.getenv("AGENT_MODEL") or (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL if claude else os.getenv("OPENAI_MODEL", ""))) if agents.use_llm() else "",
+                 "agents_model": (llm.agent_model() or os.getenv("OPENAI_MODEL", "")) if agents.use_llm() else "",
                  "vision_model": (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL) if claude else (os.getenv("OPENAI_MODEL", "") if prov else ""),
                  "mesh": len(MESH.agents()) if MESH else 0,   # agents running as separate services
                  "mesh_transport": MESH.transport if MESH else None}
     s["scenarios"] = [{"name": k, "title": v["title"]} for k, v in scenarios.SCENARIOS.items()]
     s["agntcy"] = dict(agntcy_bridge.state)
-    s["cameras"] = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
+    s["cameras"] = cams
     return jsonify(s)
 
 
@@ -446,24 +456,28 @@ def api_closing_poll():
 @app.post("/api/camera/status")
 def api_camera_status():
     body = request.get_json(silent=True) or {}
-    state["cameras"][body.get("business", "?")] = {"counts": body.get("counts", {}), "seen": time.time()}
+    with lock:   # api_state iterates this dict from another thread
+        state["cameras"][body.get("business", "?")] = {"counts": body.get("counts", {}), "seen": time.time()}
     return jsonify(ok=True)
 
 
 @app.get("/api/compare")
 def api_compare():
     """Scripted scenarios plus N seeded random runs. Deterministic, so cached after the first call."""
-    n = max(5, min(200, int(request.args.get("n", 50))))
+    n = max(5, min(200, int(request.args.get("n", 100))))
     return jsonify(compare_results(n))
 
 
 _compare_lock = threading.Lock()
 
 
-def compare_results(n=50):
+HELD_OUT = 1001   # seeds 1001+ were never used while building: the same runs as docs/RESULTS.md and the Devpost
+
+
+def compare_results(n=100):
     with _compare_lock:   # the startup warm-up and a page load never compute it twice
         if n not in _compare_cache:
-            rnd = scenarios.compare_random(n, solo=True)
+            rnd = scenarios.compare_random(n, first_seed=HELD_OUT, solo=True)
             rnd.pop("runs")
             _compare_cache[n] = {"scripted": scenarios.compare(), "random": rnd}
         return _compare_cache[n]

@@ -251,7 +251,7 @@ tr.winner td.plan{box-shadow:inset 5px 0 0 var(--ok)}
 .cmp-scroll th:first-child,.cmp-scroll td:first-child{text-align:left;position:sticky;left:0;background:var(--panel)}
 .cmp-scroll thead th{position:sticky;top:0;background:var(--chip);z-index:2;font:700 var(--t-xs)/1.25 var(--font);vertical-align:bottom}
 .cmp-scroll thead th:first-child{z-index:3;background:var(--chip)}
-.cmp-scroll tr.sect th{text-align:left;background:var(--ink);color:var(--bg);position:static;font-size:var(--t-sm)}
+.cmp-scroll tr.sect th{text-align:left;background:var(--panel-2);color:var(--ink);border-top:2px solid var(--line-2);position:static;font-size:var(--t-sm);font-weight:800}
 .cmp-scroll td.better{color:var(--ok-ink);font-weight:800;background:var(--ok-soft)}
 .cmp-scroll td.better::after{content:" ★"}
 .cmp-scroll td.note{text-align:left}
@@ -348,7 +348,7 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 
 /* each agent's latest line, shown on its card while the debate plays */
 .agent .says{margin-top:.55rem;padding:.5rem .6rem;border-radius:var(--r3);background:var(--bg,#f1f5f9);font-size:.86rem;line-height:1.35;color:var(--ink-2,#334155);font-style:italic;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.agent .says.objection{background:#fef2f2;color:var(--bad-ink)}
+.agent .says.objection{background:var(--bad-soft);color:var(--bad-ink)}
 .agent .says.now{outline:2px solid var(--ink-2,#334155);outline-offset:1px;animation:saysIn .35s ease-out}
 .agent.Speed .says.now{outline-color:var(--speed)}.agent.Cost .says.now{outline-color:var(--cost)}.agent.Need .says.now{outline-color:var(--need)}
 @keyframes saysIn{from{transform:translateY(4px);opacity:.3}to{transform:none;opacity:1}}
@@ -465,3 +465,15 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .bubble.news .b-who{color:var(--warn-ink)}
 .bubble.revise{border-left:3px solid currentColor}
 .wire-log .k-news .kd,.wire-log .k-revise .kd{color:var(--warn)}
+
+/* live deliberation: who is still thinking */
+.thinking{display:inline-flex;gap:3px}
+.thinking i{width:5px;height:5px;border-radius:50%;background:var(--muted);animation:think 1.2s infinite ease-in-out}
+.thinking i:nth-child(2){animation-delay:.2s}.thinking i:nth-child(3){animation-delay:.4s}
+.agent.Speed .thinking i{background:var(--speed)}.agent.Cost .thinking i{background:var(--cost)}.agent.Need .thinking i{background:var(--need)}
+@keyframes think{0%,80%,100%{opacity:.25;transform:none}40%{opacity:1;transform:translateY(-2px)}}
+.agent .says.waiting{font-style:normal;color:var(--muted)}
+.debate.live{max-height:18rem}
+@media (prefers-reduced-motion:reduce){.thinking i{animation:none;opacity:.6}}
+/* the 3-line quote: bottom space is a transparent border, so a 4th line can't peek through the padding */
+.agent .says{padding-bottom:0;border-bottom:.5rem solid transparent}

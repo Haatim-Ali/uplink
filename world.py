@@ -2,6 +2,7 @@
 
 The agents are real; the world around them is simulated (1 tick = 1 minute).
 """
+import datetime
 import itertools
 import time
 import json
@@ -79,6 +80,8 @@ class World:
         self.impact = {"meals": 0, "lbs": 0.0, "cost": 0.0, "spoiled": 0, "escalations": 0, "orgs": set()}
         self.outcomes = {}         # how each negotiation ended (consensus, majority, urgent, ...)
         self.negotiation = None
+        self.live_rounds = None   # the debate so far, while agents are still deliberating (live demo only)
+        self.live_donation = None
         self.negotiations = []
         self.phones = {}              # nonprofit id -> last time its phone page checked in (real seconds)
         self.network = []             # agent-to-agent messages: announce, offers, bids, awards
@@ -344,6 +347,8 @@ class World:
                 return None
         if not plans:
             d["reconsider"] = False
+            if d["status"] == "en_route":
+                d.pop("locked_driver", None)   # nothing better found: keep the current trip, and don't strand its driver
             if d["status"] == "new":
                 d["status"] = "stuck"
                 if not d.get("flagged_stuck"):
@@ -424,10 +429,11 @@ class World:
             if not self.live:
                 self.approve(d["id"], d["options"][0]["id"], auto="scripted")
             return
-        label = {"consensus": "Agreed 3 of 3", "majority": "Majority", "urgent": "Time is short, acting on best-supported plan"}[result["outcome"]]
+        label = {"consensus": "Agreed 3 of 3", "majority": "Majority 2 of 3", "urgent": "Time is short, acting on best-supported plan"}[result["outcome"]]
         d["dissent"] = result["dissent"]
         if result["dissent"]:
-            label += " · dissent kept on record: " + ", ".join(x["agent"] for x in result["dissent"])
+            who = " and ".join(x["agent"] for x in result["dissent"])
+            label += f" ({who} {'disagrees' if len(result['dissent']) == 1 else 'disagree'}, kept on record)"
         if reconsidering:
             d.pop("locked_driver", None)
             if plan["np"] == d["plan"]["np"]:
@@ -841,7 +847,8 @@ class World:
             self.say("World", f"{d['id']} arrived at {n['name']} but it's {why}. Turned away.", "event", d["id"])
             return
         if not any(x is not d and x["status"] == "en_route" and x["plan"]["driver"] == dr["id"] for x in self.donations) \
-                and not any(x.get("locked_driver") == dr["id"] for x in self.donations):
+                and not any(x is not d and x.get("locked_driver") == dr["id"]
+                            and x["status"] not in ("delivered", "spoiled", "expired") for x in self.donations):
             dr["status"] = "free"
         if d["plan"]["cost"]:
             self.impact["cost"] += d["plan"]["cost"]
@@ -865,7 +872,7 @@ class World:
             self.impact["spare"] = self.impact.get("spare", 0) + (d["safe_until"] - self.now)
             self.impact["perishable"] = self.impact.get("perishable", 0) + 1
         self.records.append({
-            "donation": d["id"], "date": "2026-10-10", "donor": d["business_name"], "recipient": n["name"],
+            "donation": d["id"], "date": datetime.date.today().isoformat(), "donor": d["business_name"], "recipient": n["name"],
             "items": ", ".join(f["items"]), "category": f["category"], "servings": f["servings"],
             "weight_lbs": f"{f['weight_lbs'][0]:g}–{f['weight_lbs'][1]:g}", "picked_up": hhmm(d["t_pick"]),
             "delivered": hhmm(self.now), "transport": d["plan"]["driver_type"],
@@ -874,7 +881,7 @@ class World:
 
     def expire(self, d):
         if d.get("locked_driver"):
-            self.drivers[d["locked_driver"]]["status"] = "free"
+            self.drivers[d.pop("locked_driver")]["status"] = "free"
         d["status"] = "expired"
         self.impact["spoiled"] += d["food"]["servings"]
         self.say("World", f"{d['id']} passed its safe time before delivery. {d['food']['servings']} servings lost.", "event", d["id"])
@@ -918,6 +925,8 @@ class World:
             "drivers": drivers, "donations": dons,
             "feed": self.feed[-120:], "decisions": self.decisions[-60:], "records": self.records,
             "negotiation": self.negotiation, "negotiations": self.negotiations, "weights": self.weights,
+            "deliberating": None if self.live_rounds is None else {
+                "donation": self.live_donation, "rounds": [dict(r, messages=list(r["messages"])) for r in list(self.live_rounds)]},
             "outcomes": self.outcomes,
             "network": self.network[-200:],
             "agents_online": {"businesses": len(self.businesses), "shelters": len(self.nonprofits),

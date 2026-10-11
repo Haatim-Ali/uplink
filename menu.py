@@ -199,7 +199,7 @@ def parse_speech(biz, text):
                 'Return {"lines": [{"id": "<menu id>", "qty": <number of units>}], '
                 '"extras": [{"name": "<food not on the menu>", "qty": <number>}]}. '
                 "Count in the menu's units. Only use ids from the menu. Leave out anything that isn't food.",
-                max_tokens=800, effort="low", model=os.getenv("AGENT_MODEL"))
+                max_tokens=800, effort="low", model=llm.agent_model())
             by_id = {m["id"]: m for m in ms}
             lines = [{"id": ln["id"], "name": by_id[ln["id"]]["name"], "qty": max(1, int(float(ln.get("qty") or 1))),
                       "serves": by_id[ln["id"]]["serves"]} for ln in out.get("lines", []) if ln.get("id") in by_id]

@@ -107,17 +107,24 @@ def _extract_json(text):
         raise
 
 
+def agent_model():
+    """The model for the quick agent calls (votes, proposals, parsing speech): AGENT_MODEL, else Claude's
+    fast model when Claude is the provider (the big model is far slower for these short replies)."""
+    return os.getenv("AGENT_MODEL") or ("claude-haiku-5-5" if provider() == "anthropic" else None)
+
+
 def chat_json(system, user, image_b64=None, media_type="image/jpeg", max_tokens=400, model=None, retries=1,
-              effort="medium"):
+              effort="medium", timeout=None):
     """Ask the model for a JSON object. Raises on failure (callers fall back).
-    effort (Claude only): "low" for quick agent votes, "high" for careful photo counting."""
+    effort (Claude only): "low" for quick agent votes, "high" for careful photo counting.
+    timeout: seconds per attempt (default TIMEOUT); agents pass a short one so a slow call can't freeze the debate."""
     global _auth_error
     if _auth_error:
         raise RuntimeError(_auth_error)
     last = None
     for _ in range(retries + 1):
         try:
-            text = _call(system, user, image_b64, media_type, max_tokens, model, effort)
+            text = _call(system, user, image_b64, media_type, max_tokens, model, effort, timeout or TIMEOUT)
             return _extract_json(text)
         except Exception as e:  # noqa: BLE001 - we retry then re-raise
             last = e
@@ -137,11 +144,11 @@ def _claude():
     global _client
     if _client is None:
         import anthropic
-        _client = anthropic.Anthropic(timeout=TIMEOUT)  # reads ANTHROPIC_API_KEY; retries 429/5xx itself
+        _client = anthropic.Anthropic(timeout=TIMEOUT, max_retries=1)  # reads ANTHROPIC_API_KEY; one retry on 429/5xx
     return _client
 
 
-def _call(system, user, image_b64, media_type, max_tokens, model, effort):
+def _call(system, user, image_b64, media_type, max_tokens, model, effort, timeout=TIMEOUT):
     p = provider()
     if p == "anthropic":
         content = []
@@ -150,7 +157,7 @@ def _call(system, user, image_b64, media_type, max_tokens, model, effort):
         content.append({"type": "text", "text": user})
         # Claude thinks before answering and that counts toward max_tokens, so callers' small
         # limits (sized for the open model) would cut the answer off. Give it room.
-        r = _claude().beta.messages.create(
+        r = _claude().with_options(timeout=timeout).beta.messages.create(
             model=model or os.getenv("ANTHROPIC_MODEL", CLAUDE_MODEL),
             max_tokens=max(max_tokens, 16000),
             system=system,
@@ -179,7 +186,7 @@ def _call(system, user, image_b64, media_type, max_tokens, model, effort):
                 "max_tokens": max_tokens,
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": content}],
             },
-            timeout=TIMEOUT,
+            timeout=timeout,
         )
         r.raise_for_status()
         return r.json()["choices"][0]["message"]["content"]
