@@ -483,8 +483,32 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .w-step{font:600 12px var(--mono);fill:var(--muted)}
 @media (prefers-reduced-motion:reduce){.node.coord.thinking circle{animation:none;stroke-width:4}}
 
-/* the negotiation beside the network graph; the message log moved down beside the map */
-.wire-side .hero{margin:0}
-.wire-side-empty{display:none;margin:0;padding:1.5rem 1rem;border:1px dashed var(--line);border-radius:var(--r2);text-align:center}
-.wire-side:has(#hero-panel[hidden]) .wire-side-empty{display:block}
-.stack-col .wire-log{max-height:24rem}
+
+/* ---------- Live view layout for the demo ----------
+   left: the negotiation (the main act); right: the agent network and the phone call that follows it */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.25rem;align-items:start;margin-bottom:1.25rem}
+.stage-left,.stage-right{display:grid;gap:1.25rem;min-width:0;align-content:start}
+.stage-left .hero{margin:0}
+.hero-empty{display:none}
+.stage-left:has(#hero-panel[hidden]) .hero-empty{display:block}
+.agents.ghost .agent{opacity:.55;min-height:6.5rem}
+.agents.ghost h3{margin-bottom:.2rem}
+.empty-note{margin:.9rem 0 0}
+.stage .wire .panel-head{flex-wrap:wrap;row-gap:.4rem}
+.stage #wire{min-height:0}
+.stage .callp{margin:0}
+.stage .call-badges{display:flex;flex-wrap:wrap;gap:.4rem;margin:-.35rem 0 .8rem}
+.stage .call-body{grid-template-columns:1fr}
+.stage .call-tx{max-height:15rem;overflow:auto}
+@media (max-width:1100px){.stage{grid-template-columns:1fr}}
+/* the graph renders at about 2/3 scale in its column: larger type keeps it readable from the back of a room */
+.stage .node text{font-size:17px}
+.stage .node text.sub{font-size:13.5px}
+.stage .w-cols text{font-size:14px}
+.stage .w-empty{font-size:22px}
+.stage .w-step,.stage .w-outcome{font-size:18px}
+.stage .wire{margin:0}
+/* bottom row: the message log runs the full height of the map */
+.live-grid:has(.log-panel){align-items:stretch}
+.log-panel{display:flex;flex-direction:column}
+.log-panel .wire-log{flex:1 1 0;min-height:16rem;max-height:none}
