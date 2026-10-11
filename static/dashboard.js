@@ -264,7 +264,7 @@ function drawNegotiation(){
   const said = msgs.slice(0, shown);
   const cards = AGENTS.map(a=>{
     const pid = rr.proposals[a];
-    const last = said.filter(m => m.agent === a).pop();   // what this agent just said: the debate, visible without a click
+    const last = said.filter(m => m.agent === a && !(m.type === "propose" && !playing)).pop();   // what this agent just said (once settled, its vote, not a repeat of "Proposes")
     const quote = last ? `<div class="says ${last.type}${playing && said[said.length-1] === last ? " now" : ""}" title="${esc(last.text)}">“${esc(last.text)}”</div>` : "";
     return `<div class="agent ${a}"><div class="agent-top"><h3><span aria-hidden="true">${ICON[a]}</span><span class="a-name">${a}</span></h3><span class="wt" title="Vote weight. It grows when this agent's earlier warning about a driver turned out right.">vote ×${(n.weights||{})[a]??1}</span></div><div class="goal">${GOALS[a]}</div><div class="wants">Proposes: <b>${pid ? planName(pid) : "—"}</b></div>${quote}</div>`;
   }).join("");
@@ -432,6 +432,57 @@ function drawGlobal(){
   prevPending = pend.length;
 }
 
+// ---------- The donation's journey: one strip, seven steps, lit up as the agents work ----------
+function flowDonation(){
+  const n = liveNeg() || currentNeg();
+  const id = n ? n.donation : ((S.donations||[]).slice().reverse().find(x => !["delivered","spoiled","expired"].includes(x.status)) || {}).id;
+  return {n, d: (S.donations||[]).find(x => x.id === id)};
+}
+function drawFlow(){
+  const el = $("flow"); if(!el) return;
+  const {n, d} = flowDonation();
+  const step = (no, title, state, cap) => ({no, title, state, cap});
+  if(!d){
+    setHTML(el, ["Food identified","Shelters answer","Drivers bid","Safety check","Agents negotiate","Dispatcher calls","Delivery"]
+      .map((t, i) => `<li class="fs pending"><span class="fs-no">${i+1}</span><div><b>${t}</b><small>waiting</small></div></li>`).join(""));
+    return;
+  }
+  const all = (S.network||[]).filter(m => m.donation === d.id);
+  let from = 0; all.forEach((m, i) => { if(m.kind === "announce") from = i; });
+  const msgs = all.slice(from);
+  const cnt = k => msgs.filter(m => m.kind === k).length;
+  const yes = cnt("accept"), part = cnt("counter"), no = cnt("decline"), bids = cnt("bid");
+  const announced = msgs.some(m => m.kind === "announce");
+  const blocked = [...new Set((S.decisions||[]).filter(x => x.donation === d.id && x.verdict === "blocked").map(x => x.text))];
+  const late = blocked.reduce((t, x) => t + (+(x.match(/^(\d+) plan\(s\) would arrive/)||[0,0])[1]), 0);
+  const removed = blocked.filter(x => !/plan\(s\) would arrive/.test(x)).length;
+  const liveHere = S.busy && S.deliberating && S.deliberating.donation === d.id;
+  const negHere = n && n.donation === d.id && !n.live ? n : null;
+  const lines = negHere ? negHere.rounds.reduce((t, r) => t + r.messages.length, 0) : 0;
+  const playing = negHere && play.seq === negHere.seq && play.shown < lines;
+  const plans = negHere ? Object.keys(negHere.scores||{}).length : 0;
+  const human = ["awaiting_human","awaiting_info"].includes(d.status);
+  const cur = liveHere ? S.deliberating.rounds[S.deliberating.rounds.length - 1] : null;
+  const negCap = liveHere ? (!cur ? "first proposals" : cur.voting ? `round ${cur.round} · voting` : `round ${cur.round + 1} · revising`)
+    : playing ? "debating…" : negHere ? ((OUTCOME[negHere.outcome]||{}).t || negHere.outcome || "").replace("All three agents agree", "all three agree") : "";
+  const callHere = call && call.donation === d.id ? call : null;
+  const moving = d.status === "en_route", done = d.status === "delivered", lost = ["spoiled","expired"].includes(d.status);
+  const after = moving || done || lost;
+  const S1 = step(1, "Food identified", "done", `${d.food.servings} servings · ${d.food.category}`);
+  const S2 = step(2, "Shelters answer", yes + part + no ? "done" : announced ? "active" : "pending",
+    yes + part + no ? [yes && `${yes} yes`, part && `${part} partial`, no && `${no} no`].filter(Boolean).join(" · ") : announced ? "asking every shelter…" : "");
+  const S3 = step(3, "Drivers bid", bids ? "done" : yes + part ? "active" : "pending", bids ? `${bids} driver${bids>1?"s":""} bid` : yes + part ? "collecting bids…" : "");
+  const S4 = step(4, "Safety check", plans || liveHere || negHere ? "done" : bids ? "active" : "pending",
+    plans ? `${plans} safe plan${plans>1?"s":""}${removed + late ? ` · ${removed + late} removed` : ""}` : removed + late ? `${removed + late} removed` : bids ? "checking…" : "");
+  const S5 = step(5, "Agents negotiate", liveHere || playing ? "active" : human ? "warn" : negHere ? "done" : "pending", human ? "asking a person" : negCap);
+  const S6 = step(6, "Dispatcher calls", callHere && callHere.phase !== "ended" ? "active" : (callHere || after) && d.plan ? "done" : "pending",
+    callHere && callHere.phase === "ringing" ? "ringing…" : callHere && callHere.phase === "talk" ? "on the call" : d.plan && (callHere || after) ? `${short(d.plan.np_name, 20)} confirmed` : "");
+  const S7 = step(7, "Delivery", done ? "done" : lost ? "bad" : moving ? "active" : "pending",
+    done ? "delivered" : lost ? "food spoiled" : moving ? (d.picked ? `food in the car · ${d.plan.arrive_hhmm}` : `driver heading to pickup`) : "");
+  setHTML(el, [S1,S2,S3,S4,S5,S6,S7].map(x => `<li class="fs ${x.state}"><span class="fs-no">${x.state === "done" ? "✓" : x.no}</span><div><b>${x.title}</b><small>${esc(x.cap || (x.state === "pending" ? "waiting" : ""))}</small></div></li>`).join(""));
+  setHTML("flow-id", `${esc(d.id)} · ${d.food.servings} servings of ${esc(short(d.food.items.join(", "), 40))} from ${esc(d.business_name)}`);
+}
+
 function drawLive(){
   const scn = (S.scenarios.find(x=>x.name===S.scenario)||{}).title;
   const run = $("sl-run");
@@ -441,7 +492,7 @@ function drawLive(){
   const pend = pendingList(), al = $("live-alert");
   al.hidden = !pend.length;
   setHTML(al, pend.length ? `<span>${pend.length} decision${pend.length>1?"s":""} waiting for you (${pend.map(d=>esc(d.id)).join(", ")}). Open Decisions</span>` : "");
-  drawNegotiation(); drawMap();
+  drawNegotiation(); drawMap(); drawFlow();
 }
 
 // ---------- agent services (the mesh) ----------

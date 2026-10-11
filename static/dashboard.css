@@ -512,3 +512,56 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .live-grid:has(.log-panel){align-items:stretch}
 .log-panel{display:flex;flex-direction:column}
 .log-panel .wire-log{flex:1 1 0;min-height:16rem;max-height:none}
+
+/* ---------- Live view as one story: the journey strip, then the panels in step order ---------- */
+.flow-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--r3);padding:1rem 1.25rem 1.1rem;margin-bottom:1.25rem}
+.flow-head{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap;margin-bottom:.85rem}
+.flow-head h2{font-size:var(--t-md);font-weight:800;letter-spacing:.01em}
+.flow-id{color:var(--muted);font-size:var(--t-sm)}
+.journey{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:0;counter-reset:fs}
+.fs{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:.5rem;padding-right:.75rem;min-width:0}
+.fs::after{content:"";position:absolute;left:2.25rem;right:.25rem;top:.95rem;height:2px;background:var(--line-2);z-index:0}
+.fs:last-child::after{display:none}
+.fs.done::after{background:var(--ok)}
+.fs.active::after{background:linear-gradient(90deg,var(--brand),var(--line-2));background-size:200% 100%;animation:flowRun 1.4s linear infinite}
+.fs > div{min-width:0;max-width:100%}
+.fs b{display:block;font-size:var(--t-sm);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fs small{display:block;color:var(--muted);font-size:var(--t-xs);line-height:1.35;min-height:1.1em}
+.fs-no{position:relative;z-index:1;flex:none;width:2rem;height:2rem;border-radius:50%;display:grid;place-items:center;font:700 var(--t-sm)/1 var(--font);
+  background:var(--panel-2);color:var(--faint);border:2px solid var(--line-2)}
+.fs.done .fs-no{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.fs.done small{color:var(--ink-2)}
+.fs.active .fs-no{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 0 0 0 var(--brand);animation:fsPulse 1.6s ease-out infinite}
+.fs.active b{color:var(--brand-ink)}
+.fs.active small{color:var(--ink)}
+.fs.warn .fs-no{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.fs.warn small{color:var(--warn-ink)}
+.fs.bad .fs-no{background:var(--bad-soft);color:var(--bad);border-color:var(--bad)}
+.fs.pending b{color:var(--muted)}
+@keyframes fsPulse{0%{box-shadow:0 0 0 0 rgba(59,130,246,.55)}100%{box-shadow:0 0 0 12px rgba(59,130,246,0)}}
+@keyframes flowRun{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){.fs.active .fs-no,.fs.active::after{animation:none}}
+
+.stepno{display:inline-grid;place-items:center;min-width:1.6rem;height:1.6rem;padding:0 .4rem;margin-right:.55rem;border-radius:999px;vertical-align:.12em;
+  background:var(--brand-soft);color:var(--brand-ink);font:700 var(--t-xs)/1 var(--font);letter-spacing:0}
+
+.stage.story{display:block;margin-bottom:0}
+.stage.story .row{display:grid;gap:1.25rem;margin-bottom:1.25rem;align-items:stretch}
+.stage.story .r1{grid-template-columns:minmax(0,1fr) minmax(0,2.1fr)}
+.stage.story .r2{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}
+.stage.story .r3{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr)}
+.col-don{display:grid;gap:1.25rem;align-content:start}
+.don-panel #cur-don{padding:0;border:none;background:none}
+.don-panel .cd-top .card-title{display:none}
+.kpis.compact{grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin:0}
+.kpis.compact .kpi{padding:.75rem .9rem}
+.kpis.compact .kpi b{font-size:var(--t-2xl)}
+.kpis.compact .kpi span{font-size:var(--t-xs)}
+.stage.story .r3 .map-panel{position:static}
+.stage.story .r3 #map{height:clamp(22rem,52vh,36rem)}
+.stage.story .r3 .log-panel .wire-log{min-height:0}
+.stage.story .callp{height:auto}
+@media (max-width:1100px){
+  .journey{grid-template-columns:repeat(4,minmax(0,1fr));row-gap:1rem}
+  .stage.story .r1,.stage.story .r2,.stage.story .r3{grid-template-columns:1fr}
+}
