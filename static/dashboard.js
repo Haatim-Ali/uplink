@@ -21,7 +21,9 @@ setInterval(()=>{ if(voiceOn && speaking) return;   // with voices on, the next 
   if(play.seq !== null && play.shown < play.total){ play.shown++; if(S && view==="live") drawNegotiation(); } }, PLAY_MS);
 
 // ---- Voices: each agent speaks in its own ElevenLabs voice (browser voice if there's no key) ----
-let voiceOn = false, speaking = false, lastSpoken = null, speakTimer = null;
+let voiceOn = localStorage.getItem("uplink_voice") !== "off", speaking = false, lastSpoken = null, speakTimer = null;
+let audioOK = false;   // browsers allow sound only after the first click or key press on the page
+["pointerdown", "keydown"].forEach(ev => addEventListener(ev, () => { if(!audioOK){ audioOK = true; try{ ringCtx(); }catch(e){} } }, {once: true}));
 const audioCache = {};
 const PITCH = {Speed:1.25, Cost:0.8, Need:1.05, Dispatch:1, Shelter:0.85};
 const plain = html => { const t = document.createElement("div"); t.innerHTML = html; return t.textContent; };
@@ -37,7 +39,7 @@ function browserSpeak(who, text){
   u.onend = u.onerror = endSpeak; speechSynthesis.speak(u);
 }
 function speak(who, text, next){
-  if(!voiceOn || !text) return;
+  if(!voiceOn || !text || !audioOK) return;
   who = PITCH[who] !== undefined ? who : "Dispatch";
   speaking = true; clearTimeout(speakTimer); speakTimer = setTimeout(endSpeak, 20000);  // never stall the debate
   if(S && S.mode && S.mode.voice === "elevenlabs"){
@@ -258,6 +260,7 @@ function drawNegotiation(){
     // already watched live as the agents spoke: no replay, straight to the result
     const watched = liveSeen.donation === n.donation && liveSeen.count > 0;
     play = {key: nkey, seq: n.seq, shown: watched ? msgs.length : 0, total: msgs.length}; callFor = n.seq; liveSeen = {donation: null, count: 0};
+    prefetchCall(n);
   }
   if(play.seq === null || play.seq === undefined){ play = {key: nkey, seq: n.seq, shown: msgs.length, total: msgs.length}; }   // old news
   wire();   // after the playback is set up for a new decision, so the diagram never flashes the final result first
@@ -660,10 +663,12 @@ function drawEvidence(r){
 
 route(); refresh(); setInterval(refresh, 1000);
 
+const syncVoiceBtn = () => { const b = $("voice"); b.textContent = voiceOn ? "Voices on" : "Voices off"; b.classList.toggle("primary", voiceOn); b.setAttribute("aria-pressed", voiceOn); };
+syncVoiceBtn();
 $("voice").onclick = ()=>{
-  voiceOn = !voiceOn; ringCtx();
-  const b = $("voice"); b.textContent = voiceOn ? "Voices on" : "Voices off";
-  b.classList.toggle("primary", voiceOn); b.setAttribute("aria-pressed", voiceOn);
+  voiceOn = !voiceOn; audioOK = true; ringCtx();
+  try{ localStorage.setItem("uplink_voice", voiceOn ? "on" : "off"); }catch(e){}
+  syncVoiceBtn();
   if(voiceOn){ toast(S && S.mode.voice==="elevenlabs" ? "Voices on (ElevenLabs). Replaying the debate." : "Voices on (browser voice; add an ElevenLabs key for real voices)", "info"); lastSpoken = null; if(S) replay(); }
   else { endSpeak(); if(window.speechSynthesis) speechSynthesis.cancel(); Object.values(audioCache).forEach(a=>a.pause()); }
 };
@@ -790,29 +795,43 @@ function ringTone(){
     o.connect(g).connect(actx.destination); o.start(actx.currentTime + t); o.stop(actx.currentTime + t + .4); }));
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
-function callSay(who, text){
+function callSay(who, say){
+  const text = say.replace(/\[[^\]]*\]\s*/g, "");
   return new Promise(resolve => {
     const done = () => { clearTimeout(t); resolve(); };
     const t = setTimeout(resolve, Math.max(2500, text.length * 75));   // never hang the call
-    if(!voiceOn){ clearTimeout(t); setTimeout(resolve, Math.max(1600, text.length * 45)); return; }
+    if(!voiceOn || !audioOK){ clearTimeout(t); setTimeout(resolve, Math.max(1600, text.length * 45)); return; }
     if(S && S.mode && S.mode.voice === "elevenlabs"){
-      const a = audioFor(who, text); a.currentTime = 0; a.onended = done;
+      const a = audioFor(who, say); a.currentTime = 0; a.onended = done;
       a.onerror = () => { if(window.speechSynthesis){ const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.onend = done; speechSynthesis.speak(u); } else done(); };
       a.play().catch(a.onerror);
     } else if(window.speechSynthesis){ const u = new SpeechSynthesisUtterance(text); u.pitch = PITCH[who] ?? 1; u.rate = 1.05; u.onend = done; speechSynthesis.speak(u); }
     else done();
   });
 }
+// The call, written to be spoken: contractions, pauses (…), CAPITALS for emphasis and ElevenLabs v3 cues in [brackets].
+// "say" is spoken; "text" (cues removed) is the transcript. The shelter's answer is its agent's real reply.
+const ampm = t => { const [h, m] = String(t || "").split(":").map(Number); return isNaN(h) ? String(t || "") : `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
+const shortNp = nm => String(nm || "").replace(/\s*\(.*\)$/, "");
 function callScript(n){
   const d = S.donations.find(x => x.id === n.donation) || {food:{items:[], servings:0}};
   const np = n.plan.np_name, drv = String(n.plan.driver_name || "").split(" (")[0];
   const reply = (S.network || []).filter(m => m.donation === n.donation && m.from === np && ["accept","counter","decline"].includes(m.kind)).pop();
-  const items = (d.food.items || []).join(", ");
-  const ask = `Hi ${np}, this is the Uplink dispatcher. ${d.business_name || "A business"} has ${d.food.servings} servings of ${items}${d.food.needs_cold ? ", and it has to stay cold" : ""}. ${drv} can bring it by ${n.plan.arrive_hhmm}. Can you take it?`;
-  const ans = reply ? reply.text : "Yes, please send it over.";
-  const close = !reply || reply.kind === "accept" ? `Great. ${drv} is on the way. Thank you!` : reply.kind === "counter" ? "Got it. We'll send you that much and find a home for the rest." : "Understood. We'll try another shelter.";
-  return {np, lines:[{who:"Dispatch", side:"a", name:"Uplink dispatcher", text:ask}, {who:"Shelter", side:"b", name:np, text:ans}, {who:"Dispatch", side:"a", name:"Uplink dispatcher", text:close}]};
+  const items = (d.food.items || []).join(" and ").toLowerCase();
+  const take = reply && (reply.text.match(/take (\d+)/) || [])[1];
+  const biz = d.business_name || "a business nearby", when = ampm(n.plan.arrive_hhmm);
+  const ask = `Hi, is this ${shortNp(np)}? … Hey! It's the Uplink dispatcher. So, ${biz} just closed up with ${d.food.servings} servings of ${items}${d.food.needs_cold ? ", and they REALLY need to stay cold" : ""}. ${drv} can have it to you by ${when}. [curious] Any chance you can take it?`;
+  const ans = !reply || reply.kind === "accept" ? `[excited] Oh, that's PERFECT timing! Yeah, we can take all ${d.food.servings}. Send it over!`
+    : reply.kind === "counter" ? `[sighs] Hmm… we're pretty tight on space tonight. We could take ${take || "some"} of them, though?`
+    : `[sighs] Ah, I'm so sorry… we're actually full right now.`;
+  const close = !reply || reply.kind === "accept" ? `Amazing! ${drv}'s heading your way now. Thank you SO much!`
+    : reply.kind === "counter" ? `No problem at all. We'll send you ${take || "what you can take"}, and find a home for the rest. Thanks!`
+    : `Totally get it. We'll try somewhere else… thanks anyway!`;
+  const ln = (who, side, name, say) => ({who, side, name, say, text: say.replace(/\[[^\]]*\]\s*/g, "")});
+  return {np, lines:[ln("Dispatch", "a", "Uplink dispatcher", ask), ln("Shelter", "b", np, ans), ln("Dispatch", "a", "Uplink dispatcher", close)]};
 }
+// generate the call's audio while the debate replays, so the call starts without a pause
+function prefetchCall(n){ if(voiceOn && n && n.plan && S.mode && S.mode.voice === "elevenlabs") try{ callScript(n).lines.forEach(l => audioFor(l.who, l.say)); }catch(e){} }
 async function startCall(n){
   const sc = callScript(n);
   const me = call = {seq:n.seq, donation:n.donation, np:sc.np, phase:"ringing", said:[], talking:null, t0:Date.now(), voiced:[]};
@@ -824,7 +843,7 @@ async function startCall(n){
   for(const ln of sc.lines){
     if(call !== me) return;
     me.talking = ln.side; me.said.push(ln); drawCall();
-    await callSay(ln.who, ln.text);
+    await callSay(ln.who, ln.say);
     me.talking = null; drawCall(); await wait(350);
   }
   me.phase = "ended"; me.secs = Math.round((Date.now() - me.t0) / 1000); drawCall();

@@ -9,21 +9,22 @@ With no ELEVENLABS_API_KEY, available() is False and the browser falls back to i
 import hashlib
 import os
 import re
-import threading
 
 import requests
 
 API = "https://api.elevenlabs.io/v1"
 TIMEOUT = 30
 WHO = ["Speed", "Cost", "Need", "Dispatch", "Shelter"]
-# Preferred premade voices per speaker (picked by name from the account's voice list)
-PREFERRED = {"Speed": ["Josh", "Antoni", "Liam", "Will"], "Cost": ["Adam", "Brian", "George", "Bill"],
-             "Need": ["Rachel", "Sarah", "Matilda", "Lily"], "Dispatch": ["Bella", "Alice", "Charlotte", "Aria"],
-             "Shelter": ["Daniel", "Callum", "Eric", "Chris", "Arnold"]}
-FALLBACK_ID = "21m00Tcm4TlvDq8ikWAM"   # Rachel, a long-standing ElevenLabs premade voice
+# ElevenLabs' default voices: they work on every plan, including free keys that can't use library voices or list
+# the account's voices. Override any of them with ELEVEN_VOICE_<SPEAKER> in .env.
+DEFAULTS = {"Speed": "TX3LPaxmHKxFdv7VOQHJ",      # Liam: energetic, young
+            "Cost": "nPczCjzI2devNBz1zQrb",       # Brian: deep, measured
+            "Need": "EXAVITQu4vr4xnSDxMaL",       # Sarah: warm
+            "Dispatch": "cgSgspJ2msm6clMCkdW9",   # Jessica: friendly, conversational
+            "Shelter": "iP95p4xoKVk53GoZ742B"}    # Chris: casual
+MODEL = "eleven_v3"   # the most expressive model; reads cues like [excited] or [sighs] written in the text
+TAG = re.compile(r"\[[^\]]*\]\s*")
 
-_voices = {}
-_lock = threading.Lock()
 _cache = {}
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".tts_cache")
 
@@ -41,32 +42,13 @@ def _headers():
 
 
 def voices():
-    """Speaker -> voice id. Env overrides first, then distinct voices from the account, then a fallback."""
-    with _lock:
-        if _voices:
-            return dict(_voices)
-        chosen = {w: os.getenv(f"ELEVEN_VOICE_{w.upper()}") for w in WHO}
-        if not all(chosen.values()):
-            try:
-                r = requests.get(f"{API}/voices", headers=_headers(), timeout=TIMEOUT)
-                r.raise_for_status()
-                acct = [(v.get("name", ""), v["voice_id"]) for v in r.json().get("voices", [])]
-            except Exception:  # noqa: BLE001
-                acct = []
-            used = {v for v in chosen.values() if v}
-            first = {name.split()[0].lower(): vid for name, vid in reversed(acct) if name}
-            for w in WHO:   # pass 1: each speaker's preferred voice, if the account has it
-                if not chosen[w]:
-                    chosen[w] = next((first[p.lower()] for p in PREFERRED[w]
-                                      if p.lower() in first and first[p.lower()] not in used), None)
-                    if chosen[w]:
-                        used.add(chosen[w])
-            for w in WHO:   # pass 2: any other distinct voice, then the fallback
-                if not chosen[w]:
-                    chosen[w] = next((vid for _, vid in acct if vid not in used), None) or FALLBACK_ID
-                    used.add(chosen[w])
-        _voices.update(chosen)
-        return dict(_voices)
+    """Speaker -> voice id: .env overrides, else ElevenLabs' default voices."""
+    return {w: os.getenv(f"ELEVEN_VOICE_{w.upper()}") or DEFAULTS[w] for w in WHO}
+
+
+def delivery(text, model):
+    """ElevenLabs v3 reads cues like [excited] or [sighs] written in the text; other models would say them out loud."""
+    return text if model.startswith("eleven_v3") else TAG.sub("", text)
 
 
 def speak(who, text):
@@ -76,7 +58,8 @@ def speak(who, text):
     if not text:
         raise ValueError("empty text")
     vid = voices()[who]
-    model = os.getenv("ELEVEN_MODEL", "eleven_flash_v2_5")
+    model = os.getenv("ELEVEN_MODEL", MODEL)
+    text = delivery(text, model)
     h = hashlib.sha1(f"{vid}|{model}|{text}".encode()).hexdigest()
     if h in _cache:
         return _cache[h]
@@ -88,7 +71,7 @@ def speak(who, text):
     r = requests.post(f"{API}/text-to-speech/{vid}", headers={**_headers(), "accept": "audio/mpeg"},
                       params={"output_format": "mp3_44100_64"},
                       json={"text": text, "model_id": model,
-                            "voice_settings": {"stability": 0.45, "similarity_boost": 0.75}},
+                            "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}},
                       timeout=TIMEOUT)
     r.raise_for_status()
     _cache[h] = r.content
