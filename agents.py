@@ -31,6 +31,7 @@ import llm
 from config import CONCESSION, JOIN_BONUS, THRESHOLDS, TIGHT_SLACK, URGENT_MINUTES
 
 AGENTS = ["Speed", "Cost", "Need"]
+GIVE_UP_MARGIN = 0.15   # a Claude agent accepting a plan this far below its bar is overruled by its rules vote
 GOALS = {
     "Speed": "get the food there fast and reliably, with a big safety margin before it spoils",
     "Cost": "spend as little money as possible (volunteers and nonprofit vans are free; paid couriers cost money)",
@@ -239,15 +240,34 @@ def _rules_vote(agent, pid, S, best_score, r, plan=None):
 
 # ---------- optional LLM-driven agents ----------
 
-def _table(world, d, plans, S, agent):
+def _table(world, d, plans, S, agent, best=None):
+    """Each agent sees only the facts its own goal is about, plus how good each plan is for it.
+    (Showing everyone everything made Claude agents argue each other's cases.)"""
+    best = best if best is not None else max((S[p["id"]][agent] for p in plans), default=1) or 1
     lines = []
     for p in plans:
-        lines.append(
-            f"{p['id']}: {p['np_name']} via {p['driver_name']} ({p['driver_type']}), {p['dur']} min, "
-            f"slack {p['slack']} min, ${p['cost']:.2f}, reliability {p['reliability']:.0%}, "
-            f"shelter last fed {world.nonprofits[p['np']]['last_donation_days']}d ago, your score {S[p['id']][agent]:.2f}"
-        )
+        share = S[p["id"]][agent] / best if best else 0
+        if agent == "Speed":
+            facts = f"arrives in {p['dur']} min, {p['slack']} min of margin before unsafe, driver {p['reliability']:.0%} reliable"
+        elif agent == "Cost":
+            facts = f"costs ${p['cost']:.2f}, driver {p['reliability']:.0%} reliable (a no-show means paying a courier to rescue it)"
+        else:
+            n = world.nonprofits[p["np"]]
+            room = n["capacity_servings"] - n["received"] - world.committed(n["id"])
+            fed = "already has food on the way" if world.committed(n["id"]) else ("got food today" if n["last_donation_days"] == 0 else f"last got food {n['last_donation_days']} days ago")
+            facts = f"shelter {fed}, room for {room} servings"
+        lines.append(f"{p['id']}: {p['np_name']} via {p['driver_name']} | {facts} | {round(100 * share)}% of your best option")
     return "\n".join(lines)
+
+
+_VOICE = {
+    "Speed": "You only care about getting the food there fast and safely: arrival time, margin, and whether the driver shows up. "
+             "You don't care about price or which shelter, so never argue about those.",
+    "Cost": "You only care about money: what the trip costs, and the risk of paying a courier to rescue food after a no-show. "
+            "You don't care about speed or which shelter, so never argue about those.",
+    "Need": "You only care about which shelter gets the food: the one that has waited longest and has room. "
+            "You don't care about price or which driver, so never argue about those.",
+}
 
 
 def _llm_shortlist(plans, S, limit=8):
@@ -261,12 +281,14 @@ def _llm_shortlist(plans, S, limit=8):
 
 
 def _llm_propose(agent, world, d, plans, S, r, history):
-    sysmsg = (f"You are the {agent} agent in a food-rescue negotiation. Your goal: {GOALS[agent]}. "
+    sysmsg = (f"You are the {agent} agent in a food-rescue negotiation. {_VOICE[agent]} "
               f"Your red line, which you never cross: {RED_LINES[agent]}. "
-              "There is no boss: a plan passes only when every agent accepts. In round 1 propose your favourite. "
-              "In later rounds you may move toward a compromise if others objected, but defend your goal. "
+              "There is no boss: a plan passes when every agent accepts, or by majority with the dissent on record. "
+              "Round 1: propose your favourite. Later rounds: stand firm unless your favourite was objected to; "
+              "then you may move to a plan that still gives you a good share of your best option. "
+              "Argue only from your own goal, with numbers. "
               'Reply with JSON only: {"propose": "<plan id>", "reason": "<one sentence, under 25 words>"}')
-    user = (f"Food: {', '.join(d['food']['items'])}, {d['food']['servings']} servings, {d['food']['category']}, "
+    user = (f"Food: {', '.join(d['food']['items'])}, {d['food']['servings']} servings, "
             f"{d['safe_until'] - world.now} minutes until unsafe.\nRound {r + 1} of 3.\n"
             f"Safe candidate plans:\n{_table(world, d, plans, S, agent)}\n\nEarlier rounds:\n{history or 'none'}")
     out = llm.chat_json(sysmsg, user, max_tokens=200, model=os.getenv("AGENT_MODEL"), effort="low")
@@ -276,14 +298,17 @@ def _llm_propose(agent, world, d, plans, S, r, history):
     return pid, out.get("reason", "")
 
 
-def _llm_vote(agent, world, d, proposed, plans_by_id, S, r):
-    sysmsg = (f"You are the {agent} agent in a food-rescue negotiation. Your goal: {GOALS[agent]}. "
+def _llm_vote(agent, world, d, proposed, plans_by_id, S, r, best=None):
+    bar = round(100 * THRESHOLDS[r])
+    sysmsg = (f"You are the {agent} agent in a food-rescue negotiation. {_VOICE[agent]} "
               f"Your red line, which you never cross: {RED_LINES[agent]}. "
-              "Vote on each proposed plan. Accept plans you can live with; object only when it really hurts your goal, "
-              "and remember that objecting forever means a human has to decide and the food may spoil. "
+              f"Vote on each proposed plan. This is round {r + 1} of 3: accept a plan only if it gives you at least "
+              f"{bar}% of your best option; otherwise object, and say in numbers what it costs your goal. "
+              "You are one voice in a team, so defend your goal; the other agents defend theirs. "
+              "Argue only from your own goal. "
               'Reply with JSON only: {"votes": {"<plan id>": {"accept": true|false, "reason": "<under 20 words>"}}}')
     user = (f"Round {r + 1} of 3. {d['safe_until'] - world.now} minutes until the food is unsafe.\n"
-            f"Proposed plans:\n{_table(world, d, [plans_by_id[i] for i in proposed], S, agent)}")
+            f"Proposed plans:\n{_table(world, d, [plans_by_id[i] for i in proposed], S, agent, best)}")
     out = llm.chat_json(sysmsg, user, max_tokens=300, model=os.getenv("AGENT_MODEL"), effort="low")
     return {pid: (bool(out["votes"][pid]["accept"]), out["votes"][pid].get("reason", "")) for pid in proposed}
 
@@ -326,7 +351,7 @@ def agent_vote(a, world, d, plans, proposed, S, V, r, mode):
     llm_votes, used = None, False
     if mode == "llm":
         try:
-            llm_votes, used = _llm_vote(a, world, d, proposed, plans_by_id, S, r), True
+            llm_votes, used = _llm_vote(a, world, d, proposed, plans_by_id, S, r, best_score[a]), True
         except Exception:  # noqa: BLE001
             pass
     out = {}
@@ -334,7 +359,8 @@ def agent_vote(a, world, d, plans, proposed, S, V, r, mode):
         p = plans_by_id[pid]
         if V[pid][a]:  # red lines hold in every round, whatever the model says
             acc, why, kind = False, V[pid][a], ("reliability" if "reliable" in V[pid][a] else "veto")
-        elif llm_votes is not None and pid in llm_votes:
+        elif llm_votes is not None and pid in llm_votes and not (
+                llm_votes[pid][0] and S[pid][a] < (THRESHOLDS[r] - GIVE_UP_MARGIN) * best_score[a]):
             acc, why = llm_votes[pid]
             kind = object_reason(a, p, best_plan, world)[1]
             why = ("Accept: " if acc else "Object: ") + why if why else ("Accept." if acc else "Object.")
