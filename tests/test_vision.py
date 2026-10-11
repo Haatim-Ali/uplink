@@ -107,6 +107,13 @@ def test_tall_photos_are_cut_top_and_bottom():
     assert any("top half" in c for c in calls) and any("bottom half" in c for c in calls)
 
 
+def test_videos_are_never_cut_in_halves():
+    vision.VISION_READS, vision.VISION_SPLIT_MIN = 3, 20
+    calls = fake([answer(30)] * 3)
+    vision.analyze(photo(), "image/jpeg", vision.VIDEO_NOTE)
+    assert len(calls) == 3 and not any("half of a larger photo" in c for c in calls)
+
+
 def test_small_unsure_spreads_skip_the_halves():
     _, _, calls = read([answer(6, conf="medium")] * 3, split_min=20)
     assert len(calls) == 3

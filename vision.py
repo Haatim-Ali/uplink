@@ -74,6 +74,9 @@ is inside this half; skip anything cut off at the edge that is mostly in the oth
 SYSTEM = "You are a careful food-donation intake assistant. You count, you don't guess."
 CONFIDENCE = ["low", "medium", "high"]
 OUTLIER = 0.25   # a reading this far from the middle one only lowers confidence; it doesn't stretch the range
+VIDEO_NOTE = ("\n\nThis image is a 2x2 grid of four frames from one short video panning across the same food. "
+              "The same items appear in more than one frame: count each physical item once, using the frame that "
+              "shows it best, and don't add up the frames.")
 
 DEMO = {
     "items": ["pepperoni pizza"],
@@ -326,7 +329,8 @@ def analyze(image_bytes, media_type="image/jpeg", menu_hint=""):
     big = isinstance(first, dict) and _total(from_counts(first)) >= VISION_SPLIT_MIN
     sure = isinstance(first, dict) and (first.get("is_food") is False or (first.get("confidence") == "high" and not big))
     extra = [(image_bytes, prompt)] * (VISION_READS - 1) if not sure and VISION_READS > 1 else []
-    parts = halves(original) if big else []
+    # halves only for a single photo: a video arrives as a grid of frames of the same food, and cutting it would double count
+    parts = halves(original) if big and VIDEO_NOTE not in (menu_hint or "") else []
     got = _read_all(extra + [(img, prompt + HALF_NOTE.format(side=side)) for side, img in parts]) if extra or parts else []
     answers += got[:len(extra)]
     half_answers = got[len(extra):]   # re-reads and the halves run at the same time

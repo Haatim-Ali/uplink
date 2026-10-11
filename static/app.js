@@ -122,12 +122,36 @@ function resetSchedule(full){
   $("sch-pick").hidden = false; $("sch-confirm").hidden = true; setStep(1);
   if(full){ photo = null; $("file").value = ""; $("preview").style.display = "none"; $("dropText").textContent = "Take or choose a photo"; $("analyze").disabled = true; }
 }
+const isVideo = f => f && /^video\//.test(f.type);
 $("file").onchange = e => {
   photo = e.target.files[0]; if(!photo) return;
-  $("preview").src = URL.createObjectURL(photo); $("preview").style.display = "block";
-  $("dropText").textContent = "Photo added. Tap to change it";
+  const url = URL.createObjectURL(photo), vid = isVideo(photo);
+  $("preview").style.display = vid ? "none" : "block"; if(!vid) $("preview").src = url;
+  $("previewVid").hidden = !vid; if(vid) $("previewVid").src = url;
+  $("dropText").textContent = vid ? "Video added. Tap to change it" : "Photo added. Tap to change it";
   $("analyze").disabled = false;
 };
+// A video becomes one image: four frames spread across it, tiled 2x2. The vision model is told they are
+// views of the same food, so it counts each item once.
+function videoSheet(file, frames = 4){
+  return new Promise((resolve, reject) => {
+    const v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto";
+    v.src = URL.createObjectURL(file);
+    v.onerror = () => reject(new Error("This browser can't read that video. Try an MP4, or take a photo."));
+    v.onloadedmetadata = async () => {
+      const W = 784, k = W / Math.max(v.videoWidth, v.videoHeight), w = Math.round(v.videoWidth * k), h = Math.round(v.videoHeight * k);
+      const c = document.createElement("canvas"); c.width = w * 2; c.height = h * 2;
+      const g = c.getContext("2d"); g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height);
+      const dur = isFinite(v.duration) && v.duration > 0 ? v.duration : 1;
+      for(let i = 0; i < frames; i++){
+        await new Promise(ok => { v.onseeked = ok; v.currentTime = Math.min(dur - 0.05, dur * (0.1 + 0.8 * i / (frames - 1))); });
+        g.drawImage(v, (i % 2) * w, Math.floor(i / 2) * h, w, h);
+      }
+      URL.revokeObjectURL(v.src);
+      c.toBlob(b => b ? resolve(b) : reject(new Error("Couldn't read frames from the video.")), "image/jpeg", 0.88);
+    };
+  });
+}
 // Shrink the photo in the browser before upload: faster, and keeps it within the model's limits.
 // If the browser can't decode it (e.g. HEIC in Chrome), send the original; the server converts it.
 function shrink(file, maxEdge = 1568){
@@ -191,8 +215,12 @@ function fill(f){
   $("sch-pick").hidden = true; $("sch-confirm").hidden = false; setStep(2); window.scrollTo(0, 0);
 }
 $("analyze").onclick = async () => {
-  $("analyze").disabled = true; $("analyze").textContent = "Reading your photo…";
-  const fd = new FormData(); fd.append("photo", await shrink(photo), "photo.jpg"); fd.append("business", $("biz").value);
+  $("analyze").disabled = true; $("analyze").textContent = isVideo(photo) ? "Reading your video…" : "Reading your photo…";
+  const fd = new FormData(); fd.append("business", $("biz").value);
+  if(isVideo(photo)){
+    try{ fd.append("photo", await videoSheet(photo), "frames.jpg"); fd.append("frames", "4"); }
+    catch(e){ $("analyze").textContent = "Continue"; $("analyze").disabled = false; $("dropText").textContent = e.message; return; }
+  } else fd.append("photo", await shrink(photo), "photo.jpg");
   let r;
   try { r = await (await fetch("/api/vision", {method:"POST", body:fd})).json(); if(!r.food) throw new Error(); }
   catch(e){ r = {source:"fallback", food:{items:[],servings:1,safe_minutes:120,weight_lbs:[1,2],category:"hot prepared",allergens:[],needs_cold:false}}; }
@@ -270,7 +298,7 @@ function drawTrack(){
     ${d.food.allergens.length ? `<div class="row"><span>Allergens</span><span>${esc(d.food.allergens.join(", "))}</span></div>` : ""}
     ${np ? `<div class="dash"></div><div class="row"><span>Shelter</span><span>${esc(np)}</span></div>` : ""}</div>`;
   const items = whyItems(d);
-  const why = items.length ? `<div class="sheet why"><h2>How we chose</h2><p class="lede">Three agents worked this out for you. Speed wants it there fast, Cost wants it cheap, Need wants it to reach the shelter that needs it most.</p>
+  const why = items.length ? `<div class="sheet why"><h2>Updates</h2>
     <ol class="feed">${items.map((x, i) => `<li class="${seenWhy.has(d.id + x.k) ? "" : "new"}"><span class="dotx ${x.cls || ""}" aria-hidden="true">${esc(x.mark)}</span><div><b>${esc(x.title)}</b>${x.detail ? `<p>${esc(x.detail)}</p>` : ""}${x.time && (i === 0 || items[i-1].time !== x.time) ? `<time>${esc(clock(x.time))}</time>` : ""}</div></li>`).join("")}</ol></div>` : "";
   items.forEach(x => seenWhy.add(d.id + x.k));
   const after = done ? `<a class="btn primary xl" href="#/receipt/${esc(d.id)}">View your receipt</a>`
@@ -279,7 +307,7 @@ function drawTrack(){
   drawTrackMap(d);
 }
 
-// ---- "How we chose": the agents' work for this one pickup, in plain words ----
+// ---- "Updates": what happened for this pickup, in plain words (the agent debate stays on /ops) ----
 const seenWhy = new Set();
 const TRUCK = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>`;
 function npOf(planId){ if(!planId) return null; const n = S.nonprofits.find(x => x.id === planId.split("|")[0]); return n ? n.name : null; }
@@ -297,20 +325,8 @@ function whyItems(d){
     out.push({k:"rep", mark:"2", title:"Shelters answered", detail: parts.join(", ") + ".", time:replies[0].time}); }
   const bids = net.filter(m => m.kind === "bid");
   if(bids.length) out.push({k:"bid", mark:"3", title:`${bids.length} drivers offered a ride`, detail:"Volunteers, couriers and shelter vans sent their time and price.", time:bids[0].time});
-  const neg = (S.negotiations || []).filter(n => n.donation === d.id).pop();
-  if(neg && neg.rounds && neg.rounds[0]){
-    ["Speed","Cost","Need"].forEach(a => {
-      const pid = neg.rounds[0].proposals[a]; const where = npOf(pid);
-      const said = feed.find(f => f.agent === a && f.type === "propose");
-      if(where) out.push({k:"p" + a, mark:a[0], cls:a, title:`${a} wanted ${where}`, detail: said ? firstSentence(said.text.replace(/^R\d+ · (Proposes|Revises to|Stands firm on) [^.]*\.\s*/, "")) || "" : "", time: said && said.time});
-    });
-    const veto = feed.find(f => f.type === "objection" && /Veto/.test(f.text)) || feed.find(f => f.type === "objection");
-    if(veto){ const body = veto.text.replace(/^R\d+ · On /, "").replace(/: (Veto|Object): /, ": ");
-      out.push({k:"obj", mark:veto.agent[0], cls:veto.agent, title:`${veto.agent} pushed back`, detail: firstSentence(body.split(": ").slice(1).join(": ")) || body, time:veto.time}); }
-    if(neg.rounds.length > 1) out.push({k:"rnd", mark:String(neg.rounds.length), title:`They went ${neg.rounds.length} rounds`, detail:"Each round, agents moved toward a plan everyone could live with.", time:neg.time});
-  }
   const res = feed.filter(f => f.type === "result").pop();
-  if(res){ const [head, ...rest] = res.text.split(": "); out.push({k:"res", mark:"✓", cls:"go", title: head.replace("Agreed 3 of 3", "All three agreed"), detail: rest.join(": ").replace(/ via [^,]*/, ""), time:res.time}); }
+  if(res && d.plan) out.push({k:"res", mark:"✓", cls:"go", title:`Matched with ${d.plan.np_name}`, detail:`The best fit right now for this food. Arrives about ${clock(d.plan.arrive_hhmm)}.`, time:res.time});
   feed.filter(f => f.type === "contact").forEach((f, i) => out.push({k:"c" + i, mark:"☎", title:f.text.split(".")[0] + ".", detail:"", time:f.time}));
   if(d.picked) out.push({k:"pick", mark:"→", cls:"go", title:"Picked up", detail:`On the way to ${d.plan ? d.plan.np_name : "the shelter"}.`});
   const del = feed.find(f => f.type === "delivered" || /delivered to/.test(f.text));
@@ -403,11 +419,10 @@ if(closingBtn) closingBtn.onclick = () => { location.hash = "#/schedule"; showTa
 let menuItems = [], menuFor = null, qty = {};
 const KIND = {"hot prepared":"Hot", "cold prepared":"Cold", packaged:"Packaged", produce:"Produce"};
 function showTab(which){
-  const m = which === "menu";
-  $("tab-menu").setAttribute("aria-selected", String(m)); $("tab-photo").setAttribute("aria-selected", String(!m));
-  $("sch-menu").hidden = !m; $("sch-photo").hidden = m;
+  ["menu","say","photo"].forEach(t => { $("tab-" + t).setAttribute("aria-selected", String(t === which)); $("sch-" + t).hidden = t !== which; });
 }
 $("tab-menu").onclick = () => showTab("menu");
+$("tab-say").onclick = () => showTab("say");
 $("tab-photo").onclick = () => showTab("photo");
 async function loadMenu(){
   const biz = $("biz").value; if(!biz) return;
@@ -460,5 +475,53 @@ $("menuConfirm").onclick = async () => {
     refresh();
   }catch(e){ $("menuErr").textContent = "We couldn't schedule this. Check your connection and try again."; $("menuErr").hidden = false; }
   $("menuConfirm").disabled = false; $("menuConfirm").textContent = "Schedule pickup";
+};
+
+// ---------- say it: record -> ElevenLabs Scribe -> Claude matches it to the menu -> filled-in menu ----------
+let sayRec = null;
+function sayState(label, status, on){ $("sayLabel").textContent = label; $("sayStatus").textContent = status || ""; $("sayBtn").classList.toggle("rec", !!on); }
+async function sendSaid(form){
+  form.append("business", $("biz").value);
+  sayState("Matching to your menu…", "", false); $("sayBtn").disabled = true;
+  let r, j;
+  try{ r = await fetch("/api/voice/donation", {method:"POST", body:form}); j = await r.json(); }
+  catch(e){ j = {error:"Couldn't reach Uplink. Check the connection and try again."}; }
+  $("sayBtn").disabled = false;
+  if(!r || !r.ok){ sayState("Tap to talk", j.error || "Try again.", false); return; }
+  if(!j.lines.length && !j.extras.length){ sayState("Tap to talk", `Heard "${j.heard}", but nothing on your menu matched. Try naming the items, or tap them on the menu.`, false); return; }
+  j.lines.forEach(l => qty[l.id] = (qty[l.id] || 0) + l.qty);
+  const extra = j.extras.length ? ` Not on your menu: ${j.extras.map(e => `${e.name} ×${e.qty}`).join(", ")}. Add ${j.extras.length > 1 ? "them" : "it"} below.` : "";
+  $("sayNotice").textContent = `Heard: "${j.heard}". We filled in ${j.lines.length === 1 ? "1 item" : j.lines.length + " items"} from your menu. Check the amounts, then schedule.${extra}`;
+  $("sayNotice").hidden = false;
+  if(j.extras.length){ $("addForm").hidden = false; $("addToggle").setAttribute("aria-expanded","true"); $("newName").value = j.extras[0].name; }
+  sayState("Tap to talk", "", false);
+  showTab("menu"); drawMenu(); window.scrollTo(0, 0);
+}
+$("sayBtn").onclick = async () => {
+  if(sayRec && sayRec.state === "recording"){ sayRec.stop(); return; }
+  const eleven = S && S.mode && S.mode.voice === "elevenlabs";
+  if(!eleven){   // no ElevenLabs key on the server: the browser's own speech recognition, if it has one
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SR){ sayState("Tap to talk", "Voice needs an ElevenLabs key on the server, or Chrome. You can tap items on the menu instead.", false); return; }
+    const sr = new SR(); sr.lang = "en-US"; sayState("Listening… tap to stop", "", true);
+    sr.onresult = e => { const f = new FormData(); f.append("text", e.results[0][0].transcript); sendSaid(f); };
+    sr.onerror = () => sayState("Tap to talk", "Didn't catch that. Try again.", false);
+    sr.onend = () => { if($("sayBtn").classList.contains("rec")) sayState("Tap to talk", "", false); };
+    sr.start(); return;
+  }
+  let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ sayState("Tap to talk", "Microphone blocked. Allow it in the browser (works on localhost or https).", false); return; }
+  const chunks = [];
+  sayRec = new MediaRecorder(stream);
+  sayRec.ondataavailable = e => chunks.push(e.data);
+  sayRec.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    const type = sayRec.mimeType || "audio/webm";
+    const f = new FormData(); f.append("audio", new Blob(chunks, {type}), type.includes("mp4") ? "say.mp4" : "say.webm");
+    sendSaid(f);
+  };
+  sayRec.start(); sayState("Listening… tap when done", "Recording stops by itself after 15 seconds.", true);
+  setTimeout(() => { if(sayRec && sayRec.state === "recording") sayRec.stop(); }, 15000);
 };
 

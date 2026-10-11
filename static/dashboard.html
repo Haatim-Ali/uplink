@@ -5,10 +5,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Uplink · food rescue agents</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+<script src="/static/vendor/leaflet/leaflet.js"></script>
+<link rel="stylesheet" href="/static/fonts/fonts.css">
 <link rel="stylesheet" href="/static/uplink.css">
 <link rel="stylesheet" href="/static/dashboard.css">
 </head>
@@ -73,6 +72,7 @@
         <div class="dd-menu" id="dd-open" hidden>
           <a href="/" target="_blank" rel="noopener"><b>Customer site ↗</b><small>What a business sees</small></a>
           <a href="/shelter" target="_blank" rel="noopener"><b>Shelter phone page ↗</b><small>Where a shelter answers</small></a>
+          <a href="/agntcy/records" target="_blank" rel="noopener"><b>Agent records (OASF) ↗</b><small>Every agent in AGNTCY's format</small></a>
         </div>
       </div>
       <div class="clock-box" title="Simulated time. One simulated minute is one real second at 1× speed."><span class="clock" id="clock">12:00</span><span class="badge-mode" id="mode" title="Agents: how the three agents reason (rules or an AI model). Vision: how photos are read.">…</span></div>
@@ -99,10 +99,19 @@
   </div>
 
   <div class="panel wire" aria-labelledby="wire-h">
-    <div class="panel-head"><h2 id="wire-h">Agent network <span class="sub-h">live messages for the current donation</span></h2><span class="wire-stat" id="wire-stat"><i class="dot"></i>idle</span></div>
+    <div class="panel-head"><h2 id="wire-h">Agent network <span class="sub-h">live messages for the current donation</span></h2><span class="wire-right"><span class="pill outline xport" id="xport" title="How the shelter and driver agents receive messages">in-process</span><span class="wire-stat" id="wire-stat"><i class="dot"></i>idle</span></span></div>
     <div class="wire-body">
       <svg id="wire" viewBox="0 0 1000 300" role="img" aria-label="Diagram of the business, shelter, driver and coordinator agents and the messages between them"></svg>
       <ol class="wire-log" id="wire-log" aria-label="Message log"></ol>
+    </div>
+  </div>
+
+  <div class="panel callp" aria-labelledby="call-h">
+    <div class="panel-head"><h2 id="call-h">Phone line <span class="sub-h">the dispatcher agent calls the chosen shelter</span></h2>
+      <span class="call-badges"><span class="pill outline">Voices: ElevenLabs Flash v2.5</span><span class="pill outline">Speech to text: ElevenLabs Scribe</span></span></div>
+    <div class="call-body">
+      <div class="call-card" id="call-card"><p class="call-idle">No call yet. When the agents choose a shelter, the dispatcher agent calls it here.</p></div>
+      <ol class="call-tx" id="call-tx" aria-live="polite" aria-label="Call transcript"></ol>
     </div>
   </div>
 
@@ -176,7 +185,7 @@
 <!-- ================= EVIDENCE ================= -->
 <section class="view page" data-view="evidence" hidden>
   <div class="page-head"><div><h1 class="page-title">Evidence</h1>
-    <p class="page-sub">Agents together vs a simple baseline, on the same scenarios.</p></div>
+    <p class="page-sub">The team of agents vs a simple baseline and vs each agent deciding alone, on the same scenarios.</p></div>
     <button class="btn sm" id="rerun" type="button">Re-run comparison</button></div>
   <div id="takeaway"></div>
   <h2 class="sec-h">Impact in the current run</h2>
@@ -232,6 +241,15 @@
     <div class="panel"><h3>Simulated</h3><ul class="plain"><li>The city, the shelters and the drivers.</li><li>The clock: one minute is one second at 1× speed.</li><li>Driver movement along straight lines.</li><li>Events such as a full shelter, a no-show or a new pantry (triggered from Demo controls).</li></ul></div>
   </div>
   <p class="helper" style="margin-top:1rem">More detail: README.md and docs/ARCHITECTURE.md in the project.</p>
+
+  <h2 class="sec-h">Built with</h2>
+  <ul class="built">
+    <li><b>Claude API (Anthropic)</b><span>Reads the food in each photo, matched against the restaurant's menu, and, when AI reasoning is on, writes each agent's proposals, objections and votes. Safety rules and vote counting stay in plain code.</span></li>
+    <li><b>ElevenLabs</b><span>Flash v2.5 gives Speed, Cost, Need, the dispatcher and the shelter their own voices. Scribe turns a shelter's spoken answer into text the agents act on.</span></li>
+    <li><b>Cisco Outshift challenge</b><span>Built for "When AI Agents Disagree", Level 3: agents with competing goals, no central decision-maker, and clear rules for when to stop, keep disagreeing, or ask a person.</span></li>
+    <li><b>AGNTCY (Cisco Outshift)</b><span>With AGNTCY on, every shelter and driver agent is its own A2A agent on NATS, built with the AGNTCY app-sdk. A donation is announced with one A2A broadcast to the shelter agents, and trips go out in one broadcast to the driver agents. Every agent also has an A2A card and an OASF record (Open menu, Agent records).</span></li>
+    <li><b>NVIDIA Brev (optional)</b><span>The photo reader can also run on an open vision model (Qwen2.5-VL) on a Brev GPU instead of Claude. See docs/BREV_SETUP.md.</span></li>
+  </ul>
 </section>
 </main>
 

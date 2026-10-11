@@ -410,6 +410,59 @@ def test_each_demo_scenario_shows_the_outcome_in_its_title():
         assert w.outcomes.get(outcome), (name, w.outcomes)
 
 
+def test_spoken_leftovers_fill_in_the_menu():
+    import app
+    import llm
+    saved = llm.available
+    llm.available = lambda: False   # the word-matching path, no AI needed
+    try:
+        c = app.app.test_client()
+        r = c.post("/api/voice/donation", data={"business": "corner-bakery",
+                   "text": "we have two dozen plain bagels and 12 sesame bagels and 4 sourdough loaves"}).get_json()
+        got = {ln["name"]: ln["qty"] for ln in r["lines"]}
+        assert got == {"Plain bagel": 24, "Sesame bagel": 12, "Sourdough loaf": 4}, got
+        r = c.post("/api/voice/donation", data={"business": "lakeside-hotel",
+                   "text": "two trays of chicken curry with rice and one vegetable lasagna"}).get_json()
+        assert {ln["name"]: ln["qty"] for ln in r["lines"]} == {"Chicken curry with rice": 2, "Vegetable lasagna": 1}
+        assert c.post("/api/voice/donation", data={"business": "campus-cafe"}).status_code == 400
+    finally:
+        llm.available = saved
+
+
+# ---------- AGNTCY ----------
+
+def test_every_agent_has_an_a2a_card_and_an_oasf_record():
+    import app
+    app.state["world"] = World(live=True)
+    r = app.app.test_client().get("/agntcy/records").get_json()
+    w = app.state["world"]
+    assert r["count"] == len(w.businesses) + len(w.nonprofits) + len(w.drivers) + 3   # + Speed, Cost, Need
+    rec = r["records"][0]
+    assert rec["schema_version"] and rec["modules"][0]["name"] == "integration/a2a"
+    card = rec["modules"][0]["data"]["card_data"]
+    assert card["name"].startswith("uplink/") and card["preferredTransport"] == "natspatterns"
+
+
+def test_agntcy_off_means_in_process_and_same_answers():
+    import agntcy_bridge
+    assert not agntcy_bridge.enabled()   # tests never need a NATS server
+    w = World(live=True)
+    d = w.add_donation(dict(PIZZA), "campus-cafe")
+    assert agntcy_bridge.offers(w, d, list(w.nonprofits.values())) is None   # caller falls back to in-process
+
+
+def test_new_information_opens_the_replan_and_each_agent_says_if_it_changed_its_mind():
+    w = World(copy.deepcopy(scenarios.SCENARIOS["volunteer_no_show"]), live=False)
+    for _ in range(60):
+        w.tick()
+    replans = [n for n in w.negotiations if n.get("new_info")]
+    assert replans, "a driver cancelled, so some negotiation should carry the new information"
+    first = replans[0]["rounds"][0]["messages"]
+    assert first[0]["type"] == "news" and "cancelled" in first[0]["text"]
+    assert {m["agent"] for m in first if m["type"] == "revise"} == {"Speed", "Cost", "Need"}
+    assert any(m["text"].startswith("That changes my pick") for m in first if m["type"] == "revise")
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

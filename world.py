@@ -9,6 +9,7 @@ import math
 import os
 
 import agents
+import agntcy_bridge
 import network
 from config import (COST_LIMIT, HANDOFF_MIN, HUMAN_TIMEOUT, JOIN_EXTRA_MIN, PHONE_ONLINE_SECONDS,
                     MIN_LOT, RELIABILITY_PENALTY, SAFETY_MARGIN, SHELTER_TIMEOUT, SPEED_KMH, START,
@@ -220,9 +221,11 @@ class World:
                      f"safe until {hhmm(d['safe_until'])}. {len(ok)} shelters can safely take it.")
             d["announced"] = True
         # each shelter agent answers from its own point of view
+        # with AGNTCY on, this is one A2A broadcast over NATS to the shelter agents (agntcy_bridge.py)
+        remote = agntcy_bridge.offers(self, d, ok) if (log and self.live) else None
         offers = {}
         for n in ok:
-            o = network.shelter_offer(self, n, d)
+            o = remote[n["id"]] if remote else network.shelter_offer(self, n, d)
             offers[n["id"]] = o
             if log:
                 self.net(d, n["name"], d["business_name"], o["kind"], o["reason"])
@@ -230,23 +233,28 @@ class World:
         # each driver agent bids on each trip
         plans, late, refused = [], 0, 0
         bids_by_driver = {}
+        trips = []
         for n in ok:
-            o = offers[n["id"]]
             for dr in self.usable_drivers(d, n):
                 p = self.make_plan(d, n, dr)
                 if p["arrive"] > d["safe_until"] - SAFETY_MARGIN or p["arrive"] > n["open_min"]:
                     late += 1
                     continue
-                bid = network.driver_bid(self, dr, d, n, p)
-                if not bid["willing"]:
-                    refused += 1
-                    bids_by_driver.setdefault(dr["name"], []).append(f"declines {n['name']}: {bid['reason']}")
-                    continue
-                p["servings"] = o["servings"]
-                p["partial"] = o["kind"] == "counter"
-                p["offer"] = o["reason"]
-                bids_by_driver.setdefault(dr["name"], []).append(f"{n['name']}: {bid['reason']}")
-                plans.append(p)
+                trips.append((f"{n['id']}|{dr['id']}", dr, n, p))
+        # with AGNTCY on, one A2A broadcast to the driver agents carries every trip they could make
+        remote_bids = agntcy_bridge.bids(self, d, trips) if (log and self.live) else None
+        for key, dr, n, p in trips:
+            o = offers[n["id"]]
+            bid = remote_bids[key] if remote_bids else network.driver_bid(self, dr, d, n, p)
+            if not bid["willing"]:
+                refused += 1
+                bids_by_driver.setdefault(dr["name"], []).append(f"declines {n['name']}: {bid['reason']}")
+                continue
+            p["servings"] = o["servings"]
+            p["partial"] = o["kind"] == "counter"
+            p["offer"] = o["reason"]
+            bids_by_driver.setdefault(dr["name"], []).append(f"{n['name']}: {bid['reason']}")
+            plans.append(p)
         if log:
             for name, lines in bids_by_driver.items():
                 more = f" (+{len(lines) - 2} more)" if len(lines) > 2 else ""
@@ -359,6 +367,9 @@ class World:
         reconsidering = d.get("reconsider") and d["status"] == "en_route"
         d["reconsider"] = False
         self.outcomes[result["outcome"]] = self.outcomes.get(result["outcome"], 0) + 1
+        info = d.pop("new_info", None)
+        if info:
+            self._mark_new_info(d, result, info)
         self.negotiation = dict(result, donation=d["id"], food=", ".join(d["food"]["items"]),
                                 time=hhmm(self.now), seq=next(self._neg_ids))
         self.negotiations.append(self.negotiation)
@@ -629,6 +640,31 @@ class World:
                  f"\"Is this free of {gap['allergens']}?\" Will act on what we know by "
                  f"{hhmm(d['answer_by'])} if there's no answer.", "result", d["id"])
 
+    def _mark_new_info(self, d, result, info):
+        """The effect of new information: open the debate with what changed, then each agent says whether
+        it changed its pick (compared with its final pick last time) and why."""
+        result["new_info"] = info
+        prev = next((n for n in reversed(self.negotiations) if n["donation"] == d["id"]), None)
+        if not result.get("rounds"):
+            return
+        lines = [{"agent": "News", "type": "news", "text": f"New information: {info}."}]
+        first = result["rounds"][0]["proposals"]
+        before = prev["rounds"][-1]["proposals"] if prev and prev.get("rounds") else {}
+
+        def name(pid):
+            if not pid:
+                return "nothing"
+            np, dr = (pid.split("|") + [""])[:2]
+            n, x = self.nonprofits.get(np), self.drivers.get(dr)
+            return f"{n['name'] if n else np}" + (f" via {x['name']}" if x else "")
+        for a in agents.AGENTS:
+            was, now = before.get(a), first.get(a)
+            if was and now and was != now:
+                lines.append({"agent": a, "type": "revise", "text": f"That changes my pick: I wanted {name(was)}, now {name(now)}."})
+            elif was and now:
+                lines.append({"agent": a, "type": "revise", "text": f"Still {name(now)}; this doesn't change my pick."})
+        result["rounds"][0]["messages"] = lines + result["rounds"][0]["messages"]
+
     def confirm_allergens(self, did, allergens=None):
         """The business answers. allergens=None means "can't confirm": keep treating them as present."""
         d = self.get(did)
@@ -641,6 +677,7 @@ class World:
             d["food"]["allergens_unverified"] = False
             listed = ", ".join(allergens) or "none of the common ones"
             self.say("World", f"{d['business_name']} confirms the allergens: {listed}. New information; replanning.", "event", did)
+            d["new_info"] = f"{d['business_name']} confirmed the allergens are only: {listed}"
         d["status"] = "new"
         return True
 
@@ -661,9 +698,11 @@ class World:
             d["origin"] = dict(dr["pos"])
             d["locked_driver"] = dr["id"]
             self.say("World", f"{d['id']}: {why}. {dr['name']} already has the food; replanning from here.", "event", d["id"])
+            d["new_info"] = f"{why}, and {dr['name']} already has the food"
         else:
             dr["status"] = "free"
             self.say("World", f"{d['id']}: {why}. Replanning.", "event", d["id"])
+            d["new_info"] = why
         d["status"] = "new"
 
     def cancel_driver(self, driver_id):
@@ -682,6 +721,7 @@ class World:
         self.say("World", f"{dr['name']} cancelled. Reliability {old:.0%} → {dr['reliability']:.0%}; every agent now sees that.", "event")
         for d in self.donations:
             if d["status"] == "awaiting_shelter" and d["ask"]["plan"]["driver"] == driver_id:
+                d["new_info"] = f"{dr['name']} cancelled; reliability dropped from {old:.0%} to {dr['reliability']:.0%}"
                 d.pop("ask")
                 d["status"] = "new"
                 self.say("World", f"{d['id']} needs a new driver.", "event", d["id"])
@@ -692,6 +732,7 @@ class World:
                              f"{agent}'s vote now weighs {self.weights[agent]}.", "adapt", d["id"])
                 d["status"] = "new"
                 d["plan"] = None
+                d["new_info"] = f"{dr['name']} cancelled; reliability dropped from {old:.0%} to {dr['reliability']:.0%}"
                 self.say("World", f"{d['id']} needs a new driver.", "event", d["id"])
 
     def add_pantry(self):
@@ -703,8 +744,10 @@ class World:
             if d["status"] in ("stuck", "awaiting_human"):
                 d["status"] = "new"
                 d["skip"] = []
+                d["new_info"] = f"{n['name']} just joined the network"
             elif d["status"] == "en_route" and self.now < d["t_pick"] and self.policy == "agents":
                 d["reconsider"] = True
+                d["new_info"] = f"{n['name']} just joined the network"
 
     # ---------------- clock ----------------
     def tick(self, minutes=1, plan_inline=True):

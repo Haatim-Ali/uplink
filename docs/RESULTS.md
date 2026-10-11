@@ -10,6 +10,28 @@
 
 Rules mode, deterministic. Regenerate with `python scenarios.py` (the tables at the bottom are its output).
 
+## Together vs each agent alone (Sat 7 PM)
+
+The challenge asks: *can independent AI agents make better decisions together than they can individually?*
+We ran the same 100 seeded random scenarios (3–6 donations, driver no-shows, full shelters, new pantries)
+through the negotiating team, through each agent deciding alone with the same safety rules, and through
+the nearest-shelter baseline. Reproduce with `python -c "import scenarios; print(scenarios.compare_random(100, solo=True)['totals'])"`.
+
+| Policy | Servings lost | Meals delivered | Shelters fed | Paid-driver cost |
+| --- | ---: | ---: | ---: | ---: |
+| Baseline (nearest shelter) | 3,502 | 12,823 | 247 | $2,804 |
+| Speed alone | 1,210 | 15,115 | 296 | $3,294 |
+| Cost alone | 1,503 | 14,822 | 288 | **$1,372** |
+| Need alone | 1,856 | 14,469 | 375 | $2,724 |
+| **Team (negotiating)** | **695** | **15,630** | **420** | $2,154 |
+
+- The team loses **43% less food than the best single agent** (Speed) and 63% less than the worst (Need).
+- It loses the least food, or ties, in **93 of 100** runs, and delivers the most meals and feeds the most shelters overall.
+- **Each agent alone fails on its blind spot.** Speed spends the most. Cost is cheapest but picks unreliable
+  volunteers, so more food spoils when they don't show. Need feeds more shelters but takes slow, risky trips.
+- **Trade-off we disclose:** Cost alone is cheaper ($1,372 vs $2,154). The team pays more to lose half as much food.
+- Against the baseline: 80% less food lost, 22% more meals, 23% lower cost, and never worse in any of the 100 runs.
+
 ## Update after adding shelter and driver agents (Sat 1:40 PM)
 
 The findings below were written before the agent network was merged (shelter agents that accept, counter-offer or decline; driver agents that bid or refuse trips beyond their range; counter-offers that split a donation). The tables at the bottom are regenerated on the merged code. **Haatim: please re-check findings 2 and 5 against the new numbers.** What changed:

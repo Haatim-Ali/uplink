@@ -166,8 +166,34 @@ def _propose_reason(agent, p, world):
     n = world.nonprofits[p["np"]]
     room = n["capacity_servings"] - n["received"] - world.committed(n["id"])
     if world.committed(n["id"]):
-        return f"Food already heading there, but it still has room for {room} servings."
-    return f"Last donation {n['last_donation_days']} days ago; room for {room} more servings."
+        return f"{n['name']} already has food on the way, but it still has room for {room} servings. Which shelter matters to me, not which driver."
+    # contrast with the shelter fed most recently, so it's clear what this choice is weighed against
+    others = [o for o in world.nonprofits.values() if o["id"] != n["id"] and not o.get("full")]
+    fresh = min(others, key=lambda o: (o["last_donation_days"] - (1 if world.committed(o["id"]) else 0)), default=None)
+    vs = ""
+    if fresh and (fresh["last_donation_days"] < n["last_donation_days"] or world.committed(fresh["id"])):
+        vs = f" {fresh['name']} {'already has food coming' if world.committed(fresh['id']) else _fed(fresh['last_donation_days'])}."
+    return f"{n['name']} {_waited(n['last_donation_days'])} and has room for {room} more servings.{vs} Which shelter matters to me, not which driver."
+
+
+def _fed(days):
+    return "got food today" if days == 0 else "got food yesterday" if days == 1 else f"got food {days} days ago"
+
+
+def _waited(days):
+    return "got food today" if days == 0 else "has waited a day" if days == 1 else f"has waited {days} days for food"
+
+
+def accept_reason(agent, p, world):
+    """Why an agent can live with a plan, in its own terms."""
+    if agent == "Speed":
+        return f"Accept: arrives with {p['slack']} min to spare and {p['driver_name']} is {p['reliability']:.0%} reliable."
+    if agent == "Cost":
+        return "Accept: costs nothing." if p["cost"] == 0 else f"Accept: ${p['cost']:.2f} is close enough to the cheapest option."
+    n = world.nonprofits[p["np"]]
+    if world.committed(n["id"]) or n["last_donation_days"] == 0:
+        return f"Accept, reluctantly: {n['name']} isn't the one that needs it most, but the others can live with this."
+    return f"Accept: {n['name']} {_waited(n['last_donation_days'])}. Any safe driver is fine with me."
 
 
 def object_reason(agent, p, best, world):
@@ -183,8 +209,10 @@ def object_reason(agent, p, best, world):
                     "A no-show means paying a courier to rescue it."), "reliability"
         return f"Object: ${p['cost']:.2f} when {short(best)} costs ${best['cost']:.2f} and is also safe.", "cost"
     n, bn = world.nonprofits[p["np"]], world.nonprofits[best["np"]]
-    return (f"Object: {p['np_name']} got food {n['last_donation_days']} days ago; "
-            f"{bn['name']} has waited {bn['last_donation_days']} days."), "need"
+    mine = "already has food on the way" if world.committed(n["id"]) else _fed(n["last_donation_days"])
+    room = bn["capacity_servings"] - bn["received"] - world.committed(bn["id"])
+    return (f"Object: {p['np_name']} {mine}, while {bn['name']} {_waited(bn['last_donation_days'])} "
+            f"and has room for {room}. Send it where it's needed."), "need"
 
 
 def _rules_round(world, d, plans, S, V, r):
@@ -321,7 +349,7 @@ def negotiate(world, d, plans):
                 else:
                     acc = _rules_vote(a, pid, S, best_score, r, p)
                     if acc:
-                        why, kind = "Accept: good enough for my goal.", None
+                        why, kind = accept_reason(a, p, world), None
                     else:
                         why, kind = object_reason(a, p, best_plan[a], world)
                 votes[pid][a] = {"accept": acc, "reason": why, "kind": None if acc else kind}
