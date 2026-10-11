@@ -381,7 +381,7 @@ function drawGlobal(){
   const vals = {meals:i.meals, lbs:i.lbs, orgs:i.orgs, lost:i.spoiled, cost:"$"+i.cost.toFixed(2), esc:i.escalations};
   document.querySelectorAll("[data-k]").forEach(el=>{ el.textContent = vals[el.dataset.k]; if(el.hasAttribute("data-bad")) el.classList.toggle("nonzero", i.spoiled>0); });
   $("clock").textContent = S.now + (S.paused?" (paused)":"");
-  $("mode").textContent = `${S.mode.agents} agents · ${S.mode.vision} vision · ${S.mode.voice||"browser"} voice`;
+  $("mode").textContent = modeText(S.mode);
   $("pause").textContent = S.paused ? "Resume" : "Pause";
   drawCamera();
   const pend = pendingList(), c = $("dec-count");
@@ -699,4 +699,11 @@ function drawCall(){
   const tx = $("call-tx"); tx.scrollTop = tx.scrollHeight;
 }
 setInterval(() => { if(call && call.phase === "talk") drawCall(); }, 1000);
+
+// status badge: say plainly which AI is doing what
+function modeText(m){
+  const who = (prov, model) => prov === "anthropic" ? `Claude${model ? " (" + model.replace(/^claude-/, "") + ")" : ""}` : prov === "openai" ? (model || "open model") : "demo";
+  const agents = m.agents === "llm" ? who(m.vision === "anthropic" ? "anthropic" : "openai", m.agents_model) : "rules";
+  return `Agents: ${agents} · Vision: ${who(m.vision, m.vision_model)} · Voice: ${m.voice === "elevenlabs" ? "ElevenLabs" : "browser"}`;
+}
 

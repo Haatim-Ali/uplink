@@ -241,6 +241,14 @@
     <div class="panel"><h3>Simulated</h3><ul class="plain"><li>The city, the shelters and the drivers.</li><li>The clock: one minute is one second at 1× speed.</li><li>Driver movement along straight lines.</li><li>Events such as a full shelter, a no-show or a new pantry (triggered from Demo controls).</li></ul></div>
   </div>
   <p class="helper" style="margin-top:1rem">More detail: README.md and docs/ARCHITECTURE.md in the project.</p>
+
+  <h2 class="sec-h">Built with</h2>
+  <ul class="built">
+    <li><b>Claude API (Anthropic)</b><span>Reads the food in each photo, matched against the restaurant's menu, and, when AI reasoning is on, writes each agent's proposals, objections and votes. Safety rules and vote counting stay in plain code.</span></li>
+    <li><b>ElevenLabs</b><span>Flash v2.5 gives Speed, Cost, Need, the dispatcher and the shelter their own voices. Scribe turns a shelter's spoken answer into text the agents act on.</span></li>
+    <li><b>Cisco Outshift challenge</b><span>Built for "When AI Agents Disagree", Level 3: agents with competing goals, no central decision-maker, and clear rules for when to stop, keep disagreeing, or ask a person.</span></li>
+    <li><b>NVIDIA Brev (optional)</b><span>The photo reader can also run on an open vision model (Qwen2.5-VL) on a Brev GPU instead of Claude. See docs/BREV_SETUP.md.</span></li>
+  </ul>
 </section>
 </main>
 

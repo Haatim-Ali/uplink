@@ -440,3 +440,10 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 .call-tx small{display:block;margin-top:.2rem;font:500 10px var(--mono);color:var(--faint)}
 @media (prefers-reduced-motion:reduce){.caller.talking .wave i{animation:none;height:14px}.line.ringing svg{animation:none}}
 @media (max-width:900px){.call-body{grid-template-columns:1fr}}
+
+/* How it works: built with */
+.built{list-style:none;margin:.5rem 0 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.built li{background:var(--panel);border:1px solid var(--line);border-radius:var(--r3);padding:1rem 1.15rem}
+.built b{display:block;margin-bottom:.25rem}
+.built span{color:var(--muted);font-size:var(--t-sm);line-height:1.5}
+@media (max-width:760px){.built{grid-template-columns:1fr}}

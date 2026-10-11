@@ -135,8 +135,13 @@ def api_state():
         s = W().to_json()
     s["speed"] = state["speed"]
     s["paused"] = state["paused"]
-    s["mode"] = {"agents": "llm" if agents.use_llm() else "rules", "vision": llm.provider() or "demo",
-                 "voice": "elevenlabs" if voice.available() else "browser"}
+    prov = llm.provider()
+    claude = prov == "anthropic"
+    s["mode"] = {"agents": "llm" if agents.use_llm() else "rules", "vision": prov or "demo",
+                 "voice": "elevenlabs" if voice.available() else "browser",
+                 # which models are actually answering, so the dashboard can credit them
+                 "agents_model": (os.getenv("AGENT_MODEL") or (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL if claude else os.getenv("OPENAI_MODEL", ""))) if agents.use_llm() else "",
+                 "vision_model": (os.getenv("ANTHROPIC_MODEL") or llm.CLAUDE_MODEL) if claude else (os.getenv("OPENAI_MODEL", "") if prov else "")}
     s["scenarios"] = [{"name": k, "title": v["title"]} for k, v in scenarios.SCENARIOS.items()]
     s["cameras"] = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
     return jsonify(s)

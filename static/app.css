@@ -219,3 +219,5 @@ input,select{font-size:1.05rem;min-height:3.2rem;border-radius:14px;border-color
 .menu-total b{display:block;font-size:1.05rem}
 .menu-total small{color:#c9c9cf}
 .menu-total .btn{min-height:3.2rem;border-radius:14px;padding:.6rem 1.3rem;font-size:1.05rem}
+
+.foot .powered{color:var(--faint);font-size:.82rem;margin-bottom:.4rem}
