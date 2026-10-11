@@ -103,7 +103,21 @@
     <div class="panel-head"><h2 id="wire-h">Agent network <span class="sub-h">live messages for the current donation</span></h2><span class="wire-right"><span class="pill outline xport" id="xport" title="How the shelter and driver agents receive messages">in-process</span><span class="wire-stat" id="wire-stat"><i class="dot"></i>idle</span></span></div>
     <div class="wire-body">
       <svg id="wire" viewBox="0 0 1000 300" role="img" aria-label="Diagram of the business, shelter, driver and coordinator agents and the messages between them"></svg>
-      <ol class="wire-log" id="wire-log" aria-label="Message log"></ol>
+      <div class="wire-side">
+        <div class="panel hero" id="hero-panel" hidden>
+          <div class="panel-head"><h2>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
+          <div id="neg"></div>
+          <details class="more" id="debate-more">
+            <summary>See the debate <span class="muted small">transcript, votes by round</span></summary>
+            <div class="more-body">
+              <div id="history" class="history"></div>
+              <div class="rounds" id="rounds" role="group" aria-label="Negotiation round"></div>
+              <div id="debate-body"></div>
+            </div>
+          </details>
+        </div>
+        <p class="wire-side-empty muted small">When a donation arrives, the three agents negotiate here.</p>
+      </div>
     </div>
   </div>
 
@@ -119,17 +133,9 @@
   <div class="live-grid">
     <div class="stack-col">
       <div class="panel" id="cur-don"></div>
-      <div class="panel hero" id="hero-panel" hidden>
-        <div class="panel-head"><h2>Negotiation <span class="sub-h">three agents, no boss</span></h2></div>
-        <div id="neg"></div>
-        <details class="more" id="debate-more">
-          <summary>See the debate <span class="muted small">transcript, votes by round</span></summary>
-          <div class="more-body">
-            <div id="history" class="history"></div>
-            <div class="rounds" id="rounds" role="group" aria-label="Negotiation round"></div>
-            <div id="debate-body"></div>
-          </div>
-        </details>
+      <div class="panel" aria-labelledby="log-h">
+        <div class="panel-head"><h2 id="log-h">Message log <span class="sub-h">every message between agents for this donation</span></h2></div>
+        <ol class="wire-log" id="wire-log" aria-label="Message log"></ol>
       </div>
     </div>
     <div class="panel map-panel">

@@ -361,7 +361,7 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 
 /* ---------- Agent network diagram (live) ---------- */
 .wire{margin-bottom:1.25rem}
-.wire-body{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:1rem;align-items:stretch}
+.wire-body{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:1rem;align-items:start}
 #wire{width:100%;height:auto;min-height:15rem;display:block;background:radial-gradient(circle,var(--line) 1px,transparent 1px) 0 0/22px 22px;border-radius:var(--r2)}
 .wire-stat{display:inline-flex;align-items:center;gap:.45rem;font:600 var(--t-xs)/1 var(--mono);color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
 .wire-stat .dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--faint)}
@@ -482,3 +482,9 @@ ul.plain{margin:0;padding-left:1.1rem;color:var(--ink-2);font-size:var(--t-sm);d
 @keyframes wthink{0%,100%{stroke-width:2.5;stroke-opacity:1}50%{stroke-width:6;stroke-opacity:.45}}
 .w-step{font:600 12px var(--mono);fill:var(--muted)}
 @media (prefers-reduced-motion:reduce){.node.coord.thinking circle{animation:none;stroke-width:4}}
+
+/* the negotiation beside the network graph; the message log moved down beside the map */
+.wire-side .hero{margin:0}
+.wire-side-empty{display:none;margin:0;padding:1.5rem 1rem;border:1px dashed var(--line);border-radius:var(--r2);text-align:center}
+.wire-side:has(#hero-panel[hidden]) .wire-side-empty{display:block}
+.stack-col .wire-log{max-height:24rem}
