@@ -48,7 +48,7 @@ function speak(who, text, next){
   } else browserSpeak(who, text);
 }
 function replay(){ const n = pinned ? (S.negotiations||[]).find(h=>h.seq===pinned) : S.negotiation; if(!n) return; callFor = n.seq;
-  play = {seq: n.seq, shown: 0, total: n.rounds.reduce((k,r)=>k+r.messages.length,0)}; drawNegotiation(); }
+  play = {key: play.key, seq: n.seq, shown: 0, total: n.rounds.reduce((k,r)=>k+r.messages.length,0)}; drawNegotiation(); }
 const $ = id => document.getElementById(id);
 // Write HTML only when it changed: no flicker, hover and scroll survive the 1-second refresh.
 function setHTML(el, html){ if(typeof el==="string") el=$(el); if(el._html!==html){ el._html=html; el.innerHTML=html; } }
@@ -231,7 +231,7 @@ function drawLiveDebate(){
   const box = document.querySelector("#neg .debate"); if(box) box.scrollTop = box.scrollHeight;
 }
 
-function pin(seq){ pinned = (pinned===seq ? null : seq); lastNegKey=null; drawNegotiation(); }
+function pin(seq){ if(S && S.holding) releaseHold(null); pinned = (pinned===seq ? null : seq); lastNegKey=null; drawNegotiation(); }
 function drawNegotiation(){
   try{ drawWire(); }catch(e){ console.error(e); }
   const hero = $("hero-panel");
@@ -243,12 +243,14 @@ function drawNegotiation(){
   hero.hidden = false;
   const shownSeq = pinned || n.seq;
   const msgs = n.rounds.flatMap(r => r.messages.map(m => ({...m, round: r.round})));
-  if(!pinned && n.seq !== play.seq && play.seq !== null && n.seq > play.seq){
+  const nkey = S.world_id + ":" + n.seq;   // seq restarts at 1 after a scenario reset, so key by world too
+  if(!pinned && play.key !== undefined && nkey !== play.key){
+    play.key = nkey;
     // already watched live as the agents spoke: no replay, straight to the result
     const watched = liveSeen.donation === n.donation && liveSeen.count > 0;
-    play = {seq: n.seq, shown: watched ? msgs.length : 0, total: msgs.length}; callFor = n.seq; liveSeen = {donation: null, count: 0};
+    play = {key: nkey, seq: n.seq, shown: watched ? msgs.length : 0, total: msgs.length}; callFor = n.seq; liveSeen = {donation: null, count: 0};
   }
-  if(play.seq === null){ play = {seq: n.seq, shown: msgs.length, total: msgs.length}; }   // first load: no replay of old news
+  if(play.seq === null || play.seq === undefined){ play = {key: nkey, seq: n.seq, shown: msgs.length, total: msgs.length}; }   // old news
   const shown = play.seq === n.seq ? play.shown : msgs.length;
   const playing = shown < msgs.length;
   const key = n.seq + "|" + n.donation + "|" + n.rounds.length + "|" + n.outcome + "|" + (n.plan?n.plan.id:"");
@@ -285,6 +287,8 @@ function drawNegotiation(){
   }
 
   if(!playing && n.plan && callFor === n.seq && !pinned){ callFor = null; startCall(n); }
+  // nothing left to play for this decision (no plan, or no call coming): let the driver go now
+  if(S.holding && !playing && callFor === null && !(call && call.phase !== "ended")) releaseHold(null);
 
   // ---- detail (inside "See the debate"): only built when opened ----
   if(!$("debate-more").open) return;
@@ -430,7 +434,7 @@ function drawGlobal(){
 function drawLive(){
   const scn = (S.scenarios.find(x=>x.name===S.scenario)||{}).title;
   const run = $("sl-run");
-  run.className = "pill " + (S.paused ? "warn" : "ok"); run.textContent = S.paused ? "Paused" : `Running ${S.speed}×`;
+  run.className = "pill " + (S.paused ? "warn" : S.holding ? "outline" : "ok"); run.textContent = S.paused ? "Paused" : S.holding ? "Dispatcher calling · driver waits" : `Running ${S.speed}×`;
   setHTML("sl-scn", scn ? esc(scn.split(":")[0]) : "No scenario running");
   setHTML("sl-extra", `${S.donations.length} donation${S.donations.length===1?"":"s"} · ${S.agents_online ? S.agents_online.shelters+" shelters · "+S.agents_online.drivers+" drivers" : ""}`);
   const pend = pendingList(), al = $("live-alert");
@@ -530,7 +534,9 @@ document.addEventListener("keydown", e => {
 // ---------- data loop ----------
 async function refresh(){
   try{
-    S = await (await fetch("/api/state")).json();
+    S = await (await fetch("/api/state?view=ops")).json();
+    // first load: whatever was decided before this page opened is old news (no replay, no call)
+    if(play.key === undefined) play.key = S.negotiation ? S.world_id + ":" + S.negotiation.seq : "none";
     if(!$("scenario").options.length){
       $("scenario").innerHTML = S.scenarios.map(s=>`<option value="${s.name}">${esc(s.title)}</option>`).join("");
       if(S.scenarios.some(x=>x.name===S.scenario)) $("scenario").value = S.scenario;
@@ -788,7 +794,11 @@ async function startCall(n){
     me.talking = null; drawCall(); await wait(350);
   }
   me.phase = "ended"; me.secs = Math.round((Date.now() - me.t0) / 1000); drawCall();
+  releaseHold(me.seq);
 }
+// the server holds the clock after a decision until the call has played; then the driver sets off on the map
+let lastRelease = 0;
+function releaseHold(seq){ if(seq === null && Date.now() - lastRelease < 2000) return; lastRelease = Date.now(); fetch("/api/control", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({release:true, seq})}).catch(()=>{}); }
 const WAVE = "<i></i>".repeat(14);
 function drawCall(){
   const card = $("call-card"); if(!card) return;

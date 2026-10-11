@@ -4,6 +4,7 @@ The agents are real; the world around them is simulated (1 tick = 1 minute).
 """
 import datetime
 import itertools
+import uuid
 import time
 import json
 import math
@@ -90,6 +91,7 @@ class World:
         self.busy = False
         self._ids = itertools.count(1)
         self._neg_ids = itertools.count(1)
+        self.world_id = uuid.uuid4().hex[:8]   # a new world (scenario reset) restarts negotiation numbers
         if scenario:
             self.load_scenario(scenario)
 
@@ -917,7 +919,7 @@ class World:
                 x["decide_by"] = hhmm(self.last_call(d))   # after this the fallback rule acts
             dons.append(x)
         return {
-            "now": hhmm(self.now), "scenario": self.scenario_name, "busy": self.busy,
+            "now": hhmm(self.now), "scenario": self.scenario_name, "busy": self.busy, "world_id": self.world_id,
             "nonprofits": [{k: n[k] for k in ("id", "name", "lat", "lng", "accepts", "has_fridge", "open_until",
                                               "capacity_servings", "received", "full", "last_donation_days")}
                            for n in self.nonprofits.values()],

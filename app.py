@@ -68,14 +68,17 @@ def start_mesh():
 
 # ---------------- background loops ----------------
 
+HOLD_MAX = 75   # seconds the clock waits for the dashboard to finish the call before moving on anyway
+
+
 def clock_loop():
     """1 simulated minute per real second (times the speed setting). Pauses while agents deliberate."""
     while True:
         time.sleep(1.0 / max(0.1, state["speed"]))
         with lock:
             w = W()
-            if state["paused"] or w.busy:
-                continue
+            if state["paused"] or w.busy or time.time() < state.get("hold_until", 0):
+                continue   # paused, agents deliberating, or the dispatcher's call is still playing on /ops
             w.tick(plan_inline=False)
 
 
@@ -120,6 +123,14 @@ def planner_loop():
                 d["status"] = "new"  # driver was taken meanwhile; renegotiate
                 continue
             w.finish(d, plans, result)
+            # With the ops dashboard open, the first driver sets off only after it has played the dispatcher's call
+            # (it says when; HOLD_MAX is a backstop), so the map moves after the story is told, not during it
+            # (the first call of each scenario only: busy scenarios with many donations keep moving)
+            if plan and w.negotiation and time.time() - state.get("ops_seen", 0) < 5 \
+                    and state.get("held_world") != w.world_id:
+                state["held_world"] = w.world_id
+                state["hold_until"] = time.time() + HOLD_MAX
+                state["hold_seq"] = w.negotiation["seq"]
 
 
 # ---------------- pages ----------------
@@ -176,8 +187,11 @@ def api_state():
     with lock:
         s = W().to_json()
         cams = {b: c["counts"] for b, c in state["cameras"].items() if time.time() - c["seen"] < 5}
+    if request.args.get("view") == "ops":
+        state["ops_seen"] = time.time()
     s["speed"] = state["speed"]
     s["paused"] = state["paused"]
+    s["holding"] = time.time() < state.get("hold_until", 0)
     prov = llm.provider()
     claude = prov == "anthropic"
     s["mode"] = {"agents": "llm" if agents.use_llm() else "rules", "vision": prov or "demo",
@@ -200,6 +214,7 @@ def api_reset():
     sc = copy.deepcopy(scenarios.SCENARIOS[name]) if name in scenarios.SCENARIOS else None
     with lock:
         state["world"] = World(sc, live=True)
+        state["hold_until"] = 0
         state["world"].mesh = MESH
         state["paused"] = False
     if MESH:
@@ -240,6 +255,8 @@ def api_control():
         state["speed"] = float(body["speed"])
     if "paused" in body:
         state["paused"] = bool(body["paused"])
+    if body.get("release") and body.get("seq") in (None, state.get("hold_seq")):
+        state["hold_until"] = 0   # the dashboard finished the call: the driver sets off
     return jsonify(ok=True, speed=state["speed"], paused=state["paused"])
 
 
