@@ -427,6 +427,32 @@ def test_one_time_item_is_donated_without_touching_the_menu():
             menu.EXTRA = saved
 
 
+def test_one_time_item_checked_by_a_person_is_verified_and_can_be_saved():
+    import tempfile
+
+    import app
+    import menu
+    saved = menu.EXTRA
+    with tempfile.TemporaryDirectory() as tmp:
+        menu.EXTRA = os.path.join(tmp, "extra.json")
+        try:
+            app.state["world"] = World(live=True)
+            c = app.app.test_client()
+            x = {"name": "Vegetable lasagna", "qty": 2, "serves": 8, "category": "hot prepared",
+                 "ingredients": ["pasta", "ricotta", "spinach"], "allergens": ["dairy", "gluten", "eggs"],
+                 "confirmed": True, "save": True}
+            r = c.post("/api/donate/menu", json={"business": "campus-cafe", "extras": [x]}).get_json()
+            f = app.state["world"].get(r["ids"][0])["food"]
+            assert not f["allergens_unverified"] and "ricotta" in f["notes"] and "checked by the business" in f["notes"]
+            kept = [m for m in menu.items("campus-cafe") if m["name"] == "Vegetable lasagna"]
+            assert kept and kept[0]["ingredients"] == ["pasta", "ricotta", "spinach"]
+            # saving without checking the allergens doesn't add it to the menu
+            c.post("/api/donate/menu", json={"business": "campus-cafe", "extras": [{**x, "name": "Mystery stew", "confirmed": False}]})
+            assert not any(m["name"] == "Mystery stew" for m in menu.items("campus-cafe"))
+        finally:
+            menu.EXTRA = saved
+
+
 def test_photo_items_not_on_the_menu_are_named():
     import menu
     f = menu.enrich({"items": ["pepperoni pizza (2 pizzas)", "lasagna tray"], "allergens": [], "category": "packaged",

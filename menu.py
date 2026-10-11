@@ -16,6 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 BASE = os.path.join(HERE, "data", "menus.json")
 EXTRA = os.path.join(HERE, "data", "menu_additions.json")
 CATEGORIES = ["hot prepared", "cold prepared", "packaged", "produce"]
+ALLERGENS = ["dairy", "eggs", "gluten", "nuts", "peanuts", "soy", "fish", "shellfish", "sesame"]   # "nuts" = tree nuts
 SAFE_MINUTES = {"hot prepared": 120, "cold prepared": 90, "packaged": 1440, "produce": 720}
 _lock = threading.Lock()
 
@@ -52,7 +53,8 @@ def add(biz, item):
             return existing
         new = {"id": f"{biz}-x{len(mine) + 1}", "name": name, "unit": str(item.get("unit") or "item")[:20],
                "serves": serves, "lbs": round(0.5 * serves, 1), "category": cat, "allergens": alg,
-               "cold": bool(item.get("cold")) or cat == "cold prepared", "added": True}
+               "cold": bool(item.get("cold")) or cat == "cold prepared", "added": True,
+               "ingredients": [str(i).strip()[:40] for i in (item.get("ingredients") or []) if str(i).strip()][:20]}
         mine.append(new)
         with open(EXTRA, "w", encoding="utf-8") as f:
             json.dump(extra, f, indent=1)
@@ -60,7 +62,8 @@ def add(biz, item):
 
 
 def one_time(item):
-    """A leftover that isn't on the menu, cleaned up like a menu item but not saved. Returns None if it has no name."""
+    """A leftover that isn't on the menu, cleaned up like a menu item but not saved. Returns None if it has no name.
+    "confirmed" means a person checked its allergens; until then the donation says they're unconfirmed."""
     name = re.sub(r"\s+", " ", str(item.get("name", ""))).strip()[:60]
     if not name:
         return None
@@ -70,9 +73,11 @@ def one_time(item):
         qty = max(0, min(500, int(float(item.get("qty") or 0))))
     except (TypeError, ValueError):
         return None
-    alg = [str(a).strip().lower() for a in (item.get("allergens") or []) if str(a).strip()][:8]
+    alg = sorted({str(a).strip().lower() for a in (item.get("allergens") or []) if str(a).strip()})[:10]
+    ing = [str(i).strip()[:40] for i in (item.get("ingredients") or []) if str(i).strip()][:20]
     return {"name": name, "qty": qty, "serves": serves, "lbs": round(0.5 * serves, 1), "category": cat, "allergens": alg,
-            "cold": bool(item.get("cold")) or cat == "cold prepared", "one_time": True}
+            "ingredients": ing, "cold": bool(item.get("cold")) or cat == "cold prepared", "one_time": True,
+            "sure": bool(item.get("sure")), "confirmed": bool(item.get("confirmed")), "save": bool(item.get("save"))}
 
 
 def foods_from_lines(biz, lines, extras=None):
@@ -91,21 +96,32 @@ def foods_from_lines(biz, lines, extras=None):
     groups = {}
     for m, qty in picked:
         key = (m["category"], bool(m.get("cold")))
-        g = groups.setdefault(key, {"items": [], "servings": 0, "lbs": 0.0, "allergens": set(), "off_menu": []})
+        g = groups.setdefault(key, {"items": [], "servings": 0, "lbs": 0.0, "allergens": set(), "off_menu": [],
+                                    "unchecked": [], "ingredients": []})
         g["items"].append(f"{m['name']} ×{qty}" if qty > 1 else m["name"])
         g["servings"] += qty * int(m.get("serves", 1))
         g["lbs"] += qty * float(m.get("lbs", 0.5))
         g["allergens"].update(m.get("allergens", []))
         if m.get("one_time"):
             g["off_menu"].append(m["name"])
+            if not m["confirmed"]:
+                g["unchecked"].append(m["name"])
+            if m["ingredients"]:
+                g["ingredients"].append(f"{m['name']}: {', '.join(m['ingredients'])}")
     out = []
     for (cat, cold), g in groups.items():
         lbs = max(0.5, round(g["lbs"], 1))
-        notes = ("Picked from the business's menu, so the allergens come from its recipes." if not g["off_menu"] else
-                 f"Not on the menu: {', '.join(g['off_menu'])}. Its allergens are a best guess, not from a recipe.")
+        if not g["off_menu"]:
+            notes = "Picked from the business's menu, so the allergens come from its recipes."
+        elif g["unchecked"]:
+            notes = f"Not on the menu, allergens not confirmed by the business: {', '.join(g['unchecked'])}."
+        else:
+            notes = f"Not on the menu, allergens checked by the business: {', '.join(g['off_menu'])}."
+        if g["ingredients"]:
+            notes += " Ingredients: " + "; ".join(g["ingredients"]) + "."
         out.append({"items": g["items"], "servings": g["servings"], "weight_lbs": [round(lbs * .9, 1), round(lbs * 1.1, 1)],
                     "category": cat, "needs_cold": cold, "allergens": sorted(g["allergens"]),
-                    "safe_minutes": SAFE_MINUTES[cat], "allergens_unverified": bool(g["off_menu"]), "notes": notes})
+                    "safe_minutes": SAFE_MINUTES[cat], "allergens_unverified": bool(g["unchecked"]), "notes": notes})
     return out
 
 
@@ -228,10 +244,13 @@ def parse_speech(biz, text):
                 f"Menu (id: name):\n{menu_txt}\n\nThey said: \"{text}\"\n\n"
                 'Return {"lines": [{"id": "<menu id>", "qty": <number of units>}], '
                 '"extras": [{"name": "<food not on the menu>", "qty": <number>, "serves": <servings in each one>, '
-                '"category": "hot prepared|cold prepared|packaged|produce", "allergens": ["<likely allergen>"]}]}. '
-                "Count in the menu's units. Only use ids from the menu; anything else they have goes in extras, "
-                "with your best guess at its servings, category and common allergens (dairy, eggs, fish, shellfish, "
-                "tree nuts, peanuts, gluten, soy, sesame). Leave out anything that isn't food.",
+                '"category": "hot prepared|cold prepared|packaged|produce", "ingredients": ["<main ingredient>"], '
+                '"allergens": ["<allergen>"], "sure": true|false}]}. '
+                "Count in the menu's units. Only use ids from the menu; anything else they have goes in extras. "
+                "For extras, estimate servings, category and the main ingredients the dish is made with. "
+                f"List only allergens the dish always contains, from: {', '.join(ALLERGENS)}. "
+                "Set sure to true only if no other allergen could be in it (e.g. plain fruit); if it depends on "
+                "the recipe, set sure to false and don't guess. Leave out anything that isn't food.",
                 max_tokens=800, effort="low", model=llm.agent_model())
             by_id = {m["id"]: m for m in ms}
             lines = [{"id": ln["id"], "name": by_id[ln["id"]]["name"], "qty": max(1, int(float(ln.get("qty") or 1))),

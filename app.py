@@ -331,15 +331,30 @@ def api_voice_donation():
     return jsonify(heard=text, lines=lines, extras=extras, stt=stt, parser=parser)
 
 
+@app.post("/api/menu/<biz>/describe")
+def api_menu_describe(biz):
+    """Typed leftovers ("vegetable lasagna, 3 trays") -> menu lines and one-time items with estimates to check."""
+    text = str((request.get_json(silent=True) or {}).get("text", "")).strip()[:300]
+    if not text:
+        return jsonify(error="Say what it is."), 400
+    lines, extras, parser = menu.parse_speech(biz, text)
+    return jsonify(lines=lines, extras=extras, parser=parser)
+
+
 @app.post("/api/donate/menu")
 def api_donate_menu():
     """Donate items picked from the menu. Different kinds of food (hot, cold, packaged, produce) have
     different safety rules, so each kind becomes its own donation."""
     body = request.get_json(silent=True) or {}
     biz = body.get("business")
-    foods = menu.foods_from_lines(biz, body.get("lines"), body.get("extras"))   # extras: one-time, not on the menu
+    extras = body.get("extras") or []   # one-time leftovers that aren't on the menu
+    foods = menu.foods_from_lines(biz, body.get("lines"), extras)
     if not foods:
         return jsonify(error="Pick at least one item."), 400
+    for x in extras:   # the business asked to keep this one on its menu
+        it = menu.one_time(x)
+        if it and it["save"] and it["confirmed"]:
+            menu.add(biz, {**it, "serves": it["serves"]})
     with lock:
         ids = [W().add_donation(vision.normalize(f, base=vision.NEUTRAL), biz)["id"] for f in foods]
     return jsonify(ok=True, ids=ids)
