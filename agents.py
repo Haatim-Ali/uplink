@@ -409,7 +409,9 @@ def negotiate(world, d, plans, council=None):
         mesh = getattr(world, "mesh", None)
         council = mesh.council(world, d, plans) if mesh else LocalCouncil(world, d, plans)
     plans_by_id = {p["id"]: p for p in plans}
-    mode = "llm" if use_llm() else "rules"
+    # Claude speaks only in the live demo; the Evidence runs (hundreds of headless worlds) use the rules,
+    # so they're fast, free and give the same numbers every time
+    mode = "llm" if use_llm() and getattr(world, "live", True) else "rules"
     parallel = council.remote or mode == "llm"
     # step 0: each agent shares its own evaluation of every plan (scores and vetoes) with the others
     ev = _each(council.evaluate, parallel)
