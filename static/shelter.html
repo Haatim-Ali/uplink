@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Uplink · Shelter phone</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap">
 <link rel="stylesheet" href="/static/uplink.css">
 <style>
 .demo-pick{margin-top:var(--s5);padding:var(--s3) 0;border-top:1px dashed var(--line-2);color:var(--muted);font-size:var(--t-sm)}
@@ -15,7 +15,7 @@
 .who-h{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center;margin-top:var(--s3)}
 .who-h h1{font-size:var(--t-xl);line-height:1.2;letter-spacing:-.01em}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2);margin-top:var(--s3)}
-.stat{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r2);padding:var(--s2) var(--s3)}
+.stat{background:var(--panel);border-radius:var(--r2);box-shadow:var(--shadow);padding:var(--s3)}
 .stat b{display:block;font-size:var(--t-lg);font-variant-numeric:tabular-nums}
 .stat span{font-size:var(--t-xs);color:var(--muted);font-weight:600}
 .cap{height:.5rem;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-top:var(--s2)}
@@ -23,28 +23,29 @@
 .sec{margin-top:var(--s4)}
 .sec h2{margin-bottom:var(--s2)}
 body.locked{overflow:hidden}
-.takeover{position:fixed;inset:0;z-index:100;background:rgba(22,25,27,.72);display:flex;align-items:flex-end;justify-content:center;padding:0}
+.takeover{position:fixed;inset:0;z-index:100;background:rgba(21,21,23,.6);backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;padding:0}
 @media (min-width:600px){.takeover{align-items:center;padding:1.5rem}}
-.takeover .ask{width:100%;max-width:34rem;max-height:100vh;overflow:auto;padding:0;border:none;border-radius:var(--r3) var(--r3) 0 0;animation:slideUp .35s cubic-bezier(.2,.8,.2,1)}
-@media (min-width:600px){.takeover .ask{border-radius:var(--r3)}}
+.takeover .ask{width:100%;max-width:34rem;max-height:100vh;overflow:auto;padding:0;border:none;border-radius:28px 28px 0 0;animation:slideUp .35s cubic-bezier(.2,.8,.2,1)}
+@media (min-width:600px){.takeover .ask{border-radius:28px}}
 @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
-.to-band{display:flex;justify-content:space-between;align-items:center;gap:1rem;background:var(--amber);color:#2b1d00;font-weight:700;padding:.8rem 1.25rem}
+.to-band{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:1.1rem 1.4rem 0;font-weight:700;color:var(--ink)}
+#cd-text{background:var(--brand-soft);color:var(--brand-ink);border-radius:99px;padding:.3rem .8rem;font-size:.9rem}
 .to-q{font-weight:600;opacity:.8;margin-left:.4rem}
-.to-body{padding:1.25rem 1.25rem 1.5rem}
-.to-body h2{font-size:2.1rem;line-height:1.1;font-stretch:112%;letter-spacing:-.02em}
+.to-body{padding:.8rem 1.4rem 1.6rem}
+.to-body h2{font-size:2.2rem;line-height:1.08;font-weight:800;letter-spacing:-.025em}
 .to-from{margin-top:.5rem;font-size:1.05rem;color:var(--ink-2)}
-.btn.accept{position:relative;overflow:hidden;width:100%;min-height:4.5rem;margin-top:1.25rem;font-size:1.35rem;font-weight:700;background:var(--brand);border-color:var(--brand);color:#fff;border-radius:var(--r3)}
-.btn.accept:hover{background:var(--brand-ink)}
+.btn.accept{position:relative;overflow:hidden;width:100%;min-height:4.25rem;margin-top:1.4rem;font-size:1.25rem;font-weight:700;background:var(--brand);border-color:var(--brand);color:#fff;border-radius:20px}
+.btn.accept:hover{background:#d94c17}
 .btn.accept span{position:relative;z-index:1}
-.btn.accept i{position:absolute;left:0;bottom:0;height:5px;background:#9be2b3;transition:width 1s linear}
+.btn.accept i{position:absolute;left:0;bottom:0;height:4px;background:rgba(255,255,255,.75);transition:width 1s linear}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.6rem}
-.row2 .btn{min-height:3.25rem;font-size:1.05rem}
-.btn.decline{color:var(--bad);border-color:#e3b2ac}
-.adjust{margin-top:.9rem;padding:1rem;border:1px solid var(--line);border-radius:var(--r2);background:var(--panel-2)}
+.row2 .btn{min-height:3.25rem;font-size:1.05rem;border-radius:16px;background:var(--panel-2);border-color:transparent}
+.btn.decline{color:var(--bad)}
+.adjust{margin-top:.9rem;padding:1rem;border-radius:18px;background:var(--panel-2)}
 .adjust label{margin-top:0}
 .stepper{display:grid;grid-template-columns:3.25rem 1fr 3.25rem;gap:.5rem;margin:.5rem 0 .75rem}
-.stepper .btn{min-height:3.25rem;font-size:1.5rem}
-.stepper input{text-align:center;font-size:1.4rem;font-weight:700;min-height:3.25rem}
+.stepper .btn{min-height:3.25rem;width:3.25rem;padding:0;font-size:1.5rem;border-radius:50%;background:#fff;border:none;box-shadow:var(--shadow)}
+.stepper input{text-align:center;font-size:1.5rem;font-weight:800;min-height:3.25rem;border:none;background:transparent}
 .ask{margin-bottom:var(--s3)}
 .tags{display:flex;flex-wrap:wrap;gap:var(--s1);margin-top:var(--s2)}
 .list>div{padding:var(--s3) 0;border-bottom:1px solid var(--line);font-size:var(--t-md)}
@@ -59,7 +60,7 @@ body.locked{overflow:hidden}
 .vbar .hint{margin:0}
 @media (prefers-reduced-motion:no-preference){.ask .mic.rec{animation:micpulse .8s ease-in-out infinite alternate}}
 @keyframes micpulse{from{opacity:1}to{opacity:.7}}
-.ask .mic{width:100%;margin-top:.9rem;min-height:3rem}
+.ask .mic{width:100%;margin-top:.9rem;min-height:3rem;border-radius:16px}
 .ask .mic.rec{background:var(--bad);color:#fff;border-color:var(--bad)}
 .heard{font-size:.9rem;margin-top:.4rem;color:var(--muted,#64748b);min-height:1em}
 </style>
@@ -141,8 +142,8 @@ async function poll(){
       <div class="card ask">
         <div class="to-band"><span>New pickup request${s.asks.length > 1 ? ` <span class="to-q">1 of ${s.asks.length}</span>` : ""}</span><span id="cd-text" class="num"></span></div>
         <div class="to-body">
-          <h2 id="to-food"><span class="num">${a.food.servings}</span> ${esc(a.food.items.join(", "))}</h2>
-          <p class="to-from">From ${esc(a.business)}. ${esc(firstName(a.driver))} brings it at <b>${esc(hm12(a.arrive))}</b>.</p>
+          <h2 id="to-food">${esc(cap(a.food.items.join(", ")))}</h2>
+          <p class="to-from"><b>${a.food.servings} servings</b> from ${esc(a.business)}. ${esc(firstName(a.driver))} brings it at <b>${esc(hm12(a.arrive))}</b>.</p>
           <div class="tags">${a.food.needs_cold?'<span class="pill info">Must stay cold</span>':""}${a.food.allergens.length?`<span class="pill warn">Contains ${esc(a.food.allergens.join(", "))}</span>`:'<span class="pill ok">No listed allergens</span>'}<span class="pill outline">${esc(cap(a.food.category))}</span></div>
           <button class="btn accept" type="button" onclick="respond('${a.donation}', true)"><span>Accept ${a.food.servings} servings</span><i id="cd-bar" aria-hidden="true"></i></button>
           <div class="row2">

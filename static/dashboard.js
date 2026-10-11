@@ -158,7 +158,7 @@ function drawMap(){
     const dr = S.drivers.find(x=>x.id===d.plan.driver); if(!dr) return;
     const to = [d.dest.lat,d.dest.lng], me = [dr.lat,dr.lng], from = [d.origin.lat,d.origin.lng];
     const pts = d.picked ? [me,to] : [me,from,to];
-    L.polyline(pts,{color:"#127a3f",weight:5,opacity:.85,lineCap:"round"}).addTo(layers.route);
+    L.polyline(pts,{color:"#f05a22",weight:5,opacity:.85,lineCap:"round"}).addTo(layers.route);
     const a = pts[pts.length-2], t = 0.82, at = [a[0]+(to[0]-a[0])*t, a[1]+(to[1]-a[1])*t];
     L.marker(at,{interactive:false,icon:L.divIcon({className:"",iconSize:[16,16],iconAnchor:[8,8],html:`<div class="arrow" style="transform:rotate(${bearing(a,to).toFixed(0)}deg)"></div>`})}).addTo(layers.route);
     focus.push(me, from, to);
